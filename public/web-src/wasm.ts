@@ -72,22 +72,7 @@ export class WasmInterface {
     projectStars(stars: Star[], location: Coord, timestamp: number): CanvasPoint[] {
         const star_ptr = this.allocArray(stars, sizedStar);
         const location_ptr = this.allocObject(location, sizedCoord);
-        const result_count_ptr = this.allocPrimative(0, u32);
-        const result_ptr: pointer = (this.instance.exports.projectStarsWasm as any)(
-            star_ptr,
-            stars.length,
-            location_ptr,
-            BigInt(timestamp),
-            result_count_ptr
-        );
-
-        const result_count = this.readPrimative(result_count_ptr, u32);
-        this.freeBytes(result_count_ptr, sizeOfPrimative(u32));
-
-        const result: CanvasPoint[] = this.readArray(result_ptr, result_count, sizedCanvasPoint);
-        this.freeBytes(result_ptr, sizeOf(sizedCanvasPoint) * result_count);
-
-        return result;
+        (this.instance.exports.projectStarsWasm as any)(star_ptr, stars.length, location_ptr, BigInt(timestamp));
     }
 
     /**

@@ -8,6 +8,8 @@ const CanvasPoint = star_math.CanvasPoint;
 const ext_pointer = usize;
 const allocator = std.heap.page_allocator;
 
+pub extern fn drawPointWasm(x: f32, y: f32, brightness: f32) void;
+
 // pub extern fn consoleLog(message: [*]const u8, message_len: u32) void;
 
 // fn log(comptime message: []const u8, args: anytype) void {
@@ -16,17 +18,18 @@ const allocator = std.heap.page_allocator;
 //     consoleLog(fmt_msg.ptr, @intCast(u32, fmt_msg.len));
 // }
 
-pub export fn projectStarsWasm(stars: [*]const Star, num_stars: u32, observer_location: *const Coord, observer_timestamp: i64, result_count_ptr: *u32) ext_pointer {
+pub export fn projectStarsWasm(stars: [*]const Star, num_stars: u32, observer_location: *const Coord, observer_timestamp: i64) void {
     const bounded_stars = stars[0..num_stars];
     defer allocator.free(bounded_stars);
     defer allocator.destroy(observer_location);
 
-    const points = star_math.projectStars(allocator, bounded_stars, observer_location.*, observer_timestamp) catch |err| {
-        result_count_ptr.* = 0;
-        return 0;
-    };
-    result_count_ptr.* = @intCast(u32, points.len);
-    return @ptrToInt(points.ptr);
+    const projected_points = star_math.projectStars(allocator, bounded_stars, observer_location.*, observer_timestamp);
+
+    if (projected_points) |points| {
+        for (points) |point| {
+            drawPointWasm(point.x, point.y, point.brightness);
+        }
+    } else |_| {}
 }
 
 pub export fn findWaypointsWasm(f: *const Coord, t: *const Coord, num_waypoints: u32) ext_pointer {

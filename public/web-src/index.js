@@ -5,7 +5,10 @@ const backgroundRadius = 0.45 * Math.min(canvasWidth, canvasHeight);
 const [centerX, centerY] = [canvasWidth / 2, canvasHeight / 2];
 let dateInput;
 let brightnessInput;
+let star_brightness = 0;
 let travelButton;
+let starCanvas;
+let starCanvasCtx;
 let currentLatitude = 0;
 let currentLongitude = 0;
 let stars;
@@ -42,21 +45,21 @@ const renderStars = (stars, coord, date) => {
         };
     });
     const timestamp = date.valueOf();
-    const canvas = document.getElementById('star-canvas');
-    const ctx = canvas.getContext('2d');
     const brightness = parseFloat(brightnessInput.value);
-    if (ctx == null) {
+    if (starCanvasCtx == null) {
         console.error('Could not get canvas context!');
         return;
     }
-    ctx.canvas.width = canvasWidth;
-    ctx.canvas.height = canvasHeight;
-    const points = wasm_interface.projectStars(stars_simple, coord, timestamp);
-    for (const point of points) {
-        const x = centerX + backgroundRadius * point.x;
-        const y = centerY - backgroundRadius * point.y;
-        ctx.fillStyle = `rgba(255, 246, 176, ${point.brightness + brightness})`;
-        ctx.fillRect(x, y, 2, 2);
+    starCanvasCtx.canvas.width = canvasWidth;
+    starCanvasCtx.canvas.height = canvasHeight;
+    wasm_interface.projectStars(stars_simple, coord, timestamp);
+};
+const drawPointWasm = (x, y, brightness) => {
+    const pointX = centerX + backgroundRadius * x;
+    const pointY = centerY - backgroundRadius * y;
+    if (starCanvasCtx != null) {
+        starCanvasCtx.fillStyle = `rgba(255, 246, 176, ${brightness + star_brightness})`;
+        starCanvasCtx.fillRect(pointX, pointY, 2, 2);
     }
 };
 const drawUIElements = () => {
@@ -120,7 +123,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Get handles for all the input elements
     dateInput = document.getElementById('dateInput');
     brightnessInput = document.getElementById('brightnessInput');
+    star_brightness = parseInt(brightnessInput.value);
     travelButton = document.getElementById('timelapse');
+    starCanvas = document.getElementById('star-canvas');
+    starCanvasCtx = starCanvas.getContext('2d');
     const latInput = document.getElementById('latInput');
     const longInput = document.getElementById('longInput');
     const locationUpdateButton = document.getElementById('locationUpdate');
@@ -202,6 +208,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const wasm_result = await WebAssembly.instantiateStreaming(fetch('./one-lib/zig-cache/lib/one-math.wasm'), {
         env: {
             consoleLog: wasm_log,
+            drawPointWasm,
         },
     });
     wasm_instance = wasm_result.instance;
@@ -221,7 +228,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // to the location dragged to, and then translates that back to lat & long before re-rendering.
     const canvas = document.getElementById('star-canvas');
     let is_dragging = false;
-    let travelling_north = true;
     let [drag_start_x, drag_start_y] = [0, 0];
     canvas.addEventListener('mousedown', event => {
         drag_start_x = event.offsetX;
