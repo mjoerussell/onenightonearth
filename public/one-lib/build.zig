@@ -1,10 +1,10 @@
 const std = @import("std");
-const CrossTarget = std.zig.CrossTarget;
 const Builder = std.build.Builder;
+const Target = std.build.Target;
 
 pub fn build(b: *Builder) !void {
     const mode = b.standardReleaseOptions();
-    const target = try CrossTarget.parse(.{ .arch_os_abi = "wasm32-freestanding" });
+    const target = try Target.parse(.{ .arch_os_abi = "wasm32-freestanding" });
     const lib = b.addStaticLibrary("one-math", "src/main.zig");
     lib.setBuildMode(mode);
     lib.setTarget(target);
