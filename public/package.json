@@ -1,0 +1,17 @@
+{
+  "name": "onenightonearth",
+  "version": "1.0.0",
+  "description": "A Star Map App",
+  "main": "index.ts",
+  "scripts": {
+    "start": "tsc --watch",
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "mjoerussell",
+  "license": "ISC",
+  "devDependencies": {
+    "prettier": "^2.0.5",
+    "typescript": "^4.0.2"
+  }
+}

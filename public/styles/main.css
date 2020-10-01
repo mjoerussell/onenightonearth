@@ -1,0 +1,66 @@
+body {
+    background: linear-gradient(#01020f, #102d6b);
+    font-family: 'Martel', serif;
+    margin: 0;
+    height: 100vh;
+}
+
+h1 {
+    margin: 0 auto;
+    font-weight: 600;
+    font-size: 36px;
+}
+
+.page-container {
+    width: 700px;
+    height: 100%;
+    padding: 0 5%;
+    margin-left: 50%;
+    transform: translateX(-50%);
+    background-color: beige;
+    /* box-shadow: 4px 0 8px rgba(175, 175, 180, 0.6); */
+}
+
+#settings {
+    padding: 2% 0;
+}
+
+#settings > div {
+    height: auto;
+}
+
+#settings label {
+    min-width: 200px;
+}
+
+.canvas-container {
+    display: inline-block;
+    position: relative;
+    width: 700px;
+    min-height: 700px;
+}
+
+.canvas-container canvas {
+    cursor: grab;
+    display: inline;
+    position: absolute;
+    /* transform: translateX(-50%); */
+    /* display: none; */
+}
+
+.canvas-container canvas.moving {
+    cursor: grabbing;
+}
+
+.canvas-container canvas#backdrop-canvas {
+    z-index: 0;
+}
+.canvas-container canvas#star-canvas {
+    z-index: 1;
+}
+.canvas-container canvas#star-debug-canvas {
+    z-index: 2;
+}
+.canvas-container canvas#grid-canvas {
+    z-index: 3;
+}

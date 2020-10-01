@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script type="module" src="./web-src/index.js"></script>
+        <meta charset="UTF-8" />
+        <title>One Night on Earth</title>
+        <link href="https://fonts.googleapis.com/css2?family=Martel&display=swap" rel="stylesheet" />
+        <link rel="stylesheet" href="./styles/main.css" />
+    </head>
+    <body>
+        <div class="page-container">
+            <h1>One night, on Earth...</h1>
+            <div id="settings">
+                <div id="main-settings">
+                    <label>
+                        Date
+                        <input id="dateInput" type="date" value="2020-08-24" />
+                    </label>
+                    <label>
+                        Latitude
+                        <input id="latInput" type="text" value="41.949869" min="-90.0" max="90.0" />
+                    </label>
+                    <label>
+                        Longitude
+                        <input id="longInput" type="text" value="-87.647642" min="-180.0" max="180.0" />
+                    </label>
+                    <div id="actions">
+                        <button id="locationUpdate">Update Location</button>
+                        <button id="timelapse">Travel</button>
+                    </div>
+                </div>
+                <div id="star-settings">
+                    <label>
+                        Brightness
+                        <input id="brightnessInput" type="range" value="0" min="0" max="1" step="0.05" />
+                    </label>
+                </div>
+            </div>
+            <div class="canvas-container">
+                <canvas id="backdrop-canvas" width="800" height="800"></canvas>
+                <canvas id="star-canvas" width="800" height="800"></canvas>
+                <!-- <canvas id="star-debug-canvas"></canvas> -->
+                <!-- <canvas id="grid-canvas" width="800" height="800"></canvas> -->
+            </div>
+        </div>
+    </body>
+</html>

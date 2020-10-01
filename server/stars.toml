@@ -1,0 +1,12 @@
+[stars]
+
+[stars.alpheratz]
+hr = 15
+name = "alpheratz"
+ra = "0h8m23.3s"
+dec = "+290526"
+mag = 2.06
+
+# Starting with only including stars with proper names
+[constellations]
+andromeda = []
