@@ -13,18 +13,24 @@
             <h1>One night, on Earth...</h1>
             <div id="settings">
                 <div id="main-settings">
-                    <label>
-                        Date
-                        <input id="dateInput" type="date" value="2020-08-24" />
-                    </label>
-                    <label>
-                        Latitude
-                        <input id="latInput" type="text" value="41.949869" min="-90.0" max="90.0" />
-                    </label>
-                    <label>
-                        Longitude
-                        <input id="longInput" type="text" value="-87.647642" min="-180.0" max="180.0" />
-                    </label>
+                    <div class="input-fields">
+                        <div class="input-row">
+                            <label>
+                                Date
+                                <input id="dateInput" type="date" value="2020-08-24" />
+                            </label>
+                        </div>
+                        <div class="input-row">
+                            <label>
+                                Latitude
+                                <input id="latInput" type="text" value="41.949869" min="-90.0" max="90.0" />
+                            </label>
+                            <label>
+                                Longitude
+                                <input id="longInput" type="text" value="-87.647642" min="-180.0" max="180.0" />
+                            </label>
+                        </div>
+                    </div>
                     <div id="actions">
                         <button id="locationUpdate">Update Location</button>
                         <button id="timelapse">Travel</button>

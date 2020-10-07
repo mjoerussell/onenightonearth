@@ -33,6 +33,29 @@ h1 {
     min-width: 200px;
 }
 
+#main-settings {
+    display: flex;
+    flex-direction: row;
+}
+
+.input-fields {
+    width: 70%;
+    padding: 10px;
+}
+
+.input-fields .input-row {
+    width: 100%;
+}
+
+#actions {
+    width: 20%;
+    padding: 5px;
+}
+
+.actions button {
+    width: 100%;
+}
+
 .canvas-container {
     display: inline-block;
     position: relative;
