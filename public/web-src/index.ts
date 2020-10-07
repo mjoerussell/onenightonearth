@@ -7,21 +7,23 @@ interface StarEntry {
     name: string;
 }
 
-const canvasWidth = 700;
-const canvasHeight = 700;
+const canvas_width = 700;
+const canvas_height = 700;
 
-const backgroundRadius = 0.45 * Math.min(canvasWidth, canvasHeight);
-const [centerX, centerY] = [canvasWidth / 2, canvasHeight / 2];
+const background_radius = 0.45 * Math.min(canvas_width, canvas_height);
+const [center_x, center_y] = [canvas_width / 2, canvas_height / 2];
 
-let dateInput: HTMLInputElement;
-let brightnessInput: HTMLInputElement;
+let date_input: HTMLInputElement;
+let brightness_input: HTMLInputElement;
 let star_brightness = 0;
-let travelButton: HTMLButtonElement;
-let starCanvas: HTMLCanvasElement;
-let starCanvasCtx: CanvasRenderingContext2D | null;
+let travel_button: HTMLButtonElement;
 
-let currentLatitude: number = 0;
-let currentLongitude: number = 0;
+let star_canvas: HTMLCanvasElement;
+let star_canvas_ctx: CanvasRenderingContext2D | null;
+
+let current_latitude: number = 0;
+let current_longitude: number = 0;
+let draw_north_up = true;
 
 let stars: StarEntry[];
 
@@ -48,8 +50,8 @@ const degToRadLong = (degrees: number): number => {
 
 const renderStars = (stars: StarEntry[], coord: Coord, date?: Date) => {
     if (!date) {
-        if (dateInput.valueAsDate) {
-            date = dateInput.valueAsDate;
+        if (date_input.valueAsDate) {
+            date = date_input.valueAsDate;
         } else {
             return;
         }
@@ -65,26 +67,27 @@ const renderStars = (stars: StarEntry[], coord: Coord, date?: Date) => {
 
     const timestamp = date.valueOf();
 
-    const brightness = parseFloat(brightnessInput.value);
+    // const brightness = parseFloat(brightnessInput.value);
 
-    if (starCanvasCtx == null) {
+    if (star_canvas_ctx == null) {
         console.error('Could not get canvas context!');
         return;
     }
 
-    starCanvasCtx.canvas.width = canvasWidth;
-    starCanvasCtx.canvas.height = canvasHeight;
+    star_canvas_ctx.canvas.width = canvas_width;
+    star_canvas_ctx.canvas.height = canvas_height;
 
     wasm_interface.projectStars(stars_simple, coord, timestamp);
 };
 
 const drawPointWasm = (x: number, y: number, brightness: number) => {
-    const pointX = centerX + backgroundRadius * x;
-    const pointY = centerY - backgroundRadius * y;
+    const direction_modifier = draw_north_up ? 1 : -1;
+    const pointX = center_x + direction_modifier * background_radius * x;
+    const pointY = center_y - direction_modifier * background_radius * y;
 
-    if (starCanvasCtx != null) {
-        starCanvasCtx.fillStyle = `rgba(255, 246, 176, ${brightness + star_brightness})`;
-        starCanvasCtx.fillRect(pointX, pointY, 2, 2);
+    if (star_canvas_ctx != null) {
+        star_canvas_ctx.fillStyle = `rgba(255, 246, 176, ${brightness + star_brightness})`;
+        star_canvas_ctx.fillRect(pointX, pointY, 2, 2);
     }
 };
 
@@ -96,59 +99,25 @@ const drawUIElements = () => {
     const gridCtx = gridCanvas?.getContext('2d');
 
     if (bgCtx) {
-        bgCtx.canvas.width = canvasWidth;
-        bgCtx.canvas.height = canvasHeight;
+        bgCtx.canvas.width = canvas_width;
+        bgCtx.canvas.height = canvas_height;
 
         bgCtx.fillStyle = '#07102b';
 
         // Draw background
-        bgCtx.arc(centerX, centerY, backgroundRadius, 0, Math.PI * 2);
+        bgCtx.arc(center_x, center_y, background_radius, 0, Math.PI * 2);
         bgCtx.fill();
     }
 
     if (gridCtx) {
-        gridCtx.canvas.width = canvasWidth;
-        gridCtx.canvas.height = canvasHeight;
+        gridCtx.canvas.width = canvas_width;
+        gridCtx.canvas.height = canvas_height;
 
         gridCtx.fillStyle = '#6a818a55';
         gridCtx.strokeStyle = '#6a818a';
-        gridCtx.arc(centerX, centerY, backgroundRadius, 0, Math.PI * 2);
+        gridCtx.arc(center_x, center_y, background_radius, 0, Math.PI * 2);
         gridCtx.lineWidth = 3;
         gridCtx.stroke();
-
-        // Draw altitude markers
-        // const markerAltitudes = [0.39269908169872414, 0.7853981633974483, 1.1780972450961724];
-        // const aziStep = (2 * Math.PI) / 2500;
-        // for (const alt of markerAltitudes) {
-        //     let azi = 0;
-        //     while (azi <= 2 * Math.PI) {
-        //         const point = wasm_interface.projectCoord(alt, azi);
-
-        //         const pointX = centerX + backgroundRadius * point.x;
-        //         const pointY = centerY - backgroundRadius * point.y;
-
-        //         gridCtx.fillRect(pointX, pointY, 1, 1);
-
-        //         azi += aziStep;
-        //     }
-        // }
-
-        // // Draw azimuth markers
-        // const markerAzis = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(i => i * ((2 * Math.PI) / 12));
-        // const altStep = Math.PI / 2 / 500;
-        // for (const azi of markerAzis) {
-        //     let alt = 0;
-        //     while (alt <= Math.PI / 2) {
-        //         const point = wasm_interface.projectCoord(alt, azi);
-
-        //         const pointX = centerX + backgroundRadius * point.x;
-        //         const pointY = centerY - backgroundRadius * point.y;
-
-        //         gridCtx.fillRect(pointX, pointY, 1, 1);
-
-        //         alt += altStep;
-        //     }
-        // }
     }
 };
 
@@ -165,36 +134,36 @@ const wasm_log = (msg_ptr: number, msg_len: number) => {
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Get handles for all the input elements
-    dateInput = document.getElementById('dateInput') as HTMLInputElement;
+    date_input = document.getElementById('dateInput') as HTMLInputElement;
 
-    brightnessInput = document.getElementById('brightnessInput') as HTMLInputElement;
-    star_brightness = parseInt(brightnessInput.value);
+    brightness_input = document.getElementById('brightnessInput') as HTMLInputElement;
+    star_brightness = parseInt(brightness_input.value);
 
-    travelButton = document.getElementById('timelapse') as HTMLButtonElement;
-    starCanvas = document.getElementById('star-canvas') as HTMLCanvasElement;
+    travel_button = document.getElementById('timelapse') as HTMLButtonElement;
+    star_canvas = document.getElementById('star-canvas') as HTMLCanvasElement;
 
-    starCanvasCtx = starCanvas.getContext('2d')!;
+    star_canvas_ctx = star_canvas.getContext('2d')!;
 
     const latInput = document.getElementById('latInput') as HTMLInputElement;
     const longInput = document.getElementById('longInput') as HTMLInputElement;
     const locationUpdateButton = document.getElementById('locationUpdate') as HTMLButtonElement;
 
     // Re-render stars when changing the date or brightness
-    dateInput.addEventListener('change', () => renderStars(stars, { latitude: currentLatitude, longitude: currentLongitude }));
-    brightnessInput.addEventListener('change', () => renderStars(stars, { latitude: currentLatitude, longitude: currentLongitude }));
+    date_input.addEventListener('change', () => renderStars(stars, { latitude: current_latitude, longitude: current_longitude }));
+    brightness_input.addEventListener('change', () => renderStars(stars, { latitude: current_latitude, longitude: current_longitude }));
 
     // Handle updating the viewing location
     locationUpdateButton.addEventListener('click', () => {
         const newLatitude = parseFloat(latInput.value);
         const newLongitude = parseFloat(longInput.value);
 
-        if (newLatitude === currentLatitude && newLongitude === currentLongitude) {
+        if (newLatitude === current_latitude && newLongitude === current_longitude) {
             return;
         }
 
         const start: Coord = {
-            latitude: degToRad(currentLatitude),
-            longitude: degToRadLong(currentLongitude),
+            latitude: degToRad(current_latitude),
+            longitude: degToRadLong(current_longitude),
         };
 
         const end: Coord = {
@@ -218,22 +187,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                 waypointIndex += 1;
 
                 if (waypointIndex === waypoints.length) {
-                    currentLatitude = newLatitude;
-                    currentLongitude = newLongitude;
+                    current_latitude = newLatitude;
+                    current_longitude = newLongitude;
 
-                    latInput.value = currentLatitude.toString();
-                    longInput.value = currentLongitude.toString();
+                    latInput.value = current_latitude.toString();
+                    longInput.value = current_longitude.toString();
                     clearInterval(travelInterval);
                 }
             }, 25);
         } else {
-            currentLatitude = newLatitude;
-            currentLongitude = newLongitude;
+            current_latitude = newLatitude;
+            current_longitude = newLongitude;
 
-            latInput.value = currentLatitude.toString();
-            longInput.value = currentLongitude.toString();
+            latInput.value = current_latitude.toString();
+            longInput.value = current_longitude.toString();
 
-            renderStars(stars, { latitude: currentLatitude, longitude: currentLongitude });
+            renderStars(stars, { latitude: current_latitude, longitude: current_longitude });
         }
     });
 
@@ -241,18 +210,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     let travelIsOn = false;
     let travelInterval: number;
     const frameTarget = 60;
-    travelButton.addEventListener('click', async () => {
+    travel_button.addEventListener('click', async () => {
         if (travelIsOn && travelInterval != null) {
             clearInterval(travelInterval);
         } else {
-            let date = dateInput.valueAsDate ?? new Date();
+            let date = date_input.valueAsDate ?? new Date();
             travelInterval = setInterval(() => {
                 const currentDate = new Date(date);
                 if (currentDate) {
                     const nextDate = new Date(currentDate);
                     nextDate.setTime(nextDate.getTime() + getDaysInMillis(getDaysPerFrame(12, frameTarget)));
-                    dateInput.valueAsDate = new Date(nextDate);
-                    renderStars(stars, { latitude: currentLatitude, longitude: currentLongitude }, nextDate);
+                    date_input.valueAsDate = new Date(nextDate);
+                    renderStars(stars, { latitude: current_latitude, longitude: current_longitude }, nextDate);
                     date = nextDate;
                 }
             }, 1000 / frameTarget);
@@ -264,38 +233,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     stars = await star_response.json();
 
     // Fetch and instantiate the WASM module
-    const wasm_result = await WebAssembly.instantiateStreaming(fetch('./one-lib/zig-cache/lib/one-math.wasm'), {
+    WebAssembly.instantiateStreaming(fetch('./one-lib/zig-cache/lib/one-math.wasm'), {
         env: {
             consoleLog: wasm_log,
             drawPointWasm,
         },
+    }).then(wasm_result => {
+        wasm_instance = wasm_result.instance;
+        wasm_interface = new WasmInterface(wasm_instance);
+
+        current_latitude = parseFloat(latInput.value);
+        current_longitude = parseFloat(longInput.value);
+
+        // Do the initial render
+        drawUIElements();
+        renderStars(stars, { latitude: current_latitude, longitude: current_longitude });
     });
 
-    wasm_instance = wasm_result.instance;
-    wasm_interface = new WasmInterface(wasm_instance);
-
-    currentLatitude = parseFloat(latInput.value);
-    currentLongitude = parseFloat(longInput.value);
-
-    // Do the initial render
-    drawUIElements();
-    renderStars(stars, { latitude: currentLatitude, longitude: currentLongitude });
-
-    // @note This is just a test of the drag-and-travel feature
-    // One thing about this version is that you're not really dragging the sky, you're dragging the world
-    // underneath you. This isn't super disorienting and often feels almost right, but it still leads
-    // to some unexpected results. The worst part imo is that the apparent drag direction changes based
-    // on what part of the world you're in.
-    //
-    // Future versions of this should switch to a system where it gets the point in the sky corresponding
-    // to the location dragged to, and then translates that back to lat & long before re-rendering.
     const canvas = document.getElementById('star-canvas') as HTMLCanvasElement;
     let is_dragging = false;
     let [drag_start_x, drag_start_y] = [0, 0];
 
     canvas.addEventListener('mousedown', event => {
-        drag_start_x = event.offsetX;
-        drag_start_y = event.offsetY;
+        drag_start_x = (event.offsetX - center_x) / canvas.width;
+        drag_start_y = (event.offsetY - center_y) / canvas.height;
 
         canvas.classList.add('moving');
 
@@ -304,27 +265,43 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     canvas.addEventListener('mousemove', event => {
         if (is_dragging) {
-            const drag_end_x = event.offsetX;
-            const drag_end_y = event.offsetY;
+            const drag_end_x = (event.offsetX - center_x) / canvas.width;
+            const drag_end_y = (event.offsetY - center_y) / canvas.height;
 
-            const dist_x = (drag_end_x - drag_start_x) * 0.4;
-            const dist_y = (drag_end_y - drag_start_y) * 0.4;
+            const new_coord = wasm_interface.dragAndMove(drag_start_x, drag_start_y, drag_end_x, drag_end_y);
 
-            currentLatitude += dist_y;
-            currentLongitude -= dist_x;
-            if (currentLongitude > 180.0) {
-                currentLongitude -= 360.0;
-            } else if (currentLongitude < -180.0) {
-                currentLongitude += 360.0;
+            const directed_add = (current_value: number, new_value: number): number => {
+                if (draw_north_up) {
+                    return current_value + new_value;
+                }
+                return current_value - new_value;
+            };
+
+            const crossed_pole =
+                (current_latitude < 90.0 && directed_add(current_latitude, new_coord.latitude) > 90.0) ||
+                (current_latitude > -90.0 && directed_add(current_latitude, new_coord.latitude) < -90.0);
+
+            if (crossed_pole) {
+                current_longitude += 180.0;
+                draw_north_up = !draw_north_up;
             }
 
-            latInput.value = currentLatitude.toString();
-            longInput.value = currentLongitude.toString();
+            current_latitude = directed_add(current_latitude, new_coord.latitude);
+            current_longitude = directed_add(current_longitude, -new_coord.longitude);
+
+            if (current_longitude > 180.0) {
+                current_longitude -= 360.0;
+            } else if (current_longitude < -180.0) {
+                current_longitude += 360.0;
+            }
+
+            latInput.value = current_latitude.toString();
+            longInput.value = current_longitude.toString();
 
             drag_start_x = drag_end_x;
             drag_start_y = drag_end_y;
 
-            renderStars(stars, { latitude: currentLatitude, longitude: currentLongitude });
+            renderStars(stars, { latitude: current_latitude, longitude: current_longitude });
         }
     });
 

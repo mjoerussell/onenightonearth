@@ -60,6 +60,12 @@ export class WasmInterface {
         this.freeBytes(res_ptr, sizeOf(sizedCoord) * num_waypoints);
         return result;
     }
+    dragAndMove(drag_start_x, drag_start_y, drag_end_x, drag_end_y) {
+        const res_ptr = this.instance.exports.dragAndMoveWasm(drag_start_x, drag_start_y, drag_end_x, drag_end_y);
+        const result = this.readObject(res_ptr, sizedCoord);
+        this.freeBytes(res_ptr, sizeOf(sizedCanvasPoint));
+        return result;
+    }
     /**
      * Given the altitude and azimuth of a star, compute it's location on the unit circle using the custom
      * projection method.

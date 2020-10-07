@@ -115,6 +115,50 @@ pub fn findWaypoints(allocator: *Allocator, f: Coord, t: Coord, num_waypoints: u
     return waypoints;
 }
 
+pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_end_y: f32) Coord {
+    const dist_x = drag_end_x - drag_start_x;
+    const dist_y = drag_end_y - drag_start_y;
+
+    // Angle between the starting point and the end point
+    // Usually atan2 is used with the parameters in the reverse order (atan2(y, x)).
+    // The order here (x, y) is intentional, since otherwise horizontal drags would result in vertical movement
+    // and vice versa
+    const dist_phi = math.atan2(f32, dist_x, dist_y);
+
+    // cast comptime_float to f32
+    const zero: f32 = 0.0;
+    // drag_distance is the angular distance between the starting location and the result location after a single drag
+    // 2.3 is a magic number of degrees, picked because it results in what feels like an appropriate drag speed
+    // Higher = move more with smaller cursor movements, and vice versa
+    const drag_distance = degToRad(f32, 2.3);
+
+    // Calculate asin(new_latitude), and clamp the result between [-1, 1]
+    var sin_lat_x = math.sin(zero) * math.cos(drag_distance) + math.cos(zero) * math.sin(drag_distance) * math.cos(dist_phi);
+    if (sin_lat_x > 1.0) {
+        sin_lat_x = 1.0;
+    } else if (sin_lat_x < -1.0) {
+        sin_lat_x = -1.0;
+    }
+
+    const new_latitude = math.asin(sin_lat_x);
+
+    // Calculate acos(new_relative_longitude) and clamp the result between [-1, 1]
+    var cos_long_x = (math.cos(drag_distance) - math.sin(zero) * math.sin(new_latitude)) / (math.cos(zero) * math.cos(new_latitude));
+    if (cos_long_x > 1.0) {
+        cos_long_x = 1.0;
+    } else if (cos_long_x < -1.0) {
+        cos_long_x = -1.0;
+    }
+
+    var new_relative_longitude = radToDegLong(math.acos(cos_long_x));
+    new_relative_longitude = if (dist_phi < 0.0) -new_relative_longitude else new_relative_longitude;
+
+    return .{
+        .latitude = radToDeg(new_latitude),
+        .longitude = new_relative_longitude,
+    };
+}
+
 fn getLocalSideralTime(current_timestamp: f64, longitude: f64) f64 {
     // The number of milliseconds between January 1st, 1970 and the J2000 epoch
     const j2000_offset_millis: f64 = 949_428_000_000.0;

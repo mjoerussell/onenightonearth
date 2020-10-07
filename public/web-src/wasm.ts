@@ -69,7 +69,7 @@ type pointer = number;
 export class WasmInterface {
     constructor(private instance: WebAssembly.Instance) {}
 
-    projectStars(stars: Star[], location: Coord, timestamp: number): CanvasPoint[] {
+    projectStars(stars: Star[], location: Coord, timestamp: number) {
         const star_ptr = this.allocArray(stars, sizedStar);
         const location_ptr = this.allocObject(location, sizedCoord);
         (this.instance.exports.projectStarsWasm as any)(star_ptr, stars.length, location_ptr, BigInt(timestamp));
@@ -90,6 +90,14 @@ export class WasmInterface {
 
         const result: Coord[] = this.readArray(res_ptr, num_waypoints, sizedCoord);
         this.freeBytes(res_ptr, sizeOf(sizedCoord) * num_waypoints);
+
+        return result;
+    }
+
+    dragAndMove(drag_start_x: number, drag_start_y: number, drag_end_x: number, drag_end_y: number): Coord {
+        const res_ptr = (this.instance.exports.dragAndMoveWasm as any)(drag_start_x, drag_start_y, drag_end_x, drag_end_y);
+        const result = this.readObject(res_ptr, sizedCoord);
+        this.freeBytes(res_ptr, sizeOf(sizedCanvasPoint));
 
         return result;
     }
