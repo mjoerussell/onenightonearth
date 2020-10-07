@@ -1,4 +1,4 @@
-import { Star, Coord, WasmInterface } from './wasm.js';
+import { Star, Coord, WasmInterface } from './wasm';
 
 interface StarEntry {
     rightAscension: number;
@@ -27,7 +27,6 @@ let draw_north_up = true;
 
 let stars: StarEntry[];
 
-let wasm_instance: WebAssembly.Instance;
 let wasm_interface: WasmInterface;
 
 const radToDeg = (radians: number): number => {
@@ -239,8 +238,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             drawPointWasm,
         },
     }).then(wasm_result => {
-        wasm_instance = wasm_result.instance;
-        wasm_interface = new WasmInterface(wasm_instance);
+        wasm_interface = new WasmInterface(wasm_result.instance);
 
         current_latitude = parseFloat(latInput.value);
         current_longitude = parseFloat(longInput.value);

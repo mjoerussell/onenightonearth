@@ -2,3 +2,4 @@ node_modules
 zig-cache
 **/*.js.map
 **/*.js
+!**/webpack.config.js
