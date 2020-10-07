@@ -128,9 +128,9 @@ pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_e
     // cast comptime_float to f32
     const zero: f32 = 0.0;
     // drag_distance is the angular distance between the starting location and the result location after a single drag
-    // 2.3 is a magic number of degrees, picked because it results in what feels like an appropriate drag speed
+    // 2.5 is a magic number of degrees, picked because it results in what feels like an appropriate drag speed
     // Higher = move more with smaller cursor movements, and vice versa
-    const drag_distance = degToRad(f32, 2.3);
+    const drag_distance = degToRad(f32, 2.5);
 
     // Calculate asin(new_latitude), and clamp the result between [-1, 1]
     var sin_lat_x = math.sin(zero) * math.cos(drag_distance) + math.cos(zero) * math.sin(drag_distance) * math.cos(dist_phi);
