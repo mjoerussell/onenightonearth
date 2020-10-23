@@ -14,7 +14,7 @@ const math = std.math;
 pub const CanvasPoint = packed struct {
     x: f32,
     y: f32,
-    brightness: f32,
+    brightness: f32 = 0.0,
 };
 
 pub const Coord = packed struct {
@@ -28,7 +28,59 @@ pub const Star = packed struct {
     brightness: f32,
 };
 
-pub fn projectStars(allocator: *Allocator, stars: []const Star, observer_location: Coord, observer_timestamp: i64) ![]CanvasPoint {
+pub const StarCoord = packed struct {
+    right_ascension: f32,
+    declination: f32,
+};
+
+pub const ConstellationBranch = packed struct {
+    a: StarCoord,
+    b: StarCoord
+};
+
+fn isStarCoord(comptime value: type) bool {
+    const coord_info = @typeInfo(StarCoord);
+    const value_info = @typeInfo(value);
+    switch (value_info) {
+        .Struct => {
+            // Iterate over all of StarCoord's fields to check them
+            inline for (coord_info.Struct.fields) |coord_field| {
+                // @compileLog(coord_field.name);
+                // Iterate all over value's fields to see if one matches the current StarCoord field
+                var found = false;
+                for (value_info.Struct.fields) |value_field| {
+                    // @compileLog(value_field.name);
+                    if (std.mem.eql(u8, value_field.name, coord_field.name) and value_field.field_type == coord_field.field_type) {
+                        // If you find one that matches, break of of the loop
+                        // @compileLog("Found field");
+                        found = true;
+                        break;
+                    }
+                }
+                // @compileLog("--------");
+                if (!found) return false;
+            }
+            return true;
+        },
+        else => return false
+    }
+}
+
+fn fieldExists(comptime value: type, comptime field_name: []const u8) bool {
+    const info = @typeInfo(value);
+    switch (info) {
+        .Struct => {
+            inline for (info.Struct.fields) |field| {
+                if (std.mem.eql(u8, field.name, field_name)) return true;
+            }
+            return false;
+        },
+        else => @compileError("Cannot call fieldExists on non-struct type " ++ @typeName(value))
+    }
+}
+
+pub fn projectStars(allocator: *Allocator, comptime T: type, stars: []const T, observer_location: Coord, observer_timestamp: i64) ![]CanvasPoint {
+    // if (!isStarCoord(T)) @compileError("Cannot evaluate function projectStars with type " ++ @typeName(T));
     const two_pi = comptime math.pi * 2.0;
     const local_sideral_time = getLocalSideralTime(@intToFloat(f64, observer_timestamp), observer_location.longitude);
 
@@ -55,7 +107,9 @@ pub fn projectStars(allocator: *Allocator, stars: []const Star, observer_locatio
         const azi = math.acos(cos_azi);
         const azimuth = if (math.sin(hour_angle_rad) < 0) azi else two_pi - azi;
 
-        const star_point = getProjectedCoord(@floatCast(f32, altitude), @floatCast(f32, azimuth), star.brightness);
+        var star_point = getProjectedCoord(@floatCast(f32, altitude), @floatCast(f32, azimuth));
+        
+        star_point.brightness = comptime if (fieldExists(T, "brightness")) star.brightness else 0.0;
 
         points[num_points] = star_point;
         num_points += 1;
@@ -64,7 +118,7 @@ pub fn projectStars(allocator: *Allocator, stars: []const Star, observer_locatio
     return allocator.realloc(points, num_points) catch |err| return points;
 }
 
-pub fn getProjectedCoord(altitude: f32, azimuth: f32, brightness: f32) CanvasPoint {
+pub fn getProjectedCoord(altitude: f32, azimuth: f32) CanvasPoint {
     const radius = comptime 2.0 / math.pi;
     const quarter_rad = comptime math.pi / 2.0;
     const s = 1.0 - (radius * altitude);
@@ -87,7 +141,7 @@ pub fn getProjectedCoord(altitude: f32, azimuth: f32, brightness: f32) CanvasPoi
         y = s * math.sin(rho);
     }
 
-    return .{ .x = x, .y = y, .brightness = brightness };
+    return .{ .x = x, .y = y };
 }
 
 pub fn findWaypoints(allocator: *Allocator, f: Coord, t: Coord, num_waypoints: u32) []Coord {

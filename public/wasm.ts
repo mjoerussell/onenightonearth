@@ -22,25 +22,21 @@ const i64 = WasmPrimative.i64;
 const f32 = WasmPrimative.f32;
 const f64 = WasmPrimative.f64;
 
-type Sized<T> = {
-    [P in keyof T]: WasmPrimative;
-};
-
-export interface Coord extends NumberStruct {
+export type Coord = {
     latitude: number;
     longitude: number;
-}
+};
 
 const sizedCoord: Sized<Coord> = {
     latitude: f32,
     longitude: f32,
 };
 
-export interface CanvasPoint extends NumberStruct {
+export type CanvasPoint = {
     x: number;
     y: number;
     brightness: number;
-}
+};
 
 const sizedCanvasPoint: Sized<CanvasPoint> = {
     x: f32,
@@ -48,11 +44,11 @@ const sizedCanvasPoint: Sized<CanvasPoint> = {
     brightness: f32,
 };
 
-export interface Star extends NumberStruct {
+export type Star = {
     rightAscension: number;
     declination: number;
     brightness: number;
-}
+};
 
 const sizedStar: Sized<Star> = {
     rightAscension: f32,
@@ -60,9 +56,62 @@ const sizedStar: Sized<Star> = {
     brightness: f32,
 };
 
-interface NumberStruct {
+export type StarCoord = {
+    rightAscension: number;
+    declination: number;
+};
+
+const sizedStarCoord: Sized<StarCoord> = {
+    rightAscension: f32,
+    declination: f32,
+};
+
+// @todo Figure out how to have allocatable structs that are not just numberstructs
+
+type SimpleAlloc = {
     [key: string]: number;
-}
+};
+
+type SimpleSize<T extends SimpleAlloc> = {
+    [K in keyof T]: WasmPrimative;
+};
+
+type ComplexAlloc = {
+    [key: string]: Allocatable;
+};
+
+type ComplexSize<T extends ComplexAlloc> = {
+    [K in keyof T]: Sized<T[K]>;
+};
+
+type Allocatable = SimpleAlloc | ComplexAlloc;
+type Sized<T extends Allocatable> = T extends SimpleAlloc ? SimpleSize<T> : T extends ComplexAlloc ? ComplexSize<T> : never;
+
+const isSimpleAlloc = (data: Allocatable): data is SimpleAlloc => {
+    for (const key in data) {
+        if (data.hasOwnProperty(key)) {
+            if (typeof data[key] !== 'number') {
+                return false;
+            }
+        }
+    }
+    return true;
+};
+
+const isSimpleSize = (type: Sized<any>): type is SimpleSize<any> => {
+    for (const key in type) {
+        if (type.hasOwnProperty(key)) {
+            if (typeof type[key] !== 'number') {
+                return false;
+            }
+        }
+    }
+    return true;
+};
+
+const isComplexSize = (type: Sized<any>): type is ComplexSize<any> => {
+    return !isSimpleSize(type);
+};
 
 type pointer = number;
 
@@ -73,6 +122,12 @@ export class WasmInterface {
         const star_ptr = this.allocArray(stars, sizedStar);
         const location_ptr = this.allocObject(location, sizedCoord);
         (this.instance.exports.projectStarsWasm as any)(star_ptr, stars.length, location_ptr, BigInt(timestamp));
+    }
+
+    projectConstellationBranch(a: Star, b: Star, location: Coord, timestamp: number) {
+        // const star_ptr = this.allocArray([a, b], sizedStar);
+        // const location_ptr = this.allocObject(location, sizedCoord);
+        // (this.instance.exports.projectConstellationBranch as any)(star_ptr, location_ptr, BigInt(timestamp));
     }
 
     /**
@@ -160,82 +215,98 @@ export class WasmInterface {
         return ptr;
     }
 
-    private allocObject<T extends NumberStruct>(data: T, size: Sized<T>): pointer {
+    private allocObject<T extends Allocatable>(data: T, size: Sized<T>): pointer {
         const total_bytes = sizeOf(size);
         const ptr = this.allocBytes(total_bytes);
         const data_mem = new DataView(this.memory, ptr, total_bytes);
-        let current_offset = 0;
-        for (const key in data) {
-            try {
-                this.setPrimative(data_mem, data[key], size[key], current_offset);
-            } catch (error) {
-                if (error instanceof RangeError) {
-                    console.error(
-                        `RangeError: Index ${current_offset} (size = ${sizeOfPrimative(
-                            size[key]
-                        )}) is out of bounds of DataView [total_bytes = ${data_mem.byteLength}] for type`
-                    );
-                }
-            }
-            current_offset += sizeOfPrimative(size[key]);
-        }
+        this.setObject(data_mem, data, size);
+        // let current_offset = 0;
+        // for (const key in data) {
+        //     try {
+        //         const next_value = data[key];
+        //         if (typeof next_value === 'number') {
+        //             this.setPrimative(data_mem, next_value, size[key], current_offset);
+        //         } else {
+        //         }
+        //     } catch (error) {
+        //         if (error instanceof RangeError) {
+        //             console.error(
+        //                 `RangeError: Index ${current_offset} (size = ${sizeOfPrimative(
+        //                     size[key]
+        //                 )}) is out of bounds of DataView [total_bytes = ${data_mem.byteLength}] for type`
+        //             );
+        //         }
+        //     }
+        //     current_offset += sizeOfPrimative(size[key]);
+        // }
 
         return ptr;
     }
 
-    private readObject<T extends NumberStruct>(ptr: pointer, size: Sized<T>): T {
+    private readObject<T extends Allocatable>(ptr: pointer, size: Sized<T>): T {
         const total_bytes = sizeOf(size);
         const data_mem = new DataView(this.memory, ptr, total_bytes);
         const result: any = {};
         let current_offset = 0;
-        for (const key in size) {
-            const value = this.getPrimative(data_mem, size[key], current_offset);
-            result[key] = value;
-            current_offset += sizeOfPrimative(size[key]);
+        if (isSimpleSize(size)) {
+            for (const key in size) {
+                const value = this.getPrimative(data_mem, size[key], current_offset);
+                result[key] = value;
+                current_offset += sizeOfPrimative(size[key]);
+            }
+        } else if (isComplexSize(size)) {
+            for (const key in size) {
+                const value = this.getObject(data_mem, size[key], current_offset);
+                result[key] = value;
+                current_offset += sizeOf(size[key]);
+            }
         }
 
         return result;
     }
 
-    private allocArray<T extends NumberStruct>(data: T[], size: Sized<T>): pointer {
+    private allocArray<T extends Allocatable>(data: T[], size: Sized<T>): pointer {
         const item_bytes = sizeOf(size);
         const total_bytes = item_bytes * data.length;
         const ptr = this.allocBytes(total_bytes);
         const data_mem = new DataView(this.memory, ptr, total_bytes);
         let current_offset = 0;
         for (const item of data) {
-            for (const key in item) {
-                try {
-                    this.setPrimative(data_mem, item[key], size[key], current_offset);
-                } catch (error) {
-                    if (error instanceof RangeError) {
-                        console.error(
-                            `RangeError: Index ${current_offset} (size = ${sizeOfPrimative(
-                                size[key]
-                            )}) is out of bounds of DataView [total_bytes = ${data_mem.byteLength}] for type`
-                        );
-                    }
-                }
-                current_offset += sizeOfPrimative(size[key]);
-            }
+            current_offset = this.setObject(data_mem, item, size, current_offset);
+            // for (const key in item) {
+            //     this.setPrimative(data_mem, item[key], size[key], current_offset);
+            //     current_offset += sizeOfPrimative(size[key]);
+            // }
         }
 
         return ptr;
     }
 
-    private readArray<T extends NumberStruct>(ptr: pointer, num_items: number, size: Sized<T>): T[] {
+    private readArray<T extends Allocatable>(ptr: pointer, num_items: number, size: Sized<T>): T[] {
         const total_bytes = sizeOf(size) * num_items;
         const data_mem = new DataView(this.memory, ptr, total_bytes);
         let current_offset = 0;
         const result_array: T[] = new Array(num_items);
-        for (let index = 0; index < num_items; index += 1) {
-            const result: any = {};
-            for (const key in size) {
-                const value = this.getPrimative(data_mem, size[key], current_offset);
-                result[key] = value;
-                current_offset += sizeOfPrimative(size[key]);
+        if (isSimpleSize(size)) {
+            for (let index = 0; index < num_items; index += 1) {
+                const result: any = {};
+                for (const key in size) {
+                    const value = this.getPrimative(data_mem, size[key], current_offset);
+                    result[key] = value;
+                    current_offset += sizeOfPrimative(size[key]);
+                }
+                result_array[index] = result;
             }
-            result_array[index] = result;
+        } else if (isComplexSize(size)) {
+            for (let index = 0; index < num_items; index += 1) {
+                const result: any = {};
+                for (const key in size) {
+                    const value = this.getObject(data_mem, size[key], current_offset);
+                    result[key] = value;
+                    current_offset += sizeOf(size[key]);
+                }
+                result_array[index] = result;
+            }
         }
 
         return result_array;
@@ -247,6 +318,46 @@ export class WasmInterface {
 
     private freeBytes(location: pointer, num_bytes: number): void {
         (this.instance.exports as any)._wasm_free(location, num_bytes);
+    }
+
+    private setObject<T extends Allocatable>(mem: DataView, data: T, type: Sized<T>, offset = 0): number {
+        let current_offset = offset;
+        if (isSimpleAlloc(data)) {
+            if (isSimpleSize(type)) {
+                for (const key in data) {
+                    this.setPrimative(mem, data[key], type[key], current_offset);
+                    current_offset += sizeOfPrimative(type[key]);
+                }
+            }
+        } else {
+            if (isComplexSize(type)) {
+                for (const key in data) {
+                    this.setObject(mem, data[key] as Allocatable, type[key], current_offset);
+                    current_offset += sizeOf(type[key]);
+                }
+            }
+        }
+        return current_offset;
+    }
+
+    private getObject<T extends Allocatable>(mem: DataView, type: Sized<T>, offset = 0): T {
+        let result: any = {};
+        let current_offset = offset;
+        if (isSimpleSize(type)) {
+            for (const key in type) {
+                const val = this.getPrimative(mem, type[key], current_offset);
+                result[key] = val;
+                current_offset += sizeOfPrimative(type[key]);
+            }
+        }
+        if (isComplexSize(type)) {
+            for (const key in type) {
+                const val = this.getObject(mem, type[key], current_offset);
+                result[key] = val;
+                current_offset += sizeOf(type[key]);
+            }
+        }
+        return result;
     }
 
     private setPrimative(mem: DataView, value: number, type: WasmPrimative, offset = 0) {
@@ -355,13 +466,20 @@ const sizeOfPrimative = (data: WasmPrimative): number => {
     }
 };
 
-const sizeOf = <T>(data: Sized<T>): number => {
+const sizeOf = <T extends Allocatable>(type: Sized<T>): number => {
     let size = 0;
-    for (const key in data) {
-        if (data.hasOwnProperty(key)) {
-            size += sizeOfPrimative(data[key]);
+    if (isSimpleSize(type)) {
+        for (const key in type) {
+            if (type.hasOwnProperty(key)) {
+                size += sizeOfPrimative(type[key]);
+            }
+        }
+    } else if (isComplexSize(type)) {
+        for (const key in type) {
+            if (type.hasOwnProperty(key)) {
+                size += sizeOf(type[key]);
+            }
         }
     }
-
     return size;
 };

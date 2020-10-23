@@ -41,6 +41,7 @@ h1 {
 .input-fields {
     width: 70%;
     padding: 10px;
+    padding-left: 0;
 }
 
 .input-fields .input-row {
@@ -67,8 +68,6 @@ h1 {
     cursor: grab;
     display: inline;
     position: absolute;
-    /* transform: translateX(-50%); */
-    /* display: none; */
 }
 
 .canvas-container canvas.moving {
