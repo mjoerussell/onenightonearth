@@ -79,7 +79,7 @@ fn fieldExists(comptime value: type, comptime field_name: []const u8) bool {
     }
 }
 
-pub fn projectStars(allocator: *Allocator, comptime T: type, stars: []const T, observer_location: Coord, observer_timestamp: i64) ![]CanvasPoint {
+pub fn projectStars(allocator: *Allocator, comptime T: type, stars: []const T, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ![]CanvasPoint {
     // if (!isStarCoord(T)) @compileError("Cannot evaluate function projectStars with type " ++ @typeName(T));
     const two_pi = comptime math.pi * 2.0;
     const local_sideral_time = getLocalSideralTime(@intToFloat(f64, observer_timestamp), observer_location.longitude);
@@ -99,7 +99,7 @@ pub fn projectStars(allocator: *Allocator, comptime T: type, stars: []const T, o
 
         const sin_alt = sin_dec * sin_lat + math.cos(declination_rad) * cos_lat * math.cos(hour_angle_rad);
         const altitude = boundedASin(sin_alt);
-        if (altitude < 0) {
+        if (filter_below_horizon and altitude < 0) {
             continue;
         }
 

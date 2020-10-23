@@ -1,20 +1,10 @@
-import { Star, Coord, WasmInterface } from './wasm';
-
-interface StarCoord {
-    rightAscension: number;
-    declination: number;
-}
+import { Star, Coord, ConstellationBranch, StarCoord, WasmInterface } from './wasm';
 
 interface StarEntry extends StarCoord {
     magnitude: number;
     name: string;
     constellation: string | null;
     consId: string | null;
-}
-
-interface ConstellationBranch {
-    a: StarCoord;
-    b: StarCoord;
 }
 
 interface ConstellationEntry {
@@ -108,25 +98,10 @@ const renderConstellations = (constellations: ConstellationEntry[], coord: Coord
         }
     }
 
-    // @fixme The constellations lines are totally out of whack
-    // @fixme The constellation lines disappear too early when dragging the constellation off screen
-
     // @todo This is just a first step for the constellations. This version is super slow, even with just 1 constellation
     // It needs to be optimized for passing a lot of data to wasm in 1 allocation
     for (const constellation of constellations) {
-        for (const branch of constellation.branches) {
-            const bA: Star = {
-                rightAscension: branch.a.rightAscension,
-                declination: branch.a.declination,
-                brightness: 1,
-            };
-            const bB: Star = {
-                rightAscension: branch.b.rightAscension,
-                declination: branch.b.rightAscension,
-                brightness: 1,
-            };
-            wasm_interface.projectConstellationBranch(bA, bB, coord, date.valueOf());
-        }
+        wasm_interface.projectConstellationBranch(constellation.branches, coord, date.valueOf());
     }
 };
 
@@ -149,7 +124,7 @@ const drawLineWasm = (x1: number, y1: number, x2: number, y2: number) => {
     const pointY2 = center_y - direction_modifier * background_radius * y2;
 
     if (star_canvas_ctx != null) {
-        star_canvas_ctx.strokeStyle = 'rgb(255, 246, 176)';
+        star_canvas_ctx.strokeStyle = 'rgb(255, 246, 176, 0.3)';
         star_canvas_ctx.beginPath();
         star_canvas_ctx.moveTo(pointX1, pointY1);
         star_canvas_ctx.lineTo(pointX2, pointY2);

@@ -98,7 +98,7 @@ pub export fn projectStarsWasm(ab_stars: [*]const Star, num_stars: u32, observer
     defer allocator.free(bounded_stars);
     defer allocator.destroy(observer_location);
 
-    const projected_points = star_math.projectStars(allocator, Star, bounded_stars, observer_location.*, observer_timestamp);
+    const projected_points = star_math.projectStars(allocator, Star, bounded_stars, observer_location.*, observer_timestamp, true);
 
     if (projected_points) |points| {
         defer allocator.free(points);
@@ -108,7 +108,7 @@ pub export fn projectStarsWasm(ab_stars: [*]const Star, num_stars: u32, observer
     } else |_| {}
 }
 
-pub export fn projectConstellationBranch(branches: [*]const ConstellationBranch, num_branches: u32, observer_location: *const Coord, observer_timestamp: i64) void {
+pub export fn projectConstellation(branches: [*]const ConstellationBranch, num_branches: u32, observer_location: *const Coord, observer_timestamp: i64) void {
     // Allocate for now, bail if not possible
     const branch_ends = allocator.alloc(StarCoord, num_branches * 2) catch |err| return;
     var index: usize = 0;
@@ -121,11 +121,15 @@ pub export fn projectConstellationBranch(branches: [*]const ConstellationBranch,
     // @todo Keep locatation across multiple branches 
     defer allocator.destroy(observer_location);
 
-    const projected_points = star_math.projectStars(allocator, StarCoord, branch_ends, observer_location.*, observer_timestamp);
+    const projected_points = star_math.projectStars(allocator, StarCoord, branch_ends, observer_location.*, observer_timestamp, false);
+
 
     if (projected_points) |points| {
         defer allocator.free(points);
-        drawLineWasm(points[0].x, points[0].y, points[1].x, points[1].y);
+        var point_index: usize = 0;
+        while (point_index < points.len) : (point_index += 2) {
+            drawLineWasm(points[point_index].x, points[point_index].y, points[point_index + 1].x, points[point_index + 1].y);
+        }
     } else |_| {}
 
 }

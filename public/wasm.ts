@@ -66,25 +66,54 @@ const sizedStarCoord: Sized<StarCoord> = {
     declination: f32,
 };
 
-// @todo Figure out how to have allocatable structs that are not just numberstructs
+export type ConstellationBranch = {
+    a: StarCoord;
+    b: StarCoord;
+};
 
+const sizedConstellationBranch: Sized<ConstellationBranch> = {
+    a: sizedStarCoord,
+    b: sizedStarCoord,
+};
+
+/**
+ * A `SimpleAlloc` is a struct whose fields are just numbers. This means that it can
+ * be allocated and read just using `getPrimative` and `setPrimative`.
+ */
 type SimpleAlloc = {
     [key: string]: number;
 };
 
+/**
+ * A `SimpleSize` is a size definition for `SimpleAlloc`.
+ */
 type SimpleSize<T extends SimpleAlloc> = {
     [K in keyof T]: WasmPrimative;
 };
 
+/**
+ * `ComplexAlloc` is a struct whose fields are structs. The fields can either be more `ComplexAlloc`'s, or
+ * just `SimpleAlloc`'s.
+ */
 type ComplexAlloc = {
     [key: string]: Allocatable;
 };
 
+/**
+ * `ComplexSize` is a size definition for `ComplexAlloc`.
+ */
 type ComplexSize<T extends ComplexAlloc> = {
     [K in keyof T]: Sized<T[K]>;
 };
 
+/**
+ * `Allocatable` types are data types that can be automatically allocated regardless of their complexity.
+ */
 type Allocatable = SimpleAlloc | ComplexAlloc;
+/**
+ * `Sized` types are companions to `Allocatable` types. For every type `T` that extends `Allocatable`, there must be an implementation
+ * of `Sized<T>` which defines the size in bytes of every field on `T`.
+ */
 type Sized<T extends Allocatable> = T extends SimpleAlloc ? SimpleSize<T> : T extends ComplexAlloc ? ComplexSize<T> : never;
 
 const isSimpleAlloc = (data: Allocatable): data is SimpleAlloc => {
@@ -124,10 +153,10 @@ export class WasmInterface {
         (this.instance.exports.projectStarsWasm as any)(star_ptr, stars.length, location_ptr, BigInt(timestamp));
     }
 
-    projectConstellationBranch(a: Star, b: Star, location: Coord, timestamp: number) {
-        // const star_ptr = this.allocArray([a, b], sizedStar);
-        // const location_ptr = this.allocObject(location, sizedCoord);
-        // (this.instance.exports.projectConstellationBranch as any)(star_ptr, location_ptr, BigInt(timestamp));
+    projectConstellationBranch(branches: ConstellationBranch[], location: Coord, timestamp: number) {
+        const branches_ptr = this.allocArray(branches, sizedConstellationBranch);
+        const location_ptr = this.allocObject(location, sizedCoord);
+        (this.instance.exports.projectConstellation as any)(branches_ptr, branches.length, location_ptr, BigInt(timestamp));
     }
 
     /**
@@ -220,26 +249,6 @@ export class WasmInterface {
         const ptr = this.allocBytes(total_bytes);
         const data_mem = new DataView(this.memory, ptr, total_bytes);
         this.setObject(data_mem, data, size);
-        // let current_offset = 0;
-        // for (const key in data) {
-        //     try {
-        //         const next_value = data[key];
-        //         if (typeof next_value === 'number') {
-        //             this.setPrimative(data_mem, next_value, size[key], current_offset);
-        //         } else {
-        //         }
-        //     } catch (error) {
-        //         if (error instanceof RangeError) {
-        //             console.error(
-        //                 `RangeError: Index ${current_offset} (size = ${sizeOfPrimative(
-        //                     size[key]
-        //                 )}) is out of bounds of DataView [total_bytes = ${data_mem.byteLength}] for type`
-        //             );
-        //         }
-        //     }
-        //     current_offset += sizeOfPrimative(size[key]);
-        // }
-
         return ptr;
     }
 
@@ -273,10 +282,6 @@ export class WasmInterface {
         let current_offset = 0;
         for (const item of data) {
             current_offset = this.setObject(data_mem, item, size, current_offset);
-            // for (const key in item) {
-            //     this.setPrimative(data_mem, item[key], size[key], current_offset);
-            //     current_offset += sizeOfPrimative(size[key]);
-            // }
         }
 
         return ptr;

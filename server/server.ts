@@ -110,13 +110,14 @@ const getConstellations = (stars: StarEntry[]): ConstellationEntry[] => {
   const catalog = fs.readFileSync('./constellations.txt').toString();
   const constellations: ConstellationEntry[] = [];
   for (const constellation of catalog.split('\n')) {
+    if (constellation.startsWith('#')) continue;
+
     const items = constellation.split('|');
     const name = items[0].toLowerCase();
     const branchEntries = items.slice(1).map(i => i.split(','));
     const branches: ConstellationBranch[] = [];
 
     for (const [aEntry, bEntry] of branchEntries) {
-      console.log(`Searching for ${name} ${aEntry},${bEntry}`);
       let a: StarCoord | null = null;
       let b: StarCoord | null = null;
       for (const star of stars) {
@@ -134,7 +135,6 @@ const getConstellations = (stars: StarEntry[]): ConstellationEntry[] => {
         }
       }
       if (a != null && b != null) {
-        console.log('Found branch');
         branches.push({ a, b });
       }
     }
