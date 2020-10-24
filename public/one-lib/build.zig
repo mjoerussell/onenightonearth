@@ -10,15 +10,19 @@ pub fn build(b: *Builder) !void {
     lib.setTarget(target);
     lib.install();
 
-    var main_tests = b.addTest("src/main.zig");
-    main_tests.setBuildMode(mode);
+    // var main_tests = b.addTest("src/main.zig");
+    // main_tests.setBuildMode(mode);
     // main_tests.setTarget(target);
 
     var star_math_tests = b.addTest("src/star_math.zig");
     star_math_tests.setBuildMode(mode);
+
+    var util_tests = b.addTest("src/job_queue.zig");
+    util_tests.setBuildMode(mode);
     // star_math_tests.setTarget(target);
 
     const test_step = b.step("test", "Run library tests");
-    test_step.dependOn(&main_tests.step);
+    // test_step.dependOn(&main_tests.step);
     test_step.dependOn(&star_math_tests.step);
+    test_step.dependOn(&util_tests.step);
 }

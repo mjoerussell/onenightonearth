@@ -20,7 +20,8 @@ pub const Coord = packed struct {
     longitude: f32,
 };
 
-pub const Star = packed struct {
+pub const Star = struct {
+    name: []const u8,
     right_ascension: f32,
     declination: f32,
     brightness: f32,
@@ -35,6 +36,12 @@ pub const ConstellationBranch = packed struct {
     a: StarCoord,
     b: StarCoord
 };
+
+const catalog = @embedFile("./sao_catalog");
+
+pub fn initData(allocator: *Allocator) void {
+    
+}
 
 fn fieldExists(comptime value: type, comptime field_name: []const u8) bool {
     const info = @typeInfo(value);

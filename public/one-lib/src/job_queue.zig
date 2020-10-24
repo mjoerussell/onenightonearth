@@ -270,26 +270,79 @@ pub fn JobQueue(comptime T: type, comptime R: type, comptime num_jobs: usize) ty
     };
 }
 
-pub const LineIterator = struct {
-    data: []const u8,
-    current_pos: usize,
+pub fn TokenIterator(comptime token: []const u8) type {
+    return struct {
+        const Self = @This();
+        data: []const u8,
+        current_pos: usize,
 
-    pub fn create(data: []const u8) LineIterator {
-        return .{
-            .data = data,
-            .current_pos = 0,
-        };
-    }
-
-    pub fn next_line(it: *LineIterator) ?[]const u8 {
-        const starting_pos = it.current_pos;
-        var end_pos = starting_pos;
-        while (end_pos < it.data.len) : (end_pos += 1) {
-            if (it.data[end_pos] == '\n') {
-                it.current_pos = end_pos + 1;
-                return it.data[starting_pos..end_pos];
-            }
+        pub fn create(data: []const u8) Self {
+            return .{
+                .data = data,
+                .current_pos = 0,
+            };
         }
-        return null;
+
+        pub fn next_line(it: *Self) ?[]const u8 {
+            const starting_pos = it.current_pos;
+            var end_pos = starting_pos;
+            while (end_pos + token.len < it.data.len) : (end_pos += 1) {
+                if (std.mem.eql(u8, it.data[end_pos..end_pos + token.len], token)) {
+                    it.current_pos = end_pos + token.len;
+                    return it.data[starting_pos..end_pos];
+                }
+            }
+            return null;
+        }
+    };
+}
+
+pub const LineIterator = TokenIterator("\n");
+
+test "Line Iterator" {
+    const expectEqualStrings = std.testing.expectEqualStrings;
+    const first = "First line";
+    const second = "  Second line ";
+    const third = "Third 2122343   asdfds  line  ";
+    const data = first ++ "\n" ++ second ++ "\n" ++ third;
+    var it = LineIterator.create(data);
+    var index: usize = 0;
+    while (it.next_line()) |line| : (index += 1)  {
+        switch (index) {
+            0 => expectEqualStrings(first, line),
+            1 => expectEqualStrings(second, line),
+            2 => expectEqualStrings(third, line),
+            else => std.debug.panic("Should only have 3 lines", .{})
+        }
     }
-};
+}
+
+test "Single-Char Token Iterator" {
+    const expectEqualStrings = std.testing.expectEqualStrings;
+    const data = "one|two|three";
+    var it = TokenIterator("|").create(data);
+    var index: usize = 0;
+    while (it.next_line()) |line| : (index += 1)  {
+        switch (index) {
+            0 => expectEqualStrings("one", line),
+            1 => expectEqualStrings("two", line),
+            2 => expectEqualStrings("three", line),
+            else => std.debug.panic("Should only have 3 lines", .{})
+        }
+    }
+}
+
+test "Multi-Char Token Iterator" {
+    const expectEqualStrings = std.testing.expectEqualStrings;
+    const data = "oneabctwoabcthree";
+    var it = TokenIterator("abc").create(data);
+    var index: usize = 0;
+    while (it.next_line()) |line| : (index += 1)  {
+        switch (index) {
+            0 => expectEqualStrings("one", line),
+            1 => expectEqualStrings("two", line),
+            2 => expectEqualStrings("three", line),
+            else => std.debug.panic("Should only have 3 lines", .{})
+        }
+    }
+}
