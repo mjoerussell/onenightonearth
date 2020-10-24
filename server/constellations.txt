@@ -1,2 +1,12 @@
-# Andromeda contellation
+# Andromeda
 And|Gam,Bet|Bet,Mu|Mu,Nu|Nu,Phi|Bet,Pi|Bet,Del|Pi,Del|Del,Eps|Eps,Xi|Xi,Eta|Del,Alp|Pi,Rho|Rho,Iot|Iot,Kap|Kap,Lam|Iot,Omi
+# Antila
+Ant|Iot,Alp|Alp,Eps
+# Apus
+Aps|Gam,Bet|Bet,Del|Del,Alp
+# Aquarius
+Aqr|Chi,Phi|Chi,Del|Del,Tau|Tau,Lam|Phi,Lam|Lam,Rho|Rho,Ome|Ome,Alp|Alp,Pi|Pi,Zet|Zet,Eta|Zet,Gam|Gam,Alp|Alp,Bet|Bet,Mu|Mu,Eps
+# Aquila
+Aql|Ome,Iot|Ome,Eta|Iot,Lam|Lam,Del|Lam,Zet|Zet,Eps|Del,Zet|Eta,Del|Del,Gam|Gam,Alp|Alp,Bet
+# Ara
+Ara|Bet,Alp|Alp,Eps|Eps,Zet|Zet,Eta|Eta,Del|Del,Gam

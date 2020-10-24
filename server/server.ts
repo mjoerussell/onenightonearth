@@ -1,6 +1,6 @@
 import express from 'express';
 import bodyParser from 'body-parser';
-import http from 'http';
+import http, { maxHeaderSize } from 'http';
 import fs from 'fs';
 import path from 'path';
 
@@ -77,11 +77,11 @@ const getConstellationId = (entry: CatalogEntry): string | null => {
 };
 
 const getMagnitude = (entry: CatalogEntry): number => {
-  let mag = parseFloat(entry.substring(102, 107));
-  mag -= 8;
-  mag = mag / -12;
+  const mag = parseFloat(entry.substring(102, 107));
+  // mag -= 8;
+  // mag = mag / -12;
 
-  return mag;
+  return 1 / mag;
 };
 
 const PORT = 8080;
@@ -91,20 +91,35 @@ app.use(express.static(path.join(__dirname, '../public')));
 app.use(bodyParser.json());
 
 const stars: StarEntry[] = fs
-  .readFileSync('./catalog')
+  .readFileSync('./sao_catalog')
   .toString()
   .split('\n')
+  .slice(75)
+  .filter(entry => entry.startsWith('SAO'))
   .map(entry => {
+    const data = entry.split('|');
+    const v_mag = parseFloat(data[13]);
+    const dimmest_visible = 18.6;
+    const brightest_value = -4.6;
+    const mag_display_factor = (dimmest_visible - (v_mag - brightest_value)) / dimmest_visible;
     return {
-      rightAscension: getRightAscension(entry),
-      declination: getDeclination(entry),
-      magnitude: getMagnitude(entry),
-      name: getName(entry),
-      constellation: getConstellation(entry),
-      consId: getConstellationId(entry),
+      name: data[0],
+      rightAscension: parseFloat(data[1]),
+      declination: parseFloat(data[5]),
+      magnitude: mag_display_factor,
+      constellation: null,
+      consId: null,
     };
+    // return {
+    //   rightAscension: getRightAscension(entry),
+    //   declination: getDeclination(entry),
+    //   magnitude: getMagnitude(entry),
+    //   name: getName(entry),
+    //   constellation: getConstellation(entry),
+    //   consId: getConstellationId(entry),
+    // };
   })
-  .filter(star => star.magnitude > 0);
+  .filter(star => star.magnitude > 0.25);
 
 const getConstellations = (stars: StarEntry[]): ConstellationEntry[] => {
   const catalog = fs.readFileSync('./constellations.txt').toString();
@@ -145,8 +160,6 @@ const getConstellations = (stars: StarEntry[]): ConstellationEntry[] => {
   return constellations;
 };
 
-const constellations = getConstellations(stars);
-
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -156,7 +169,8 @@ app.get('/stars', (req, res) => {
 });
 
 app.get('/constellations', (req, res) => {
-  res.send(constellations);
+  // res.send(getConstellations(stars));
+  res.send([]);
 });
 
 http.createServer(app).listen(PORT, () => console.log(`Listening on port ${PORT}`));

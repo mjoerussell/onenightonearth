@@ -20,7 +20,9 @@ const [center_x, center_y] = [canvas_width / 2, canvas_height / 2];
 
 let date_input: HTMLInputElement;
 let brightness_input: HTMLInputElement;
+let constellations_on_input: HTMLInputElement;
 let star_brightness = 0;
+let zoom_factor = 1.0;
 let travel_button: HTMLButtonElement;
 
 let star_canvas: HTMLCanvasElement;
@@ -86,9 +88,8 @@ const renderStars = (stars: StarEntry[], coord: Coord, date?: Date) => {
 };
 
 const renderConstellations = (constellations: ConstellationEntry[], coord: Coord, date?: Date) => {
-    if (star_canvas_ctx == null) {
-        return;
-    }
+    if (!constellations_on_input.checked) return;
+    if (star_canvas_ctx == null) return;
 
     if (!date) {
         if (date_input.valueAsDate) {
@@ -107,24 +108,24 @@ const renderConstellations = (constellations: ConstellationEntry[], coord: Coord
 
 const drawPointWasm = (x: number, y: number, brightness: number) => {
     const direction_modifier = draw_north_up ? 1 : -1;
-    const pointX = center_x + direction_modifier * background_radius * x;
-    const pointY = center_y - direction_modifier * background_radius * y;
+    const pointX = center_x + direction_modifier * (background_radius * zoom_factor) * x;
+    const pointY = center_y - direction_modifier * (background_radius * zoom_factor) * y;
 
     if (star_canvas_ctx != null) {
-        star_canvas_ctx.fillStyle = `rgba(255, 246, 176, ${brightness + star_brightness})`;
+        star_canvas_ctx.fillStyle = `rgba(255, 246, 176, ${brightness / 2})`;
         star_canvas_ctx.fillRect(pointX, pointY, 2, 2);
     }
 };
 
 const drawLineWasm = (x1: number, y1: number, x2: number, y2: number) => {
     const direction_modifier = draw_north_up ? 1 : -1;
-    const pointX1 = center_x + direction_modifier * background_radius * x1;
-    const pointY1 = center_y - direction_modifier * background_radius * y1;
-    const pointX2 = center_x + direction_modifier * background_radius * x2;
-    const pointY2 = center_y - direction_modifier * background_radius * y2;
+    const pointX1 = center_x + direction_modifier * (background_radius * zoom_factor) * x1;
+    const pointY1 = center_y - direction_modifier * (background_radius * zoom_factor) * y1;
+    const pointX2 = center_x + direction_modifier * (background_radius * zoom_factor) * x2;
+    const pointY2 = center_y - direction_modifier * (background_radius * zoom_factor) * y2;
 
     if (star_canvas_ctx != null) {
-        star_canvas_ctx.strokeStyle = 'rgb(255, 246, 176, 0.3)';
+        star_canvas_ctx.strokeStyle = 'rgb(255, 246, 176, 0.15)';
         star_canvas_ctx.beginPath();
         star_canvas_ctx.moveTo(pointX1, pointY1);
         star_canvas_ctx.lineTo(pointX2, pointY2);
@@ -176,28 +177,33 @@ const wasm_log = (msg_ptr: number, msg_len: number) => {
 document.addEventListener('DOMContentLoaded', async () => {
     // Get handles for all the input elements
     date_input = document.getElementById('dateInput') as HTMLInputElement;
-
-    brightness_input = document.getElementById('brightnessInput') as HTMLInputElement;
-    star_brightness = parseInt(brightness_input.value);
-
-    travel_button = document.getElementById('timelapse') as HTMLButtonElement;
-    star_canvas = document.getElementById('star-canvas') as HTMLCanvasElement;
-
-    star_canvas_ctx = star_canvas.getContext('2d')!;
-
-    const latInput = document.getElementById('latInput') as HTMLInputElement;
-    const longInput = document.getElementById('longInput') as HTMLInputElement;
-    const locationUpdateButton = document.getElementById('locationUpdate') as HTMLButtonElement;
-
-    // Re-render stars when changing the date or brightness
     date_input.addEventListener('change', () => {
         renderStars(stars, { latitude: current_latitude, longitude: current_longitude });
         renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
     });
+    travel_button = document.getElementById('timelapse') as HTMLButtonElement;
+
+    star_canvas = document.getElementById('star-canvas') as HTMLCanvasElement;
+    star_canvas_ctx = star_canvas.getContext('2d')!;
+
+    brightness_input = document.getElementById('brightnessInput') as HTMLInputElement;
     brightness_input.addEventListener('change', () => {
         renderStars(stars, { latitude: current_latitude, longitude: current_longitude });
         renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
     });
+
+    constellations_on_input = document.getElementById('constellationsOn') as HTMLInputElement;
+    constellations_on_input.addEventListener('click', () => {
+        const coord: Coord = { latitude: current_latitude, longitude: current_longitude };
+        renderConstellations(constellations, coord);
+        renderStars(stars, coord);
+    });
+
+    star_brightness = parseInt(brightness_input.value);
+
+    const latInput = document.getElementById('latInput') as HTMLInputElement;
+    const longInput = document.getElementById('longInput') as HTMLInputElement;
+    const locationUpdateButton = document.getElementById('locationUpdate') as HTMLButtonElement;
 
     // Handle updating the viewing location
     locationUpdateButton.addEventListener('click', () => {
@@ -276,7 +282,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             travel_button.innerText = 'Time Travel';
             clearInterval(travelInterval);
         } else {
-            travel_button.innerText = 'Stop Time Travelling';
+            travel_button.innerText = 'Stop';
             let date = date_input.valueAsDate ?? new Date();
             travelInterval = setInterval(() => {
                 const currentDate = new Date(date);
@@ -293,10 +299,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         travelIsOn = !travelIsOn;
     });
 
-    const star_response = await fetch('/stars');
-    stars = await star_response.json();
+    const fetchAll = async (...paths: string[]): Promise<Response[]> => {
+        return await Promise.all(paths.map(p => fetch(p)));
+    };
 
-    const constellation_response = await fetch('/constellations');
+    const [star_response, constellation_response] = await fetchAll('/stars', '/constellations');
+    stars = await star_response.json();
     constellations = await constellation_response.json();
 
     // Fetch and instantiate the WASM module
@@ -318,69 +326,91 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
     });
 
-    const canvas = document.getElementById('star-canvas') as HTMLCanvasElement;
     let is_dragging = false;
     let [drag_start_x, drag_start_y] = [0, 0];
 
-    canvas.addEventListener('mousedown', event => {
-        drag_start_x = (event.offsetX - center_x) / canvas.width;
-        drag_start_y = (event.offsetY - center_y) / canvas.height;
+    star_canvas.addEventListener('mousedown', event => {
+        drag_start_x = (event.offsetX - center_x) / star_canvas.width;
+        drag_start_y = (event.offsetY - center_y) / star_canvas.height;
 
-        canvas.classList.add('moving');
+        star_canvas.classList.add('moving');
 
         is_dragging = true;
     });
 
-    canvas.addEventListener('mousemove', event => {
-        if (is_dragging) {
-            const drag_end_x = (event.offsetX - center_x) / canvas.width;
-            const drag_end_y = (event.offsetY - center_y) / canvas.height;
+    star_canvas.addEventListener('mousemove', event => {
+        if (!is_dragging) return;
+        const drag_end_x = (event.offsetX - center_x) / star_canvas.width;
+        const drag_end_y = (event.offsetY - center_y) / star_canvas.height;
 
-            const new_coord = wasm_interface.dragAndMove(drag_start_x, drag_start_y, drag_end_x, drag_end_y);
+        // The new coordinate will be relative to the current latitude and longitude - it will be a lat/long
+        // value that is measured with the current location as the origin.
+        // This means that in order to calculate the actual next location, new_coord has to be added to current
+        const new_coord = wasm_interface.dragAndMove(drag_start_x, drag_start_y, drag_end_x, drag_end_y);
 
-            const directed_add = (current_value: number, new_value: number): number => {
-                if (draw_north_up) {
-                    return current_value + new_value;
-                }
-                return current_value - new_value;
-            };
-
-            const crossed_pole =
-                (current_latitude < 90.0 && directed_add(current_latitude, new_coord.latitude) > 90.0) ||
-                (current_latitude > -90.0 && directed_add(current_latitude, new_coord.latitude) < -90.0);
-
-            if (crossed_pole) {
-                current_longitude += 180.0;
-                draw_north_up = !draw_north_up;
+        // Add or subtract new_value from current_value depending on the orientation
+        const directed_add = (current_value: number, new_value: number): number => {
+            if (draw_north_up) {
+                return current_value + new_value / zoom_factor;
             }
+            return current_value - new_value / zoom_factor;
+        };
 
-            current_latitude = directed_add(current_latitude, new_coord.latitude);
-            current_longitude = directed_add(current_longitude, -new_coord.longitude);
+        // The user crossed a pole if the new latitude is inside the bounds [-90, 90] but the new location
+        // would be outside that range
+        const crossed_pole =
+            (current_latitude < 90.0 && directed_add(current_latitude, new_coord.latitude) > 90.0) ||
+            (current_latitude > -90.0 && directed_add(current_latitude, new_coord.latitude) < -90.0);
 
-            if (current_longitude > 180.0) {
-                current_longitude -= 360.0;
-            } else if (current_longitude < -180.0) {
-                current_longitude += 360.0;
-            }
-
-            latInput.value = current_latitude.toString();
-            longInput.value = current_longitude.toString();
-
-            drag_start_x = drag_end_x;
-            drag_start_y = drag_end_y;
-
-            renderStars(stars, { latitude: current_latitude, longitude: current_longitude });
-            renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
+        if (crossed_pole) {
+            // Add 180 degrees to the longitude because crossing a pole in a straight line would bring you to the other side
+            // of the world
+            current_longitude += 180.0;
+            // Flip draw direction because if you were going south you're now going north and vice versa
+            draw_north_up = !draw_north_up;
         }
+
+        current_latitude = directed_add(current_latitude, new_coord.latitude);
+        current_longitude = directed_add(current_longitude, -new_coord.longitude);
+
+        // Keep the longitude value in the range [-180, 180]
+        if (current_longitude > 180.0) {
+            current_longitude -= 360.0;
+        } else if (current_longitude < -180.0) {
+            current_longitude += 360.0;
+        }
+
+        // Show the new location in the input boxes
+        latInput.value = current_latitude.toString();
+        longInput.value = current_longitude.toString();
+
+        // Reset the start positions to the current end positions for the next calculation
+        drag_start_x = drag_end_x;
+        drag_start_y = drag_end_y;
+
+        renderStars(stars, { latitude: current_latitude, longitude: current_longitude });
+        renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
     });
 
-    canvas.addEventListener('mouseup', event => {
-        canvas.classList.remove('moving');
+    star_canvas.addEventListener('mouseup', event => {
+        star_canvas.classList.remove('moving');
         is_dragging = false;
     });
 
-    canvas.addEventListener('mouseleave', event => {
-        canvas.classList.remove('moving');
+    star_canvas.addEventListener('mouseleave', event => {
+        star_canvas.classList.remove('moving');
         is_dragging = false;
+    });
+
+    star_canvas.addEventListener('wheel', event => {
+        // Zoom out faster than zooming in, because usually when you zoom out you just want
+        // to go all the way out and it's annoying to have to do a ton of scrolling
+        const delta_amount = event.deltaY < 0 ? 0.05 : 0.15;
+        zoom_factor -= event.deltaY * delta_amount;
+        // Don't let the user scroll out further than the default size
+        if (zoom_factor < 1) zoom_factor = 1;
+        // Re-render the stars
+        renderStars(stars, { latitude: current_latitude, longitude: current_longitude });
+        renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
     });
 });
