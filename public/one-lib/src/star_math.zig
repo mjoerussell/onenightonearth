@@ -1,8 +1,6 @@
-// @todo Clean up this code, separate into main functions - wasm interface
 // @todo Improve testing - find online calculators for star functions and compare against them (fingers crossed)
 // @fixme There's some flickering going on in the middle of the window while time-travelling
 //        This might actually be something that's happening across the whole vertical line from center up to the edge
-
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
@@ -38,34 +36,6 @@ pub const ConstellationBranch = packed struct {
     b: StarCoord
 };
 
-fn isStarCoord(comptime value: type) bool {
-    const coord_info = @typeInfo(StarCoord);
-    const value_info = @typeInfo(value);
-    switch (value_info) {
-        .Struct => {
-            // Iterate over all of StarCoord's fields to check them
-            inline for (coord_info.Struct.fields) |coord_field| {
-                // @compileLog(coord_field.name);
-                // Iterate all over value's fields to see if one matches the current StarCoord field
-                var found = false;
-                for (value_info.Struct.fields) |value_field| {
-                    // @compileLog(value_field.name);
-                    if (std.mem.eql(u8, value_field.name, coord_field.name) and value_field.field_type == coord_field.field_type) {
-                        // If you find one that matches, break of of the loop
-                        // @compileLog("Found field");
-                        found = true;
-                        break;
-                    }
-                }
-                // @compileLog("--------");
-                if (!found) return false;
-            }
-            return true;
-        },
-        else => return false
-    }
-}
-
 fn fieldExists(comptime value: type, comptime field_name: []const u8) bool {
     const info = @typeInfo(value);
     switch (info) {
@@ -80,7 +50,6 @@ fn fieldExists(comptime value: type, comptime field_name: []const u8) bool {
 }
 
 pub fn projectStars(allocator: *Allocator, comptime T: type, stars: []const T, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ![]CanvasPoint {
-    // if (!isStarCoord(T)) @compileError("Cannot evaluate function projectStars with type " ++ @typeName(T));
     // @fixme There's still a bug here - For some reason, if stars are in certain locations in the sky they get blinked to (0,0) on the canvas.
     // I'm assuming that a trig function is returning NaN, but I'm not sure. Also not sure if the root cause is here or getProjectedCoord,
     // but either way it's going through this function.
