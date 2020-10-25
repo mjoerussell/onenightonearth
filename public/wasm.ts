@@ -147,16 +147,21 @@ type pointer = number;
 export class WasmInterface {
     constructor(private instance: WebAssembly.Instance) {}
 
+    init() {
+        (this.instance.exports.initialize as any)();
+    }
+
     projectStars(stars: Star[], location: Coord, timestamp: number) {
-        const star_ptr = this.allocArray(stars, sizedStar);
+        // const star_ptr = this.allocArray(stars, sizedStar);
         const location_ptr = this.allocObject(location, sizedCoord);
-        (this.instance.exports.projectStarsWasm as any)(star_ptr, stars.length, location_ptr, BigInt(timestamp));
+        // (this.instance.exports.projectStarsWasm as any)(star_ptr, stars.length, location_ptr, BigInt(timestamp));
+        (this.instance.exports.projectStarsWasm as any)(location_ptr, BigInt(timestamp));
     }
 
     projectConstellationBranch(branches: ConstellationBranch[], location: Coord, timestamp: number) {
-        const branches_ptr = this.allocArray(branches, sizedConstellationBranch);
-        const location_ptr = this.allocObject(location, sizedCoord);
-        (this.instance.exports.projectConstellation as any)(branches_ptr, branches.length, location_ptr, BigInt(timestamp));
+        // const branches_ptr = this.allocArray(branches, sizedConstellationBranch);
+        // const location_ptr = this.allocObject(location, sizedCoord);
+        // (this.instance.exports.projectConstellation as any)(branches_ptr, branches.length, location_ptr, BigInt(timestamp));
     }
 
     /**

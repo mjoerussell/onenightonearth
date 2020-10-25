@@ -283,7 +283,7 @@ pub fn TokenIterator(comptime token: []const u8) type {
             };
         }
 
-        pub fn next_line(it: *Self) ?[]const u8 {
+        pub fn next(it: *Self) ?[]const u8 {
             const starting_pos = it.current_pos;
             var end_pos = starting_pos;
             while (end_pos + token.len < it.data.len) : (end_pos += 1) {

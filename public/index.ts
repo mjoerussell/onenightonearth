@@ -317,6 +317,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }).then(wasm_result => {
         wasm_interface = new WasmInterface(wasm_result.instance);
 
+        wasm_interface.init();
+
         current_latitude = parseFloat(latInput.value);
         current_longitude = parseFloat(longInput.value);
 

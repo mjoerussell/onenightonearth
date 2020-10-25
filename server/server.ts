@@ -98,10 +98,16 @@ const stars: StarEntry[] = fs
   .filter(entry => entry.startsWith('SAO'))
   .map(entry => {
     const data = entry.split('|');
+    try {
+      const v_mag = parseFloat(data[13]);
+    } catch (e) {
+      console.error(`${data[13]} is not a valid float`);
+    }
     const v_mag = parseFloat(data[13]);
     const dimmest_visible = 18.6;
     const brightest_value = -4.6;
     const mag_display_factor = (dimmest_visible - (v_mag - brightest_value)) / dimmest_visible;
+
     return {
       name: data[0],
       rightAscension: parseFloat(data[1]),

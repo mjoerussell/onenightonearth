@@ -17,7 +17,7 @@ pub fn build(b: *Builder) !void {
     var star_math_tests = b.addTest("src/star_math.zig");
     star_math_tests.setBuildMode(mode);
 
-    var util_tests = b.addTest("src/job_queue.zig");
+    var util_tests = b.addTest("src/util.zig");
     util_tests.setBuildMode(mode);
     // star_math_tests.setTarget(target);
 

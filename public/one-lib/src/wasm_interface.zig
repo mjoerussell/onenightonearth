@@ -22,12 +22,23 @@ fn log(comptime message: []const u8, args: anytype) void {
     consoleLog(fmt_msg.ptr, @intCast(u32, fmt_msg.len));
 }
 
-pub export fn projectStarsWasm(ab_stars: [*]const Star, num_stars: u32, observer_location: *const Coord, observer_timestamp: i64) void {
-    const bounded_stars = ab_stars[0..num_stars];
-    defer allocator.free(bounded_stars);
+pub export fn initialize() void {
+    star_math.initData(allocator) catch |err| switch (err) {
+        error.OutOfMemory => log("Could not allocate memory for stars", .{}),
+        error.ParseRA => log("Could not parse right ascension in catalog", .{}),
+        error.ParseDec => log("Could not parse declination in catalog", .{}),
+        error.ParseMag => log("Could not parse magnitude in catalog", .{}),
+    };
+}
+
+// pub export fn projectStarsWasm(ab_stars: [*]const Star, num_stars: u32, observer_location: *const Coord, observer_timestamp: i64) void {
+pub export fn projectStarsWasm(observer_location: *const Coord, observer_timestamp: i64) void {
+    // const bounded_stars = ab_stars[0..num_stars];
+    // defer allocator.free(bounded_stars);
     defer allocator.destroy(observer_location);
 
-    const projected_points = star_math.projectStars(allocator, Star, bounded_stars, observer_location.*, observer_timestamp, true);
+    // const projected_points = star_math.projectStars(allocator, Star, bounded_stars, observer_location.*, observer_timestamp, true);
+    const projected_points = star_math.projectStars(allocator, observer_location.*, observer_timestamp, true);
 
     if (projected_points) |points| {
         defer allocator.free(points);
@@ -37,31 +48,31 @@ pub export fn projectStarsWasm(ab_stars: [*]const Star, num_stars: u32, observer
     } else |_| {}
 }
 
-pub export fn projectConstellation(branches: [*]const ConstellationBranch, num_branches: u32, observer_location: *const Coord, observer_timestamp: i64) void {
-    // Allocate for now, bail if not possible
-    const branch_ends = allocator.alloc(StarCoord, num_branches * 2) catch |err| return;
-    var index: usize = 0;
-    for (branches[0..num_branches]) |branch| {
-        branch_ends[index] = branch.a;
-        branch_ends[index + 1] = branch.b;
-        index += 2;
-    }
-    defer allocator.free(branches[0..num_branches]);
-    // @todo Keep locatation across multiple branches 
-    defer allocator.destroy(observer_location);
+// pub export fn projectConstellation(branches: [*]const ConstellationBranch, num_branches: u32, observer_location: *const Coord, observer_timestamp: i64) void {
+//     // Allocate for now, bail if not possible
+//     const branch_ends = allocator.alloc(StarCoord, num_branches * 2) catch |err| return;
+//     var index: usize = 0;
+//     for (branches[0..num_branches]) |branch| {
+//         branch_ends[index] = branch.a;
+//         branch_ends[index + 1] = branch.b;
+//         index += 2;
+//     }
+//     defer allocator.free(branches[0..num_branches]);
+//     // @todo Keep locatation across multiple branches 
+//     defer allocator.destroy(observer_location);
 
-    const projected_points = star_math.projectStars(allocator, StarCoord, branch_ends, observer_location.*, observer_timestamp, false);
+//     const projected_points = star_math.projectStars(allocator, StarCoord, branch_ends, observer_location.*, observer_timestamp, false);
 
 
-    if (projected_points) |points| {
-        defer allocator.free(points);
-        var point_index: usize = 0;
-        while (point_index < points.len) : (point_index += 2) {
-            drawLineWasm(points[point_index].x, points[point_index].y, points[point_index + 1].x, points[point_index + 1].y);
-        }
-    } else |_| {}
+//     if (projected_points) |points| {
+//         defer allocator.free(points);
+//         var point_index: usize = 0;
+//         while (point_index < points.len) : (point_index += 2) {
+//             drawLineWasm(points[point_index].x, points[point_index].y, points[point_index + 1].x, points[point_index + 1].y);
+//         }
+//     } else |_| {}
 
-}
+// }
 
 pub export fn dragAndMoveWasm(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_end_y: f32) *Coord {
     const coord = star_math.dragAndMove(drag_start_x, drag_start_y, drag_end_x, drag_end_y);
