@@ -119,10 +119,8 @@ pub fn projectStars(allocator: *Allocator, observer_location: Coord, observer_ti
     const half_pi = comptime math.pi / 2.0;
     const local_sideral_time = getLocalSideralTime(@intToFloat(f64, observer_timestamp), observer_location.longitude);
 
-    // const points: []CanvasPoint = try allocator.alloc(CanvasPoint, stars.len);
     const points: []CanvasPoint = try allocator.alloc(CanvasPoint, global_stars.len);
     var num_points: u32 = 0;
-    // for (stars) |star, i| {
     for (global_stars) |star, i| {
         const hour_angle = local_sideral_time - @as(f64, star.right_ascension);
 

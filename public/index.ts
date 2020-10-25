@@ -1,4 +1,4 @@
-import { Star, Coord, ConstellationBranch, StarCoord, WasmInterface } from './wasm';
+import { Coord, ConstellationBranch, StarCoord, WasmInterface } from './wasm';
 
 interface StarEntry extends StarCoord {
     magnitude: number;
@@ -55,7 +55,6 @@ const degToRadLong = (degrees: number): number => {
     return normDeg * 0.017453292519943295;
 };
 
-// const renderStars = (stars: StarEntry[], coord: Coord, date?: Date) => {
 const renderStars = (coord: Coord, date?: Date) => {
     if (!date) {
         if (date_input.valueAsDate) {
@@ -65,17 +64,7 @@ const renderStars = (coord: Coord, date?: Date) => {
         }
     }
 
-    // const stars_simple: Star[] = stars.map(s => {
-    //     return {
-    //         rightAscension: s.rightAscension,
-    //         declination: s.declination,
-    //         brightness: s.magnitude,
-    //     };
-    // });
-
     const timestamp = date.valueOf();
-
-    // const brightness = parseFloat(brightnessInput.value);
 
     if (star_canvas_ctx == null) {
         console.error('Could not get canvas context!');
@@ -85,7 +74,6 @@ const renderStars = (coord: Coord, date?: Date) => {
     star_canvas_ctx.canvas.width = canvas_width;
     star_canvas_ctx.canvas.height = canvas_height;
 
-    // wasm_interface.projectStars(stars_simple, coord, timestamp);
     wasm_interface.projectStars(coord, timestamp);
 };
 
@@ -180,7 +168,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Get handles for all the input elements
     date_input = document.getElementById('dateInput') as HTMLInputElement;
     date_input.addEventListener('change', () => {
-        // renderStars(stars, { latitude: current_latitude, longitude: current_longitude });
         renderStars({ latitude: current_latitude, longitude: current_longitude });
         renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
     });
@@ -191,7 +178,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     brightness_input = document.getElementById('brightnessInput') as HTMLInputElement;
     brightness_input.addEventListener('change', () => {
-        // renderStars(stars, { latitude: current_latitude, longitude: current_longitude });
         renderStars({ latitude: current_latitude, longitude: current_longitude });
         renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
     });
@@ -200,7 +186,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     constellations_on_input.addEventListener('click', () => {
         const coord: Coord = { latitude: current_latitude, longitude: current_longitude };
         renderConstellations(constellations, coord);
-        // renderStars(stars, coord);
         renderStars(coord);
     });
 
@@ -253,7 +238,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             // @todo Update this loop so that all distances get traveled at the same speed,
             // not in the same amount of time
             const travelInterval = setInterval(() => {
-                // renderStars(stars, waypoints[waypoint_index]);
                 renderStars(waypoints[waypoint_index]);
                 renderConstellations(constellations, waypoints[waypoint_index]);
                 waypoint_index += 1;
@@ -274,7 +258,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             latInput.value = current_latitude.toString();
             longInput.value = current_longitude.toString();
 
-            // renderStars(stars, { latitude: current_latitude, longitude: current_longitude });
             renderStars({ latitude: current_latitude, longitude: current_longitude });
             renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
         }
@@ -298,7 +281,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     nextDate.setTime(nextDate.getTime() + getDaysInMillis(getDaysPerFrame(20, frame_target)));
                     date_input.valueAsDate = new Date(nextDate);
                     renderStars({ latitude: current_latitude, longitude: current_longitude }, nextDate);
-                    // renderStars(stars, { latitude: current_latitude, longitude: current_longitude }, nextDate);
                     renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude }, nextDate);
                     date = nextDate;
                 }
@@ -307,12 +289,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         travelIsOn = !travelIsOn;
     });
 
-    // const fetchAll = async (...paths: string[]): Promise<Response[]> => {
-    //     return await Promise.all(paths.map(p => fetch(p)));
-    // };
-
-    // const [star_response, constellation_response] = await fetchAll('/stars', '/constellations');
-    // stars = await star_response.json();
+    // const constellation_response = await fetch('/constellations');
     // constellations = await constellation_response.json();
     constellations = [];
 
@@ -333,7 +310,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Do the initial render
         drawUIElements();
-        // renderStars(stars, { latitude: current_latitude, longitude: current_longitude });
         renderStars({ latitude: current_latitude, longitude: current_longitude });
         renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
     });
@@ -400,7 +376,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         drag_start_x = drag_end_x;
         drag_start_y = drag_end_y;
 
-        // renderStars(stars, { latitude: current_latitude, longitude: current_longitude });
         renderStars({ latitude: current_latitude, longitude: current_longitude });
         renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
     });
@@ -423,7 +398,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Don't let the user scroll out further than the default size
         if (zoom_factor < 1) zoom_factor = 1;
         // Re-render the stars
-        // renderStars(stars, { latitude: current_latitude, longitude: current_longitude });
         renderStars({ latitude: current_latitude, longitude: current_longitude });
         renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
     });

@@ -31,14 +31,8 @@ pub export fn initialize() void {
     };
 }
 
-// pub export fn projectStarsWasm(ab_stars: [*]const Star, num_stars: u32, observer_location: *const Coord, observer_timestamp: i64) void {
-pub export fn projectStarsWasm(observer_location: *const Coord, observer_timestamp: i64) void {
-    // const bounded_stars = ab_stars[0..num_stars];
-    // defer allocator.free(bounded_stars);
-    defer allocator.destroy(observer_location);
-
-    // const projected_points = star_math.projectStars(allocator, Star, bounded_stars, observer_location.*, observer_timestamp, true);
-    const projected_points = star_math.projectStars(allocator, observer_location.*, observer_timestamp, true);
+pub export fn projectStarsWasm(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
+    const projected_points = star_math.projectStars(allocator, .{ .latitude = observer_latitude, .longitude = observer_longitude}, observer_timestamp, true);
 
     if (projected_points) |points| {
         defer allocator.free(points);

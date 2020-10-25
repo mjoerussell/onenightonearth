@@ -44,18 +44,6 @@ const sizedCanvasPoint: Sized<CanvasPoint> = {
     brightness: f32,
 };
 
-export type Star = {
-    rightAscension: number;
-    declination: number;
-    brightness: number;
-};
-
-const sizedStar: Sized<Star> = {
-    rightAscension: f32,
-    declination: f32,
-    brightness: f32,
-};
-
 export type StarCoord = {
     rightAscension: number;
     declination: number;
@@ -151,12 +139,8 @@ export class WasmInterface {
         (this.instance.exports.initialize as any)();
     }
 
-    // projectStars(stars: Star[], location: Coord, timestamp: number) {
-    projectStars(location: Coord, timestamp: number) {
-        // const star_ptr = this.allocArray(stars, sizedStar);
-        const location_ptr = this.allocObject(location, sizedCoord);
-        // (this.instance.exports.projectStarsWasm as any)(star_ptr, stars.length, location_ptr, BigInt(timestamp));
-        (this.instance.exports.projectStarsWasm as any)(location_ptr, BigInt(timestamp));
+    projectStars({ latitude, longitude }: Coord, timestamp: number) {
+        (this.instance.exports.projectStarsWasm as any)(latitude, longitude, BigInt(timestamp));
     }
 
     projectConstellationBranch(branches: ConstellationBranch[], location: Coord, timestamp: number) {
