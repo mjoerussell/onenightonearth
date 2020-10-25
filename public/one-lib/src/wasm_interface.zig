@@ -3,6 +3,7 @@ const ArrayList = std.ArrayList;
 const parseFloat = std.fmt.parseFloat;
 const star_math = @import("./star_math.zig");
 const Star = star_math.Star;
+const StarIterator = star_math.StarIterator;
 const StarCoord = star_math.StarCoord;
 const ConstellationBranch = star_math.ConstellationBranch;
 const Coord = star_math.Coord;
@@ -32,14 +33,11 @@ pub export fn initialize() void {
 }
 
 pub export fn projectStarsWasm(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
-    const projected_points = star_math.projectStars(allocator, .{ .latitude = observer_latitude, .longitude = observer_longitude}, observer_timestamp, true);
-
-    if (projected_points) |points| {
-        defer allocator.free(points);
-        for (points) |point| {
-            drawPointWasm(point.x, point.y, point.brightness);
-        }
-    } else |_| {}
+    var it = StarIterator{};
+    while (it.next()) |star| {
+        const point = star_math.projectStar(star, .{ .latitude = observer_latitude, .longitude = observer_longitude}, observer_timestamp, true);
+        if (point) |p| drawPointWasm(p.x, p.y, p.brightness);
+    }
 }
 
 // pub export fn projectConstellation(branches: [*]const ConstellationBranch, num_branches: u32, observer_location: *const Coord, observer_timestamp: i64) void {

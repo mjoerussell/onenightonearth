@@ -43,14 +43,18 @@ pub const ConstellationBranch = packed struct {
 const catalog = @embedFile("./sao_catalog");
 var global_stars: []Star = undefined;
 
-fn parseFloat(comptime T: type, val: []const u8) !T {
-    if (@typeInfo(T) != .Float) @compileError("Cannot parse into non-float type.");
+pub const StarIterator = struct {
+    const Self = @This();
+    index: usize = 0,
 
-    return std.fmt.parseFloat(T, val) catch |err| {
-        const res = try std.fmt.parseInt(i128, val, 10);
-        return @intToFloat(T, res);
-    };
-} 
+    pub fn next(self: *Self) ?Star {
+        if (self.index < global_stars.len) {
+            defer self.index += 1;
+            return global_stars[self.index];
+        }
+        return null;
+    }
+};
 
 pub const InitError = error {
     OutOfMemory,
@@ -88,7 +92,7 @@ pub fn initData(allocator: *Allocator) InitError!void {
                     else => continue
                 }
             }
-            if (star.brightness > 0.35) {
+            if (star.brightness > 0.32) {
                 global_stars[star_index] = star;
                 star_index += 1;
             }
@@ -110,8 +114,8 @@ fn fieldExists(comptime value: type, comptime field_name: []const u8) bool {
     }
 }
 
-// pub fn projectStars(allocator: *Allocator, comptime T: type, stars: []const T, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ![]CanvasPoint {
-pub fn projectStars(allocator: *Allocator, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ![]CanvasPoint {
+// pub fn projectStars(allocator: *Allocator, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ![]CanvasPoint {
+pub fn projectStar(star: Star, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?CanvasPoint {
     // @fixme There's still a bug here - For some reason, if stars are in certain locations in the sky they get blinked to (0,0) on the canvas.
     // I'm assuming that a trig function is returning NaN, but I'm not sure. Also not sure if the root cause is here or getProjectedCoord,
     // but either way it's going through this function.
@@ -119,38 +123,31 @@ pub fn projectStars(allocator: *Allocator, observer_location: Coord, observer_ti
     const half_pi = comptime math.pi / 2.0;
     const local_sideral_time = getLocalSideralTime(@intToFloat(f64, observer_timestamp), observer_location.longitude);
 
-    const points: []CanvasPoint = try allocator.alloc(CanvasPoint, global_stars.len);
     var num_points: u32 = 0;
-    for (global_stars) |star, i| {
-        const hour_angle = local_sideral_time - @as(f64, star.right_ascension);
+    const hour_angle = local_sideral_time - @as(f64, star.right_ascension);
 
-        const declination_rad = degToRad(f32, star.declination);
-        const lat_rad = degToRad(f32, observer_location.latitude);
-        const hour_angle_rad = floatMod(degToRad(f64, hour_angle), two_pi);
+    const declination_rad = degToRad(f32, star.declination);
+    const lat_rad = degToRad(f32, observer_location.latitude);
+    const hour_angle_rad = floatMod(degToRad(f64, hour_angle), two_pi);
 
-        const sin_dec = math.sin(declination_rad);
-        const sin_lat = math.sin(lat_rad);
-        const cos_lat = math.cos(lat_rad);
+    const sin_dec = math.sin(declination_rad);
+    const sin_lat = math.sin(lat_rad);
+    const cos_lat = math.cos(lat_rad);
 
-        const sin_alt = sin_dec * sin_lat + math.cos(declination_rad) * cos_lat * math.cos(hour_angle_rad);
-        const altitude = boundedASin(sin_alt);
-        if ((filter_below_horizon and altitude < 0) or (!filter_below_horizon and altitude < -(half_pi / 3.0))) {
-            continue;
-        }
-
-        const cos_azi = (sin_dec - math.sin(altitude) * sin_lat) / (math.cos(altitude) * cos_lat);
-        const azi = math.acos(cos_azi);
-        const azimuth = if (math.sin(hour_angle_rad) < 0) azi else two_pi - azi;
-
-        var star_point = getProjectedCoord(@floatCast(f32, altitude), @floatCast(f32, azimuth));
-        
-        star_point.brightness = comptime if (fieldExists(Star, "brightness")) star.brightness else 0.0;
-
-        points[num_points] = star_point;
-        num_points += 1;
+    const sin_alt = sin_dec * sin_lat + math.cos(declination_rad) * cos_lat * math.cos(hour_angle_rad);
+    const altitude = boundedASin(sin_alt);
+    if ((filter_below_horizon and altitude < 0) or (!filter_below_horizon and altitude < -(half_pi / 3.0))) {
+        return null;
     }
 
-    return allocator.realloc(points, num_points) catch |err| return points;
+    const cos_azi = (sin_dec - math.sin(altitude) * sin_lat) / (math.cos(altitude) * cos_lat);
+    const azi = math.acos(cos_azi);
+    const azimuth = if (math.sin(hour_angle_rad) < 0) azi else two_pi - azi;
+
+    var star_point = getProjectedCoord(@floatCast(f32, altitude), @floatCast(f32, azimuth));
+    star_point.brightness = comptime if (fieldExists(Star, "brightness")) star.brightness else 0.0;
+
+    return star_point;
 }
 
 pub fn getProjectedCoord(altitude: f32, azimuth: f32) CanvasPoint {
