@@ -18,7 +18,6 @@ h1 {
     margin-left: 50%;
     transform: translateX(-50%);
     background-color: beige;
-    /* box-shadow: 4px 0 8px rgba(175, 175, 180, 0.6); */
 }
 
 #settings {
@@ -46,15 +45,40 @@ h1 {
 
 .input-fields .input-row {
     width: 100%;
+    margin: 5px 0;
+}
+
+.input-fields input {
+    padding: 3px;
+    margin: 0 5px;
+    color: #01020f;
+    background-color: #ffffff00;
+    border: 1px solid #01020f;
+    border-radius: 2px;
 }
 
 #actions {
     width: 20%;
     padding: 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-evenly;
 }
 
-.actions button {
+#actions button {
     width: 100%;
+    padding: 2px 0;
+    border: 1px solid #01020f;
+    border-radius: 2px;
+    color: #01020f;
+    background-color: #ffffff00;
+}
+
+#actions button:hover {
+    color: #fff;
+    background-color: #01020f;
+    cursor: pointer;
 }
 
 .canvas-container {

@@ -151,7 +151,8 @@ export class WasmInterface {
         (this.instance.exports.initialize as any)();
     }
 
-    projectStars(stars: Star[], location: Coord, timestamp: number) {
+    // projectStars(stars: Star[], location: Coord, timestamp: number) {
+    projectStars(location: Coord, timestamp: number) {
         // const star_ptr = this.allocArray(stars, sizedStar);
         const location_ptr = this.allocObject(location, sizedCoord);
         // (this.instance.exports.projectStarsWasm as any)(star_ptr, stars.length, location_ptr, BigInt(timestamp));
