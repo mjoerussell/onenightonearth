@@ -307,7 +307,7 @@ test "Line Iterator" {
     const data = first ++ "\n" ++ second ++ "\n" ++ third;
     var it = LineIterator.create(data);
     var index: usize = 0;
-    while (it.next_line()) |line| : (index += 1)  {
+    while (it.next()) |line| : (index += 1)  {
         switch (index) {
             0 => expectEqualStrings(first, line),
             1 => expectEqualStrings(second, line),
@@ -322,7 +322,7 @@ test "Single-Char Token Iterator" {
     const data = "one|two|three";
     var it = TokenIterator("|").create(data);
     var index: usize = 0;
-    while (it.next_line()) |line| : (index += 1)  {
+    while (it.next()) |line| : (index += 1)  {
         switch (index) {
             0 => expectEqualStrings("one", line),
             1 => expectEqualStrings("two", line),
@@ -337,12 +337,25 @@ test "Multi-Char Token Iterator" {
     const data = "oneabctwoabcthree";
     var it = TokenIterator("abc").create(data);
     var index: usize = 0;
-    while (it.next_line()) |line| : (index += 1)  {
+    while (it.next()) |line| : (index += 1)  {
         switch (index) {
             0 => expectEqualStrings("one", line),
             1 => expectEqualStrings("two", line),
             2 => expectEqualStrings("three", line),
             else => std.debug.panic("Should only have 3 lines", .{})
+        }
+    }
+}
+
+test "No tokens" {
+    const expectEqualStrings = std.testing.expectEqualStrings;
+    const data = "abc";
+    var it = TokenIterator("|").create(data);
+    var index: usize = 0;
+    while (it.next()) |token| : (index += 1) {
+        switch (index) {
+            0 => expectEqualStrings(data, token),
+            else => std.debug.panic("Should only have 1 token", .{})
         }
     }
 }

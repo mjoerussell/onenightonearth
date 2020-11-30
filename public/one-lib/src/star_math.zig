@@ -40,12 +40,25 @@ pub const ConstellationBranch = packed struct {
     b: StarCoord
 };
 
-const catalog = @embedFile("./sao_catalog");
-var global_stars: []Star = undefined;
+pub var global_stars: []Star = undefined;
 
 pub const StarIterator = struct {
     const Self = @This();
     index: usize = 0,
+    end_index: usize = 0,
+
+    pub fn create() Self {
+        return StarIterator{
+            .end_index = global_stars.len
+        };
+    }
+
+    pub fn fromRange(start: usize, end: usize) Self {
+        return StarIterator{
+            .index = start,
+            .end_index = if (end > global_stars.len) global_stars.len else end
+        };
+    }
 
     pub fn next(self: *Self) ?Star {
         if (self.index < global_stars.len) {
@@ -63,42 +76,36 @@ pub const InitError = error {
     ParseMag
 };
 
-pub fn initData(allocator: *Allocator) InitError!void {
-    global_stars = allocator.alloc(Star, 300_000) catch |err| return error.OutOfMemory;
-    var line_it = LineIterator.create(catalog);
-    var star_index: usize = 0;
+pub fn initData(allocator: *Allocator, star_data: []const u8) InitError!void {
+    var star_list = std.ArrayList(Star).init(allocator);
+    var line_it = LineIterator.create(star_data);
     while (line_it.next()) |line| {
-        if (std.mem.startsWith(u8, line, "SAO")) {
-            var star = Star{};
-            var data_it = TokenIterator("|").create(line);
-            var data_index: usize = 0;
-            data_loop: while (data_it.next()) |value| : (data_index += 1) {
-                // @todo Parse float or int to float
-                // Only get data from the desired indices
-                switch (data_index) {
-                    0 => star.name = value,
-                    1 => star.right_ascension = std.fmt.parseFloat(f32, value) catch |_| return error.ParseRA,
-                    5 => star.declination = std.fmt.parseFloat(f32, value) catch |_| return error.ParseDec,
-                    13 => {
-                        // const v_mag = parseFloat(f32, value) catch |_| return error.ParseMag;
-                        // const v_mag = parseFloat(f32, value) catch |_| 0.0;
-                        const v_mag = std.fmt.parseFloat(f32, value) catch |_| 0.0;
-                        const dimmest_visible: f32 = 18.6;
-                        const brightest_value: f32 = -4.6;
-                        const mag_display_factor = (dimmest_visible - (v_mag - brightest_value)) / dimmest_visible;
-                        star.brightness = mag_display_factor;
-                        break :data_loop;
-                    },
-                    else => continue
-                }
-            }
-            if (star.brightness > 0.32) {
-                global_stars[star_index] = star;
-                star_index += 1;
+        var star = Star{};
+        var data_it = TokenIterator("|").create(line);
+        var data_index: usize = 0;
+        data_loop: while (data_it.next()) |value| : (data_index += 1) {
+            // @todo Parse float or int to float
+            // Only get data from the desired indices
+            switch (data_index) {
+                0 => star.name = value,
+                1 => star.right_ascension = std.fmt.parseFloat(f32, value) catch |_| return error.ParseRA,
+                5 => star.declination = std.fmt.parseFloat(f32, value) catch |_| return error.ParseDec,
+                13 => {
+                    const v_mag = std.fmt.parseFloat(f32, value) catch |_| 0.0;
+                    const dimmest_visible: f32 = 18.6;
+                    const brightest_value: f32 = -4.6;
+                    const mag_display_factor = (dimmest_visible - (v_mag - brightest_value)) / dimmest_visible;
+                    star.brightness = mag_display_factor;
+                    break :data_loop;
+                },
+                else => continue
             }
         }
+        if (star.brightness > 0.3) {
+            try star_list.append(star);
+        }
     }
-    global_stars = try allocator.realloc(global_stars, star_index + 1);
+    global_stars = star_list.toOwnedSlice();
 }
 
 fn fieldExists(comptime value: type, comptime field_name: []const u8) bool {
@@ -114,7 +121,6 @@ fn fieldExists(comptime value: type, comptime field_name: []const u8) bool {
     }
 }
 
-// pub fn projectStars(allocator: *Allocator, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ![]CanvasPoint {
 pub fn projectStar(star: Star, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?CanvasPoint {
     // @fixme There's still a bug here - For some reason, if stars are in certain locations in the sky they get blinked to (0,0) on the canvas.
     // I'm assuming that a trig function is returning NaN, but I'm not sure. Also not sure if the root cause is here or getProjectedCoord,

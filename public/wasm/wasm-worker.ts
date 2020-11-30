@@ -1,194 +1,65 @@
-enum WasmPrimative {
-    u8,
-    u16,
-    u32,
-    u64,
-    i8,
-    i16,
-    i32,
-    i64,
-    f32,
-    f64,
-}
+import {
+    Coord,
+    CanvasPoint,
+    sizedCanvasPoint,
+    ConstellationBranch,
+    WasmPrimative,
+    isSimpleAlloc,
+    isSimpleSize,
+    isComplexSize,
+    pointer,
+    Allocatable,
+    Sized,
+} from './size';
 
-const u8 = WasmPrimative.u8;
-const u16 = WasmPrimative.u16;
-const u32 = WasmPrimative.u32;
-const u64 = WasmPrimative.u64;
-const i8 = WasmPrimative.i8;
-const i16 = WasmPrimative.i16;
-const i32 = WasmPrimative.i32;
-const i64 = WasmPrimative.i64;
-const f32 = WasmPrimative.f32;
-const f64 = WasmPrimative.f64;
+let instance: WasmInterface;
 
-export type Coord = {
-    latitude: number;
-    longitude: number;
+const wasm_log = (msg_ptr: number, msg_len: number) => {
+    const message = instance.getString(msg_ptr, msg_len);
+    console.log(`[WASM] ${message}`);
 };
 
-const sizedCoord: Sized<Coord> = {
-    latitude: f32,
-    longitude: f32,
-};
+// consoleLog: wasm_log,
+// drawPointWasm,
+// drawLineWasm,
 
-export type CanvasPoint = {
-    x: number;
-    y: number;
-    brightness: number;
-};
-
-const sizedCanvasPoint: Sized<CanvasPoint> = {
-    x: f32,
-    y: f32,
-    brightness: f32,
-};
-
-export type StarCoord = {
-    rightAscension: number;
-    declination: number;
-};
-
-const sizedStarCoord: Sized<StarCoord> = {
-    rightAscension: f32,
-    declination: f32,
-};
-
-export type ConstellationBranch = {
-    a: StarCoord;
-    b: StarCoord;
-};
-
-const sizedConstellationBranch: Sized<ConstellationBranch> = {
-    a: sizedStarCoord,
-    b: sizedStarCoord,
-};
-
-/**
- * A `SimpleAlloc` is a struct whose fields are just numbers. This means that it can
- * be allocated and read just using `getPrimative` and `setPrimative`.
- */
-type SimpleAlloc = {
-    [key: string]: number;
-};
-
-/**
- * A `SimpleSize` is a size definition for `SimpleAlloc`.
- */
-type SimpleSize<T extends SimpleAlloc> = {
-    [K in keyof T]: WasmPrimative;
-};
-
-/**
- * `ComplexAlloc` is a struct whose fields are structs. The fields can either be more `ComplexAlloc`'s, or
- * just `SimpleAlloc`'s.
- */
-type ComplexAlloc = {
-    [key: string]: Allocatable;
-};
-
-/**
- * `ComplexSize` is a size definition for `ComplexAlloc`.
- */
-type ComplexSize<T extends ComplexAlloc> = {
-    [K in keyof T]: Sized<T[K]>;
-};
-
-/**
- * `Allocatable` types are data types that can be automatically allocated regardless of their complexity.
- */
-type Allocatable = SimpleAlloc | ComplexAlloc;
-/**
- * `Sized` types are companions to `Allocatable` types. For every type `T` that extends `Allocatable`, there must be an implementation
- * of `Sized<T>` which defines the size in bytes of every field on `T`.
- */
-type Sized<T extends Allocatable> = T extends SimpleAlloc ? SimpleSize<T> : T extends ComplexAlloc ? ComplexSize<T> : never;
-
-const isSimpleAlloc = (data: Allocatable): data is SimpleAlloc => {
-    for (const key in data) {
-        if (data.hasOwnProperty(key)) {
-            if (typeof data[key] !== 'number') {
-                return false;
-            }
-        }
+onmessage = (event: MessageEvent) => {
+    if (event.data.type === 'INIT') {
+        WebAssembly.instantiate(event.data.wasm_buffer, {
+            env: {
+                consoleLog: wasm_log,
+            },
+        }).then(wasm_result => {
+            instance = new WasmInterface(wasm_result.instance);
+            instance.initialize(event.data.stars);
+            postMessage({ type: 'INIT_COMPLETE' });
+        });
+    } else if (event.data.type === 'PROJECT') {
+        const { latitude, longitude, timestamp } = event.data;
+        const canvas_points = instance.projectStars(latitude, longitude, timestamp);
+        postMessage({
+            type: 'drawPointWasm',
+            points: canvas_points,
+        });
     }
-    return true;
 };
 
-const isSimpleSize = (type: Sized<any>): type is SimpleSize<any> => {
-    for (const key in type) {
-        if (type.hasOwnProperty(key)) {
-            if (typeof type[key] !== 'number') {
-                return false;
-            }
-        }
-    }
-    return true;
-};
-
-const isComplexSize = (type: Sized<any>): type is ComplexSize<any> => {
-    return !isSimpleSize(type);
-};
-
-type pointer = number;
-
-export class WasmInterface {
+class WasmInterface {
     constructor(private instance: WebAssembly.Instance) {}
 
-    init() {
-        (this.instance.exports.initialize as any)();
+    initialize(stars: string): void {
+        const star_ptr = this.allocString(stars);
+        (this.instance.exports.initialize as any)(star_ptr, stars.length);
     }
 
-    projectStars({ latitude, longitude }: Coord, timestamp: number) {
-        (this.instance.exports.projectStarsWasm as any)(latitude, longitude, BigInt(timestamp));
-    }
-
-    projectConstellationBranch(branches: ConstellationBranch[], location: Coord, timestamp: number) {
-        // const branches_ptr = this.allocArray(branches, sizedConstellationBranch);
-        // const location_ptr = this.allocObject(location, sizedCoord);
-        // (this.instance.exports.projectConstellation as any)(branches_ptr, branches.length, location_ptr, BigInt(timestamp));
-    }
-
-    /**
-     * Compute waypoints along the great circle between two points. This results in a direct line between
-     * the given points along the surface of a sphere.
-     * @param starting_location The location to start at.
-     * @param end_location      The location to end up at.
-     * @param num_waypoints     The number of waypoints to compute. Defaults to `100`.
-     * @return An array of length `num_waypoints` of Coords representing a path between `starting_location` and `end_location`.
-     */
-    getWaypoints(starting_location: Coord, end_location: Coord, num_waypoints = 100): Coord[] {
-        const start_ptr = this.allocObject(starting_location, sizedCoord);
-        const end_ptr = this.allocObject(end_location, sizedCoord);
-        const res_ptr = (this.instance.exports.findWaypointsWasm as any)(start_ptr, end_ptr, num_waypoints);
-
-        const result: Coord[] = this.readArray(res_ptr, num_waypoints, sizedCoord);
-        this.freeBytes(res_ptr, sizeOf(sizedCoord) * num_waypoints);
-
-        return result;
-    }
-
-    dragAndMove(drag_start_x: number, drag_start_y: number, drag_end_x: number, drag_end_y: number): Coord {
-        const res_ptr = (this.instance.exports.dragAndMoveWasm as any)(drag_start_x, drag_start_y, drag_end_x, drag_end_y);
-        const result = this.readObject(res_ptr, sizedCoord);
-        this.freeBytes(res_ptr, sizeOf(sizedCanvasPoint));
-
-        return result;
-    }
-
-    /**
-     * Given the altitude and azimuth of a star, compute it's location on the unit circle using the custom
-     * projection method.
-     * @param altitude      The altitude of the star being projected.
-     * @param azimuth       The azimuth of the star being projected.
-     * @param brightness
-     */
-    projectCoord(altitude: number, azimuth: number, brightness: number = 1.0): CanvasPoint {
-        const res_ptr = (this.instance.exports.getProjectedCoordWasm as any)(altitude, azimuth, brightness);
-        const result = this.readObject(res_ptr, sizedCanvasPoint);
-        this.freeBytes(res_ptr, sizeOf(sizedCanvasPoint));
-
-        return result;
+    projectStars(latitude: number, longitude: number, timestamp: BigInt): CanvasPoint[] {
+        const len_ptr = this.allocBytes(4);
+        const ptr: number = (this.instance.exports.projectStarsWasm as any)(latitude, longitude, timestamp, len_ptr);
+        if (ptr === 0) return [];
+        const num_points = this.readPrimative(len_ptr, WasmPrimative.u32);
+        const points = this.readArray(ptr, num_points, sizedCanvasPoint);
+        this.freeBytes(ptr, sizeOf(sizedCanvasPoint) * num_points);
+        return points;
     }
 
     getString(ptr: pointer, len: number): string {
@@ -197,7 +68,7 @@ export class WasmInterface {
         return decoder.decode(message_mem);
     }
 
-    private allocPrimative(data: number, size: WasmPrimative): pointer {
+    allocPrimative(data: number, size: WasmPrimative): pointer {
         const total_bytes = sizeOfPrimative(size);
         const ptr = this.allocBytes(total_bytes);
         const data_mem = new DataView(this.memory, ptr, total_bytes);
@@ -215,13 +86,13 @@ export class WasmInterface {
         return ptr;
     }
 
-    private readPrimative(ptr: pointer, size: WasmPrimative): number {
+    readPrimative(ptr: pointer, size: WasmPrimative): number {
         const total_bytes = sizeOfPrimative(size);
         const data_mem = new DataView(this.memory, ptr, total_bytes);
         return this.getPrimative(data_mem, size) as number;
     }
 
-    private allocString(data: string): pointer {
+    allocString(data: string): pointer {
         const ptr = this.allocBytes(data.length);
         const encoder = new TextEncoder();
         const data_mem = new DataView(this.memory, ptr, data.length);
@@ -234,7 +105,7 @@ export class WasmInterface {
         return ptr;
     }
 
-    private allocObject<T extends Allocatable>(data: T, size: Sized<T>): pointer {
+    allocObject<T extends Allocatable>(data: T, size: Sized<T>): pointer {
         const total_bytes = sizeOf(size);
         const ptr = this.allocBytes(total_bytes);
         const data_mem = new DataView(this.memory, ptr, total_bytes);
@@ -242,7 +113,7 @@ export class WasmInterface {
         return ptr;
     }
 
-    private readObject<T extends Allocatable>(ptr: pointer, size: Sized<T>): T {
+    readObject<T extends Allocatable>(ptr: pointer, size: Sized<T>): T {
         const total_bytes = sizeOf(size);
         const data_mem = new DataView(this.memory, ptr, total_bytes);
         const result: any = {};
@@ -264,7 +135,7 @@ export class WasmInterface {
         return result;
     }
 
-    private allocArray<T extends Allocatable>(data: T[], size: Sized<T>): pointer {
+    allocArray<T extends Allocatable>(data: T[], size: Sized<T>): pointer {
         const item_bytes = sizeOf(size);
         const total_bytes = item_bytes * data.length;
         const ptr = this.allocBytes(total_bytes);
@@ -277,7 +148,7 @@ export class WasmInterface {
         return ptr;
     }
 
-    private readArray<T extends Allocatable>(ptr: pointer, num_items: number, size: Sized<T>): T[] {
+    readArray<T extends Allocatable>(ptr: pointer, num_items: number, size: Sized<T>): T[] {
         const total_bytes = sizeOf(size) * num_items;
         const data_mem = new DataView(this.memory, ptr, total_bytes);
         let current_offset = 0;
@@ -307,15 +178,15 @@ export class WasmInterface {
         return result_array;
     }
 
-    private allocBytes(num_bytes: number): pointer {
+    allocBytes(num_bytes: number): pointer {
         return (this.instance.exports as any)._wasm_alloc(num_bytes);
     }
 
-    private freeBytes(location: pointer, num_bytes: number): void {
+    freeBytes(location: pointer, num_bytes: number): void {
         (this.instance.exports as any)._wasm_free(location, num_bytes);
     }
 
-    private setObject<T extends Allocatable>(mem: DataView, data: T, type: Sized<T>, offset = 0): number {
+    setObject<T extends Allocatable>(mem: DataView, data: T, type: Sized<T>, offset = 0): number {
         let current_offset = offset;
         if (isSimpleAlloc(data)) {
             if (isSimpleSize(type)) {
@@ -335,7 +206,7 @@ export class WasmInterface {
         return current_offset;
     }
 
-    private getObject<T extends Allocatable>(mem: DataView, type: Sized<T>, offset = 0): T {
+    getObject<T extends Allocatable>(mem: DataView, type: Sized<T>, offset = 0): T {
         let result: any = {};
         let current_offset = offset;
         if (isSimpleSize(type)) {
@@ -357,43 +228,43 @@ export class WasmInterface {
 
     private setPrimative(mem: DataView, value: number, type: WasmPrimative, offset = 0) {
         switch (type) {
-            case u8: {
+            case WasmPrimative.u8: {
                 mem.setUint8(offset, value);
                 break;
             }
-            case u16: {
+            case WasmPrimative.u16: {
                 mem.setUint16(offset, value, true);
                 break;
             }
-            case u32: {
+            case WasmPrimative.u32: {
                 mem.setUint32(offset, value, true);
                 break;
             }
-            case u64: {
+            case WasmPrimative.u64: {
                 mem.setBigUint64(offset, BigInt(value), true);
                 break;
             }
-            case i8: {
+            case WasmPrimative.i8: {
                 mem.setInt8(offset, value);
                 break;
             }
-            case i16: {
+            case WasmPrimative.i16: {
                 mem.setInt16(offset, value, true);
                 break;
             }
-            case i32: {
+            case WasmPrimative.i32: {
                 mem.setInt32(offset, value, true);
                 break;
             }
-            case i64: {
+            case WasmPrimative.i64: {
                 mem.setBigInt64(offset, BigInt(value), true);
                 break;
             }
-            case f32: {
+            case WasmPrimative.f32: {
                 mem.setFloat32(offset, value, true);
                 break;
             }
-            case f64: {
+            case WasmPrimative.f64: {
                 mem.setFloat64(offset, value, true);
                 break;
             }
@@ -402,34 +273,34 @@ export class WasmInterface {
 
     private getPrimative(mem: DataView, type: WasmPrimative, offset = 0): number | BigInt {
         switch (type) {
-            case u8: {
+            case WasmPrimative.u8: {
                 return mem.getUint8(offset);
             }
-            case u16: {
+            case WasmPrimative.u16: {
                 return mem.getUint16(offset, true);
             }
-            case u32: {
+            case WasmPrimative.u32: {
                 return mem.getUint32(offset, true);
             }
-            case u64: {
+            case WasmPrimative.u64: {
                 return mem.getBigUint64(offset, true);
             }
-            case i8: {
+            case WasmPrimative.i8: {
                 return mem.getInt8(offset);
             }
-            case i16: {
+            case WasmPrimative.i16: {
                 return mem.getInt16(offset, true);
             }
-            case i32: {
+            case WasmPrimative.i32: {
                 return mem.getInt32(offset, true);
             }
-            case i64: {
+            case WasmPrimative.i64: {
                 return mem.getBigInt64(offset, true);
             }
-            case f32: {
+            case WasmPrimative.f32: {
                 return mem.getFloat32(offset, true);
             }
-            case f64: {
+            case WasmPrimative.f64: {
                 return mem.getFloat64(offset, true);
             }
         }
@@ -442,19 +313,19 @@ export class WasmInterface {
 
 const sizeOfPrimative = (data: WasmPrimative): number => {
     switch (data) {
-        case u8:
-        case i8:
+        case WasmPrimative.u8:
+        case WasmPrimative.i8:
             return 1;
-        case u16:
-        case i16:
+        case WasmPrimative.u16:
+        case WasmPrimative.i16:
             return 2;
-        case u32:
-        case i32:
-        case f32:
+        case WasmPrimative.u32:
+        case WasmPrimative.i32:
+        case WasmPrimative.f32:
             return 4;
-        case u64:
-        case i64:
-        case f64:
+        case WasmPrimative.u64:
+        case WasmPrimative.i64:
+        case WasmPrimative.f64:
             return 8;
         default:
             return data;

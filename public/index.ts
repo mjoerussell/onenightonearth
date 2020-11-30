@@ -1,4 +1,5 @@
-import { Coord, ConstellationBranch, StarCoord, WasmInterface } from './wasm';
+import { WasmInterface } from './wasm/interface';
+import { Coord, ConstellationBranch, StarCoord } from './wasm/size';
 
 interface StarEntry extends StarCoord {
     magnitude: number;
@@ -71,10 +72,8 @@ const renderStars = (coord: Coord, date?: Date) => {
         return;
     }
 
-    star_canvas_ctx.canvas.width = canvas_width;
-    star_canvas_ctx.canvas.height = canvas_height;
-
-    wasm_interface.projectStars(coord, timestamp);
+    star_canvas_ctx.clearRect(0, 0, star_canvas_ctx.canvas.width, star_canvas_ctx.canvas.height);
+    return wasm_interface.projectStars(coord, timestamp);
 };
 
 const renderConstellations = (constellations: ConstellationEntry[], coord: Coord, date?: Date) => {
@@ -159,11 +158,6 @@ const getDaysPerFrame = (daysPerSecond: number, frameTarget: number): number => 
     return daysPerSecond / frameTarget;
 };
 
-const wasm_log = (msg_ptr: number, msg_len: number) => {
-    const message = wasm_interface.getString(msg_ptr, msg_len);
-    console.log(`[WASM] ${message}`);
-};
-
 document.addEventListener('DOMContentLoaded', async () => {
     // Get handles for all the input elements
     date_input = document.getElementById('dateInput') as HTMLInputElement;
@@ -175,6 +169,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     star_canvas = document.getElementById('star-canvas') as HTMLCanvasElement;
     star_canvas_ctx = star_canvas.getContext('2d')!;
+
+    star_canvas_ctx.canvas.width = canvas_width;
+    star_canvas_ctx.canvas.height = canvas_height;
 
     brightness_input = document.getElementById('brightnessInput') as HTMLInputElement;
     brightness_input.addEventListener('change', () => {
@@ -226,12 +223,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         // 4000 = 4 seconds for the whole traversal
         const point_interval = 4000 / coord_dist;
 
-        const waypoints = wasm_interface.getWaypoints(start, end).map(coord => {
-            return {
-                latitude: radToDeg(coord.latitude),
-                longitude: radToDegLong(coord.longitude),
-            };
-        });
+        // const waypoints = wasm_interface.getWaypoints(start, end).map(coord => {
+        //     return {
+        //         latitude: radToDeg(coord.latitude),
+        //         longitude: radToDegLong(coord.longitude),
+        //     };
+        // });
+
+        const waypoints: any[] = [];
 
         let waypoint_index = 0;
         if (waypoints != null && waypoints.length > 0) {
@@ -270,21 +269,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     travel_button.addEventListener('click', async () => {
         if (travelIsOn && travelInterval != null) {
             travel_button.innerText = 'Time Travel';
-            clearInterval(travelInterval);
         } else {
             travel_button.innerText = 'Stop';
             let date = date_input.valueAsDate ?? new Date();
-            travelInterval = setInterval(() => {
+            const runTimeTravel = () => {
                 const currentDate = new Date(date);
                 if (currentDate) {
                     const nextDate = new Date(currentDate);
                     nextDate.setTime(nextDate.getTime() + getDaysInMillis(getDaysPerFrame(20, frame_target)));
                     date_input.valueAsDate = new Date(nextDate);
-                    renderStars({ latitude: current_latitude, longitude: current_longitude }, nextDate);
-                    renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude }, nextDate);
-                    date = nextDate;
+                    renderStars({ latitude: current_latitude, longitude: current_longitude }, nextDate)?.then(() => {
+                        date = nextDate;
+                        if (travelIsOn) {
+                            travelInterval = setTimeout(runTimeTravel);
+                        }
+                    });
+                    // renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude }, nextDate);
+                    // date = nextDate;
                 }
-            }, 1000 / frame_target);
+            };
+            travelInterval = setTimeout(runTimeTravel);
         }
         travelIsOn = !travelIsOn;
     });
@@ -294,25 +298,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     constellations = [];
 
     // Fetch and instantiate the WASM module
-    WebAssembly.instantiateStreaming(fetch('./one-lib/zig-cache/lib/one-math.wasm'), {
-        env: {
-            consoleLog: wasm_log,
+    wasm_interface = new WasmInterface(4);
+    await wasm_interface
+        .init({
+            // consoleLog: wasm_log,
             drawPointWasm,
             drawLineWasm,
-        },
-    }).then(wasm_result => {
-        wasm_interface = new WasmInterface(wasm_result.instance);
+        })
+        .then(() => {
+            console.log('wasm interface loaded');
+            current_latitude = parseFloat(latInput.value);
+            current_longitude = parseFloat(longInput.value);
 
-        wasm_interface.init();
-
-        current_latitude = parseFloat(latInput.value);
-        current_longitude = parseFloat(longInput.value);
-
-        // Do the initial render
-        drawUIElements();
-        renderStars({ latitude: current_latitude, longitude: current_longitude });
-        renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
-    });
+            // Do the initial render
+            drawUIElements();
+            return renderStars({ latitude: current_latitude, longitude: current_longitude });
+            // renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
+        });
 
     let is_dragging = false;
     let [drag_start_x, drag_start_y] = [0, 0];
@@ -334,7 +336,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         // The new coordinate will be relative to the current latitude and longitude - it will be a lat/long
         // value that is measured with the current location as the origin.
         // This means that in order to calculate the actual next location, new_coord has to be added to current
-        const new_coord = wasm_interface.dragAndMove(drag_start_x, drag_start_y, drag_end_x, drag_end_y);
+        // const new_coord = wasm_interface.dragAndMove(drag_start_x, drag_start_y, drag_end_x, drag_end_y);
+        const new_coord: Coord = { latitude: 0, longitude: 0 };
 
         // Add or subtract new_value from current_value depending on the orientation
         const directed_add = (current_value: number, new_value: number): number => {

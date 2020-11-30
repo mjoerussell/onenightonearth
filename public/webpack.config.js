@@ -1,7 +1,10 @@
 const path = require('path');
 
 module.exports = {
-    entry: './index.ts',
+    entry: {
+        bundle: './index.ts',
+        worker: './wasm/wasm-worker.ts'
+    },
     devtool: 'inline-source-map',
     mode: 'development',
     module: {
@@ -17,7 +20,7 @@ module.exports = {
         extensions: ['.ts', '.js'],
     },
     output: {
-        filename: 'bundle.js',
+        filename: '[name].js',
         path: path.resolve(__dirname, 'dist'),
     },
 };

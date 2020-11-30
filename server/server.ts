@@ -32,6 +32,17 @@ const app = express();
 app.use(express.static(path.join(__dirname, '../public')));
 app.use(bodyParser.json());
 
+const readFile = (path: string): Promise<Buffer> => {
+  return new Promise((resolve, reject) => {
+    fs.readFile(path, (error, data) => {
+      if (error != null) {
+        reject(error);
+      }
+      resolve(data);
+    });
+  });
+};
+
 const getConstellations = (stars: StarEntry[]): ConstellationEntry[] => {
   const catalog = fs.readFileSync('./constellations.txt').toString();
   const constellations: ConstellationEntry[] = [];
@@ -73,6 +84,20 @@ const getConstellations = (stars: StarEntry[]): ConstellationEntry[] => {
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// app.get('/worker.js', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'dist', 'worker.js'));
+// });
+
+app.get('/stars', async (req, res) => {
+  const catalog = await readFile(path.join(__dirname, 'sao_catalog'));
+  res.send(
+    catalog
+      .toString()
+      .split('\n')
+      .filter(line => line.startsWith('SAO'))
+  );
 });
 
 app.get('/constellations', (req, res) => {
