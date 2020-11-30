@@ -1,12 +1,13 @@
+import { MultiCanvas } from './canvas';
 import { WasmInterface } from './wasm/interface';
 import { Coord, ConstellationBranch, StarCoord } from './wasm/size';
 
-interface StarEntry extends StarCoord {
-    magnitude: number;
-    name: string;
-    constellation: string | null;
-    consId: string | null;
-}
+// interface StarEntry extends StarCoord {
+//     magnitude: number;
+//     name: string;
+//     constellation: string | null;
+//     consId: string | null;
+// }
 
 interface ConstellationEntry {
     name: string;
@@ -26,8 +27,11 @@ let star_brightness = 0;
 let zoom_factor = 1.0;
 let travel_button: HTMLButtonElement;
 
-let star_canvas: HTMLCanvasElement;
-let star_canvas_ctx: CanvasRenderingContext2D | null;
+let star_canvas: MultiCanvas;
+// let star_canvas_alpha: HTMLCanvasElement;
+// let star_canvas_alpha_ctx: CanvasRenderingContext2D | null;
+// let star_canvas_beta: HTMLCanvasElement;
+// let star_canvas_beta_ctx: CanvasRenderingContext2D | null;
 
 let current_latitude: number = 0;
 let current_longitude: number = 0;
@@ -67,18 +71,18 @@ const renderStars = (coord: Coord, date?: Date) => {
 
     const timestamp = date.valueOf();
 
-    if (star_canvas_ctx == null) {
+    if (star_canvas == null) {
         console.error('Could not get canvas context!');
         return;
     }
 
-    star_canvas_ctx.clearRect(0, 0, star_canvas_ctx.canvas.width, star_canvas_ctx.canvas.height);
-    return wasm_interface.projectStars(coord, timestamp);
+    star_canvas.run(ctx => ctx.clearRect(0, 0, star_canvas.canvas.width, star_canvas.canvas.height));
+    return wasm_interface.projectStars(coord, timestamp).then(() => star_canvas.swapBuffers());
 };
 
 const renderConstellations = (constellations: ConstellationEntry[], coord: Coord, date?: Date) => {
     if (!constellations_on_input.checked) return;
-    if (star_canvas_ctx == null) return;
+    if (star_canvas == null) return;
 
     if (!date) {
         if (date_input.valueAsDate) {
@@ -100,9 +104,11 @@ const drawPointWasm = (x: number, y: number, brightness: number) => {
     const pointX = center_x + direction_modifier * (background_radius * zoom_factor) * x;
     const pointY = center_y - direction_modifier * (background_radius * zoom_factor) * y;
 
-    if (star_canvas_ctx != null) {
-        star_canvas_ctx.fillStyle = `rgba(255, 246, 176, ${brightness / 3.5})`;
-        star_canvas_ctx.fillRect(pointX, pointY, 2, 2);
+    if (star_canvas != null) {
+        star_canvas.run(ctx => {
+            ctx.fillStyle = `rgba(255, 246, 176, ${brightness / 3.5})`;
+            ctx.fillRect(pointX, pointY, 2, 2);
+        });
     }
 };
 
@@ -113,12 +119,14 @@ const drawLineWasm = (x1: number, y1: number, x2: number, y2: number) => {
     const pointX2 = center_x + direction_modifier * (background_radius * zoom_factor) * x2;
     const pointY2 = center_y - direction_modifier * (background_radius * zoom_factor) * y2;
 
-    if (star_canvas_ctx != null) {
-        star_canvas_ctx.strokeStyle = 'rgb(255, 246, 176, 0.15)';
-        star_canvas_ctx.beginPath();
-        star_canvas_ctx.moveTo(pointX1, pointY1);
-        star_canvas_ctx.lineTo(pointX2, pointY2);
-        star_canvas_ctx.stroke();
+    if (star_canvas != null) {
+        star_canvas.run(ctx => {
+            ctx.strokeStyle = 'rgb(255, 246, 176, 0.15)';
+            ctx.beginPath();
+            ctx.moveTo(pointX1, pointY1);
+            ctx.lineTo(pointX2, pointY2);
+            ctx.stroke();
+        });
     }
 };
 
@@ -167,11 +175,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     travel_button = document.getElementById('timelapse') as HTMLButtonElement;
 
-    star_canvas = document.getElementById('star-canvas') as HTMLCanvasElement;
-    star_canvas_ctx = star_canvas.getContext('2d')!;
-
-    star_canvas_ctx.canvas.width = canvas_width;
-    star_canvas_ctx.canvas.height = canvas_height;
+    star_canvas = new MultiCanvas('star-canvas-alpha', 'star-canvas-beta');
 
     brightness_input = document.getElementById('brightnessInput') as HTMLInputElement;
     brightness_input.addEventListener('change', () => {
@@ -320,18 +324,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     let [drag_start_x, drag_start_y] = [0, 0];
 
     star_canvas.addEventListener('mousedown', event => {
-        drag_start_x = (event.offsetX - center_x) / star_canvas.width;
-        drag_start_y = (event.offsetY - center_y) / star_canvas.height;
+        drag_start_x = (event.offsetX - center_x) / star_canvas.canvas.width;
+        drag_start_y = (event.offsetY - center_y) / star_canvas.canvas.height;
 
-        star_canvas.classList.add('moving');
+        star_canvas.canvas.classList.add('moving');
 
         is_dragging = true;
     });
 
     star_canvas.addEventListener('mousemove', event => {
         if (!is_dragging) return;
-        const drag_end_x = (event.offsetX - center_x) / star_canvas.width;
-        const drag_end_y = (event.offsetY - center_y) / star_canvas.height;
+        const drag_end_x = (event.offsetX - center_x) / star_canvas.canvas.width;
+        const drag_end_y = (event.offsetY - center_y) / star_canvas.canvas.height;
 
         // The new coordinate will be relative to the current latitude and longitude - it will be a lat/long
         // value that is measured with the current location as the origin.
@@ -384,12 +388,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     star_canvas.addEventListener('mouseup', event => {
-        star_canvas.classList.remove('moving');
+        star_canvas.canvas.classList.remove('moving');
         is_dragging = false;
     });
 
     star_canvas.addEventListener('mouseleave', event => {
-        star_canvas.classList.remove('moving');
+        star_canvas.canvas.classList.remove('moving');
         is_dragging = false;
     });
 

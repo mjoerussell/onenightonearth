@@ -101,7 +101,8 @@ h1 {
 .canvas-container canvas#backdrop-canvas {
     z-index: 0;
 }
-.canvas-container canvas#star-canvas {
+.canvas-container canvas#star-canvas-alpha,
+.canvas-container canvas#star-canvas-beta {
     z-index: 1;
 }
 .canvas-container canvas#star-debug-canvas {
