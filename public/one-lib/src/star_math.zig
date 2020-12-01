@@ -101,7 +101,7 @@ pub fn initData(allocator: *Allocator, star_data: []const u8) InitError!void {
                 else => continue
             }
         }
-        if (star.brightness > 0.3) {
+        if (star.brightness > 0.35) {
             try star_list.append(star);
         }
     }

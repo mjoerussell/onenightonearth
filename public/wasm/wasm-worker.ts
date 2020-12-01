@@ -1,3 +1,4 @@
+import { Renderer } from '../render';
 import {
     Coord,
     CanvasPoint,
@@ -10,9 +11,12 @@ import {
     pointer,
     Allocatable,
     Sized,
+    sizedCoord,
 } from './size';
 
 let instance: WasmInterface;
+// let renderer: Renderer;
+let num_stars = 0;
 
 const wasm_log = (msg_ptr: number, msg_len: number) => {
     const message = instance.getString(msg_ptr, msg_len);
@@ -25,6 +29,7 @@ const wasm_log = (msg_ptr: number, msg_len: number) => {
 
 onmessage = (event: MessageEvent) => {
     if (event.data.type === 'INIT') {
+        // renderer = event.data.renderer;
         WebAssembly.instantiate(event.data.wasm_buffer, {
             env: {
                 consoleLog: wasm_log,
@@ -32,14 +37,30 @@ onmessage = (event: MessageEvent) => {
         }).then(wasm_result => {
             instance = new WasmInterface(wasm_result.instance);
             instance.initialize(event.data.stars);
+            num_stars = event.data.stars.split('\n').length;
             postMessage({ type: 'INIT_COMPLETE' });
         });
     } else if (event.data.type === 'PROJECT') {
         const { latitude, longitude, timestamp } = event.data;
-        const canvas_points = instance.projectStars(latitude, longitude, timestamp);
+        // Get cached pointers for result length and result points if they exist, otherwise allocate new ones
+        const result_len_ptr = event.data.result_len_ptr ?? instance.allocBytes(4);
+        const result_ptr = event.data.result_ptr ?? instance.allocBytes(num_stars * sizeOf(sizedCanvasPoint));
+        if (event.data.result_ptr == null) {
+            console.warn('Allocated array for canvas points');
+        }
+        const canvas_points = instance.projectStars(latitude, longitude, timestamp, result_len_ptr, result_ptr);
         postMessage({
             type: 'drawPointWasm',
             points: canvas_points,
+            // For simplicity, always send the pointers back whether or not they're newly allocated
+            result_ptr,
+            result_len_ptr,
+        });
+    } else if (event.data.type === 'findWaypoints') {
+        const waypoints = instance.findWaypoints(event.data.start, event.data.end, 75);
+        postMessage({
+            type: 'findWaypoints',
+            waypoints,
         });
     }
 };
@@ -52,14 +73,20 @@ class WasmInterface {
         (this.instance.exports.initialize as any)(star_ptr, stars.length);
     }
 
-    projectStars(latitude: number, longitude: number, timestamp: BigInt): CanvasPoint[] {
-        const len_ptr = this.allocBytes(4);
-        const ptr: number = (this.instance.exports.projectStarsWasm as any)(latitude, longitude, timestamp, len_ptr);
-        if (ptr === 0) return [];
-        const num_points = this.readPrimative(len_ptr, WasmPrimative.u32);
-        const points = this.readArray(ptr, num_points, sizedCanvasPoint);
-        this.freeBytes(ptr, sizeOf(sizedCanvasPoint) * num_points);
+    projectStars(latitude: number, longitude: number, timestamp: BigInt, result_len_ptr: number, result_ptr: number): CanvasPoint[] {
+        (this.instance.exports.projectStarsWasm as any)(latitude, longitude, timestamp, result_len_ptr, result_ptr);
+        const num_points = this.readPrimative(result_len_ptr, WasmPrimative.u32);
+        const points = this.readArray(result_ptr, num_points, sizedCanvasPoint);
         return points;
+    }
+
+    findWaypoints(start: Coord, end: Coord, num_waypoints: number = 100): Coord[] {
+        const start_ptr = this.allocObject(start, sizedCoord);
+        const end_ptr = this.allocObject(end, sizedCoord);
+        const result_ptr = (this.instance.exports.findWaypointsWasm as any)(start_ptr, end_ptr, num_waypoints);
+        const waypoints = this.readArray(result_ptr, num_waypoints, sizedCoord);
+        this.freeBytes(result_ptr, num_waypoints * sizeOf(sizedCoord));
+        return waypoints;
     }
 
     getString(ptr: pointer, len: number): string {

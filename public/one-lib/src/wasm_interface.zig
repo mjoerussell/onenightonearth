@@ -27,20 +27,17 @@ pub export fn initialize(star_data: [*]const u8, data_len: u32) void {
     star_math.initData(allocator, star_data[0..data_len]) catch unreachable;
 }
 
-pub export fn projectStarsWasm(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64, result_len: *u32) ?[*]CanvasPoint {
-    var points = allocator.alloc(CanvasPoint, star_math.global_stars.len) catch |err| return null;
+pub export fn projectStarsWasm(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64, result_len: *u32, results: [*]CanvasPoint) void {
     var num_points: u32 = 0;
     for (star_math.global_stars) |star, index| {
         const point = star_math.projectStar(star, .{ .latitude = observer_latitude, .longitude = observer_longitude}, observer_timestamp, true);
         if (point) |p| {
-            points[num_points] = p;
+            results[num_points] = p;
             num_points += 1;
         }
     }
 
     result_len.* = num_points;
-    const final_points = allocator.realloc(points, num_points) catch |err| return null;
-    return final_points.ptr;
 }
 
 // pub export fn projectConstellation(branches: [*]const ConstellationBranch, num_branches: u32, observer_location: *const Coord, observer_timestamp: i64) void {

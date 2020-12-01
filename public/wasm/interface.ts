@@ -1,4 +1,4 @@
-import { Coord, CanvasPoint, ConstellationBranch } from './size';
+import { Coord, ConstellationBranch } from './size';
 
 export interface WasmEnv {
     [func_name: string]: (...args: any[]) => any;
@@ -7,6 +7,7 @@ export interface WasmEnv {
 interface WorkerHandle {
     worker: Worker;
     processing: boolean;
+    saved_data: any;
 }
 
 export class WasmInterface {
@@ -31,6 +32,7 @@ export class WasmInterface {
                     this.workers.push({
                         worker,
                         processing: false,
+                        saved_data: {},
                     });
 
                     // Receive the worker's messages
@@ -43,11 +45,17 @@ export class WasmInterface {
                                 resolve();
                             }
                         } else if (message.data.type === 'drawPointWasm') {
-                            for (const point of message.data.points as CanvasPoint[]) {
-                                env.drawPointWasm(point.x, point.y, point.brightness);
-                            }
+                            env.drawPoints(message.data.points);
                             this.workers[i].processing = false;
+                            this.workers[i].saved_data = {
+                                ...this.workers[i].saved_data,
+                                projection_result_ptr: message.data.result_ptr,
+                                projection_result_len_ptr: message.data.result_len_ptr,
+                            };
                             // env.drawPointWasm(message.data.x, message.data.y, message.data.brightness);
+                        } else if (message.data.type === 'findWaypoints') {
+                            this.workers[i].processing = false;
+                            this.workers[i].saved_data.waypoints = message.data.waypoints;
                         }
                     };
 
@@ -70,26 +78,22 @@ export class WasmInterface {
                 latitude,
                 longitude,
                 timestamp: BigInt(timestamp),
+                result_len_ptr: handle.saved_data.projection_result_len_ptr,
+                result_ptr: handle.saved_data.projection_result_ptr,
             });
         }
 
         return new Promise((resolve, reject) => {
-            const check_interval = setInterval(() => {
-                let all_done: boolean = true;
+            const check_if_done = () => {
                 for (const handle of this.workers) {
                     if (handle.processing) {
-                        all_done = false;
-                        break;
+                        window.requestAnimationFrame(check_if_done);
+                        return;
                     }
                 }
-                if (all_done) {
-                    console.log('done');
-                    clearInterval(check_interval);
-                    resolve();
-                } else {
-                    console.log('not done');
-                }
-            }, 1);
+                resolve();
+            };
+            window.requestAnimationFrame(check_if_done);
         });
     }
 
@@ -97,5 +101,37 @@ export class WasmInterface {
         // const branches_ptr = this.allocArray(branches, sizedConstellationBranch);
         // const location_ptr = this.allocObject(location, sizedCoord);
         // (this.instance.exports.projectConstellation as any)(branches_ptr, branches.length, location_ptr, BigInt(timestamp));
+    }
+
+    findWaypoints(start: Coord, end: Coord): Promise<Coord[]> {
+        let waypoint_worker: WorkerHandle;
+        for (let i = 0; i < this.workers.length; i += 1) {
+            // Find the first non-processing worker
+            if (!this.workers[i].processing) {
+                waypoint_worker = this.workers[i];
+                break;
+            }
+            if (i === this.workers.length - 1) {
+                // Loop forever until one is found
+                i = -1;
+            }
+        }
+        waypoint_worker!.processing = true;
+        waypoint_worker!.worker.postMessage({
+            type: 'findWaypoints',
+            start,
+            end,
+        });
+        return new Promise((resolve, reject) => {
+            const check_if_done = () => {
+                if (waypoint_worker.processing) {
+                    window.requestAnimationFrame(check_if_done);
+                    return;
+                }
+                resolve(waypoint_worker.saved_data.waypoints);
+                delete waypoint_worker.saved_data.waypoints;
+            };
+            window.requestAnimationFrame(check_if_done);
+        });
     }
 }
