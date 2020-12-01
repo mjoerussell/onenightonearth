@@ -39,9 +39,8 @@ export class WasmInterface {
                     worker.onmessage = message => {
                         if (message.data.type === 'INIT_COMPLETE') {
                             num_complete += 1;
-                            console.log(`${num_complete} workers initialized`);
                             if (num_complete === this.num_workers) {
-                                // console.log('finishing initializing');
+                                console.log('Finished initializing');
                                 resolve();
                             }
                         } else if (message.data.type === 'drawPointWasm') {
@@ -73,7 +72,6 @@ export class WasmInterface {
     }
 
     projectStars({ latitude, longitude }: Coord, timestamp: number): Promise<void> {
-        // return this.whenSettled().then(() => {
         for (const handle of this.workers) {
             handle.processing = true;
             handle.worker.postMessage({
@@ -86,7 +84,6 @@ export class WasmInterface {
             });
         }
         return this.whenSettled();
-        // });
     }
 
     projectConstellationBranch(branches: ConstellationBranch[], location: Coord, timestamp: number) {

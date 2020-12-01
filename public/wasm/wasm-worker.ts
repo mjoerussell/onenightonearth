@@ -15,7 +15,6 @@ import {
 } from './size';
 
 let instance: WasmInterface;
-// let renderer: Renderer;
 let num_stars = 0;
 
 const wasm_log = (msg_ptr: number, msg_len: number) => {
@@ -23,13 +22,8 @@ const wasm_log = (msg_ptr: number, msg_len: number) => {
     console.log(`[WASM] ${message}`);
 };
 
-// consoleLog: wasm_log,
-// drawPointWasm,
-// drawLineWasm,
-
 onmessage = (event: MessageEvent) => {
     if (event.data.type === 'INIT') {
-        // renderer = event.data.renderer;
         WebAssembly.instantiate(event.data.wasm_buffer, {
             env: {
                 consoleLog: wasm_log,
