@@ -62,6 +62,12 @@ onmessage = (event: MessageEvent) => {
             type: 'findWaypoints',
             waypoints,
         });
+    } else if (event.data.type === 'dragAndMove') {
+        const coord = instance.dragAndMove(event.data.drag_start, event.data.drag_end);
+        postMessage({
+            type: 'dragAndMove',
+            coord,
+        });
     }
 };
 
@@ -87,6 +93,18 @@ class WasmInterface {
         const waypoints = this.readArray(result_ptr, num_waypoints, sizedCoord);
         this.freeBytes(result_ptr, num_waypoints * sizeOf(sizedCoord));
         return waypoints;
+    }
+
+    dragAndMove(drag_start: Coord, drag_end: Coord): Coord {
+        const result_ptr = (this.instance.exports.dragAndMoveWasm as any)(
+            drag_start.latitude,
+            drag_start.longitude,
+            drag_end.latitude,
+            drag_end.longitude
+        );
+        const result: Coord = this.readObject(result_ptr, sizedCoord);
+        this.freeBytes(result_ptr, sizeOf(sizedCoord));
+        return result;
     }
 
     getString(ptr: pointer, len: number): string {

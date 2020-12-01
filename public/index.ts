@@ -329,6 +329,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     let is_dragging = false;
+    let is_drawing = false;
     let [drag_start_x, drag_start_y] = [0, 0];
 
     const center_x = renderer.width / 2;
@@ -343,16 +344,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         is_dragging = true;
     });
 
-    renderer.addEventListener('mousemove', event => {
-        if (!is_dragging) return;
+    renderer.addEventListener('mousemove', async event => {
+        if (!is_dragging || is_drawing) return;
         const drag_end_x = (event.offsetX - center_x) / renderer.width;
         const drag_end_y = (event.offsetY - center_y) / renderer.height;
 
         // The new coordinate will be relative to the current latitude and longitude - it will be a lat/long
         // value that is measured with the current location as the origin.
         // This means that in order to calculate the actual next location, new_coord has to be added to current
-        // const new_coord = wasm_interface.dragAndMove(drag_start_x, drag_start_y, drag_end_x, drag_end_y);
-        const new_coord: Coord = { latitude: 0, longitude: 0 };
+        const new_coord = await wasm_interface.dragAndMove(
+            { latitude: drag_start_x, longitude: drag_start_y },
+            { latitude: drag_end_x, longitude: drag_end_y }
+        );
 
         // Add or subtract new_value from current_value depending on the orientation
         const directed_add = (current_value: number, new_value: number): number => {
@@ -362,39 +365,44 @@ document.addEventListener('DOMContentLoaded', async () => {
             return current_value - new_value / renderer.zoom_factor;
         };
 
-        // The user crossed a pole if the new latitude is inside the bounds [-90, 90] but the new location
-        // would be outside that range
-        const crossed_pole =
-            (current_latitude < 90.0 && directed_add(current_latitude, new_coord.latitude) > 90.0) ||
-            (current_latitude > -90.0 && directed_add(current_latitude, new_coord.latitude) < -90.0);
+        if (new_coord != null) {
+            // The user crossed a pole if the new latitude is inside the bounds [-90, 90] but the new location
+            // would be outside that range
+            const crossed_pole =
+                (current_latitude < 90.0 && directed_add(current_latitude, new_coord.latitude) > 90.0) ||
+                (current_latitude > -90.0 && directed_add(current_latitude, new_coord.latitude) < -90.0);
 
-        if (crossed_pole) {
-            // Add 180 degrees to the longitude because crossing a pole in a straight line would bring you to the other side
-            // of the world
-            current_longitude += 180.0;
-            // Flip draw direction because if you were going south you're now going north and vice versa
-            renderer.draw_north_up = !renderer.draw_north_up;
+            if (crossed_pole) {
+                // Add 180 degrees to the longitude because crossing a pole in a straight line would bring you to the other side
+                // of the world
+                current_longitude += 180.0;
+                // Flip draw direction because if you were going south you're now going north and vice versa
+                renderer.draw_north_up = !renderer.draw_north_up;
+            }
+
+            current_latitude = directed_add(current_latitude, new_coord.latitude);
+            current_longitude = directed_add(current_longitude, -new_coord.longitude);
+
+            // Keep the longitude value in the range [-180, 180]
+            if (current_longitude > 180.0) {
+                current_longitude -= 360.0;
+            } else if (current_longitude < -180.0) {
+                current_longitude += 360.0;
+            }
+
+            // Show the new location in the input boxes
+            latInput.value = current_latitude.toString();
+            longInput.value = current_longitude.toString();
         }
-
-        current_latitude = directed_add(current_latitude, new_coord.latitude);
-        current_longitude = directed_add(current_longitude, -new_coord.longitude);
-
-        // Keep the longitude value in the range [-180, 180]
-        if (current_longitude > 180.0) {
-            current_longitude -= 360.0;
-        } else if (current_longitude < -180.0) {
-            current_longitude += 360.0;
-        }
-
-        // Show the new location in the input boxes
-        latInput.value = current_latitude.toString();
-        longInput.value = current_longitude.toString();
 
         // Reset the start positions to the current end positions for the next calculation
         drag_start_x = drag_end_x;
         drag_start_y = drag_end_y;
 
-        renderStars({ latitude: current_latitude, longitude: current_longitude });
+        is_drawing = true;
+        renderStars({ latitude: current_latitude, longitude: current_longitude })?.then(() => {
+            is_drawing = false;
+        });
         // renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
     });
 

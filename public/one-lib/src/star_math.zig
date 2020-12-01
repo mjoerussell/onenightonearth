@@ -158,28 +158,15 @@ pub fn projectStar(star: Star, observer_location: Coord, observer_timestamp: i64
 
 pub fn getProjectedCoord(altitude: f32, azimuth: f32) CanvasPoint {
     const radius = comptime 2.0 / math.pi;
-    const quarter_rad = comptime math.pi / 2.0;
+    // s is the distance from the center of the projection circle to the point
+    // aka 1 - the angular distance along the surface of the sky sphere
     const s = 1.0 - (radius * altitude);
-    const rho = floatMod(azimuth, quarter_rad);
-    const quadrant = math.floor(azimuth / quarter_rad);
 
-    var x: f32 = 0;
-    var y: f32 = 0;
-    if (quadrant == 0) {
-        x = s * math.sin(rho);
-        y = s * math.cos(rho);
-    } else if (quadrant == 1) {
-        x = s * math.cos(rho);
-        y = -1 * s * math.sin(rho);
-    } else if (quadrant == 2) {
-        x = -1 * s * math.sin(rho);
-        y = -1 * s * math.cos(rho);
-    } else if (quadrant == 3) {
-        x = -1 * s * math.cos(rho);
-        y = s * math.sin(rho);
-    }
-
-    return .{ .x = x, .y = y };
+    // Convert from polar to cartesian coordinates
+    return .{ 
+        .x = s * math.sin(azimuth), 
+        .y = s * math.cos(azimuth) 
+    };
 }
 
 pub fn findWaypoints(allocator: *Allocator, f: Coord, t: Coord, num_waypoints: u32) []Coord {

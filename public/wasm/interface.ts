@@ -52,10 +52,12 @@ export class WasmInterface {
                                 projection_result_ptr: message.data.result_ptr,
                                 projection_result_len_ptr: message.data.result_len_ptr,
                             };
-                            // env.drawPointWasm(message.data.x, message.data.y, message.data.brightness);
                         } else if (message.data.type === 'findWaypoints') {
                             this.workers[i].processing = false;
                             this.workers[i].saved_data.waypoints = message.data.waypoints;
+                        } else if (message.data.type === 'dragAndMove') {
+                            this.workers[i].processing = false;
+                            this.workers[i].saved_data.coord = message.data.coord;
                         }
                     };
 
@@ -71,6 +73,7 @@ export class WasmInterface {
     }
 
     projectStars({ latitude, longitude }: Coord, timestamp: number): Promise<void> {
+        // return this.whenSettled().then(() => {
         for (const handle of this.workers) {
             handle.processing = true;
             handle.worker.postMessage({
@@ -82,19 +85,8 @@ export class WasmInterface {
                 result_ptr: handle.saved_data.projection_result_ptr,
             });
         }
-
-        return new Promise((resolve, reject) => {
-            const check_if_done = () => {
-                for (const handle of this.workers) {
-                    if (handle.processing) {
-                        window.requestAnimationFrame(check_if_done);
-                        return;
-                    }
-                }
-                resolve();
-            };
-            window.requestAnimationFrame(check_if_done);
-        });
+        return this.whenSettled();
+        // });
     }
 
     projectConstellationBranch(branches: ConstellationBranch[], location: Coord, timestamp: number) {
@@ -103,21 +95,10 @@ export class WasmInterface {
         // (this.instance.exports.projectConstellation as any)(branches_ptr, branches.length, location_ptr, BigInt(timestamp));
     }
 
-    findWaypoints(start: Coord, end: Coord): Promise<Coord[]> {
-        let waypoint_worker: WorkerHandle;
-        for (let i = 0; i < this.workers.length; i += 1) {
-            // Find the first non-processing worker
-            if (!this.workers[i].processing) {
-                waypoint_worker = this.workers[i];
-                break;
-            }
-            if (i === this.workers.length - 1) {
-                // Loop forever until one is found
-                i = -1;
-            }
-        }
-        waypoint_worker!.processing = true;
-        waypoint_worker!.worker.postMessage({
+    async findWaypoints(start: Coord, end: Coord): Promise<Coord[]> {
+        const waypoint_worker = await this.getIdleWorker();
+        waypoint_worker.processing = true;
+        waypoint_worker.worker.postMessage({
             type: 'findWaypoints',
             start,
             end,
@@ -132,6 +113,57 @@ export class WasmInterface {
                 delete waypoint_worker.saved_data.waypoints;
             };
             window.requestAnimationFrame(check_if_done);
+        });
+    }
+
+    async dragAndMove(drag_start: Coord, drag_end: Coord): Promise<Coord> {
+        const waypoint_worker = await this.getIdleWorker();
+        waypoint_worker.processing = true;
+        waypoint_worker.worker.postMessage({
+            type: 'dragAndMove',
+            drag_start,
+            drag_end,
+        });
+        return new Promise((resolve, reject) => {
+            const check_if_done = () => {
+                if (waypoint_worker.processing) {
+                    window.requestAnimationFrame(check_if_done);
+                    return;
+                }
+                resolve(waypoint_worker.saved_data.coord);
+                delete waypoint_worker.saved_data.coord;
+            };
+            window.requestAnimationFrame(check_if_done);
+        });
+    }
+
+    private getIdleWorker(): Promise<WorkerHandle> {
+        return new Promise((resolve, reject) => {
+            const check_all = () => {
+                for (const handle of this.workers) {
+                    // Find the first non-processing worker
+                    if (!handle.processing) {
+                        resolve(handle);
+                    }
+                }
+                window.requestAnimationFrame(check_all);
+            };
+            window.requestAnimationFrame(check_all);
+        });
+    }
+
+    private whenSettled(): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const check_all = () => {
+                for (const handle of this.workers) {
+                    if (handle.processing) {
+                        window.requestAnimationFrame(check_all);
+                        return;
+                    }
+                }
+                resolve();
+            };
+            window.requestAnimationFrame(check_all);
         });
     }
 }
