@@ -10,14 +10,25 @@ interface WorkerHandle {
     saved_data: any;
 }
 
-export class WasmInterface {
+/**
+ * A wrapper class used for the main code to interact with WebAssembly code. This class uses WebWorkers
+ * to achieve multi-threaded rendering operations, when appropriate.
+ */
+export class WorkerInterface {
     private workers: WorkerHandle[] = [];
 
     constructor(private num_workers: number = 4) {}
 
+    /**
+     * Initialize the workers. This promise will resolve when all of the workers have finished their initialization process,
+     * which involves compiling a WASM module and running its initialization code.
+     * @param env
+     */
     init(env: WasmEnv): Promise<void> {
         let num_complete = 0;
+        // Get the star data from the server
         const star_promise: Promise<string[]> = fetch('/stars').then(star_result => star_result.json());
+        // Get the WASM code from the server
         const wasm_promise = fetch('./one-lib/zig-cache/lib/one-math.wasm').then(response => response.arrayBuffer());
 
         return new Promise((resolve, reject) => {
@@ -37,13 +48,13 @@ export class WasmInterface {
 
                     // Receive the worker's messages
                     worker.onmessage = message => {
-                        if (message.data.type === 'INIT_COMPLETE') {
+                        if (message.data.type === 'init_complete') {
                             num_complete += 1;
                             if (num_complete === this.num_workers) {
                                 console.log('Finished initializing');
                                 resolve();
                             }
-                        } else if (message.data.type === 'drawPointWasm') {
+                        } else if (message.data.type === 'draw_point_wasm') {
                             env.drawPoints(message.data.points);
                             this.workers[i].processing = false;
                             this.workers[i].saved_data = {
@@ -51,10 +62,10 @@ export class WasmInterface {
                                 projection_result_ptr: message.data.result_ptr,
                                 projection_result_len_ptr: message.data.result_len_ptr,
                             };
-                        } else if (message.data.type === 'findWaypoints') {
+                        } else if (message.data.type === 'find_waypoints') {
                             this.workers[i].processing = false;
                             this.workers[i].saved_data.waypoints = message.data.waypoints;
-                        } else if (message.data.type === 'dragAndMove') {
+                        } else if (message.data.type === 'drag_and_move') {
                             this.workers[i].processing = false;
                             this.workers[i].saved_data.coord = message.data.coord;
                         }
@@ -62,7 +73,7 @@ export class WasmInterface {
 
                     // Initialize the worker with the star range to process and the WASM env
                     worker.postMessage({
-                        type: 'INIT',
+                        type: 'init',
                         wasm_buffer,
                         stars: worker_star_data,
                     });
@@ -75,7 +86,7 @@ export class WasmInterface {
         for (const handle of this.workers) {
             handle.processing = true;
             handle.worker.postMessage({
-                type: 'PROJECT',
+                type: 'project_stars',
                 latitude,
                 longitude,
                 timestamp: BigInt(timestamp),
@@ -96,7 +107,7 @@ export class WasmInterface {
         const waypoint_worker = await this.getIdleWorker();
         waypoint_worker.processing = true;
         waypoint_worker.worker.postMessage({
-            type: 'findWaypoints',
+            type: 'find_waypoints',
             start,
             end,
         });
@@ -117,7 +128,7 @@ export class WasmInterface {
         const waypoint_worker = await this.getIdleWorker();
         waypoint_worker.processing = true;
         waypoint_worker.worker.postMessage({
-            type: 'dragAndMove',
+            type: 'drag_and_move',
             drag_start,
             drag_end,
         });

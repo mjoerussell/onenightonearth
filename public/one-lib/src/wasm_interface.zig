@@ -3,7 +3,6 @@ const ArrayList = std.ArrayList;
 const parseFloat = std.fmt.parseFloat;
 const star_math = @import("./star_math.zig");
 const Star = star_math.Star;
-const StarIterator = star_math.StarIterator;
 const StarCoord = star_math.StarCoord;
 const ConstellationBranch = star_math.ConstellationBranch;
 const Coord = star_math.Coord;
@@ -23,8 +22,22 @@ fn log(comptime message: []const u8, args: anytype) void {
     consoleLog(fmt_msg.ptr, @intCast(u32, fmt_msg.len));
 }
 
-pub export fn initialize(star_data: [*]const u8, data_len: u32) void {
-    star_math.initData(allocator, star_data[0..data_len]) catch unreachable;
+pub export fn initialize(star_data: [*]const u8, data_len: u32) usize {
+    const num_stars = star_math.initData(allocator, star_data[0..data_len]) catch |err| {
+        switch (err) {
+            error.ParseDec => log("[ERROR] Could not parse declination", .{}),
+            error.ParseMag => log("[ERROR] Could not parse magnitude", .{}),
+            error.ParseRA => log("[ERROR] Could not parse right ascension", .{}),
+            error.OutOfMemory => log("[ERROR] Ran out of memory during initialization", .{})
+        }
+        return 0;
+    };
+    // log("Parsed {} stars", .{num_stars});
+    // for (star_math.global_stars) |star, index| {
+    //     if (index == 5) break;
+    //     log("{}: RA{d:.3}; DEC{d:.3}; BRGHT:{d:.3}", .{star.name, star.right_ascension, star.declination, star.brightness});
+    // }
+    return num_stars;
 }
 
 pub export fn projectStarsWasm(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64, result_len: *u32, results: [*]CanvasPoint) void {

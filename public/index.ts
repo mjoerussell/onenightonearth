@@ -1,13 +1,6 @@
 import { Renderer } from './render';
-import { WasmInterface } from './wasm/interface';
-import { Coord, ConstellationBranch, StarCoord, CanvasPoint } from './wasm/size';
-
-// interface StarEntry extends StarCoord {
-//     magnitude: number;
-//     name: string;
-//     constellation: string | null;
-//     consId: string | null;
-// }
+import { WorkerInterface } from './wasm/worker-interface';
+import { Coord, ConstellationBranch, CanvasPoint } from './wasm/size';
 
 interface ConstellationEntry {
     name: string;
@@ -21,7 +14,7 @@ let star_brightness = 0;
 let travel_button: HTMLButtonElement;
 
 let renderer: Renderer;
-let wasm_interface: WasmInterface;
+let worker_interface: WorkerInterface;
 
 let current_latitude: number = 0;
 let current_longitude: number = 0;
@@ -62,11 +55,7 @@ const renderStars = (coord: Coord, date?: Date) => {
         return;
     }
 
-    renderer.run(ctx => {
-        ctx.clearRect(0, 0, renderer.canvas.width, renderer.canvas.height);
-        // ctx.fillStyle = 'rgba(255, 246, 176, 0.5)';
-    });
-    return wasm_interface.projectStars(coord, timestamp).then(() => renderer.swapBuffers());
+    return worker_interface.projectStars(coord, timestamp).then(() => renderer.pushBuffer());
 };
 
 const renderConstellations = (constellations: ConstellationEntry[], coord: Coord, date?: Date) => {
@@ -84,7 +73,7 @@ const renderConstellations = (constellations: ConstellationEntry[], coord: Coord
     // @todo This is just a first step for the constellations. This version is super slow, even with just 1 constellation
     // It needs to be optimized for passing a lot of data to wasm in 1 allocation
     for (const constellation of constellations) {
-        wasm_interface.projectConstellationBranch(constellation.branches, coord, date.valueOf());
+        worker_interface.projectConstellationBranch(constellation.branches, coord, date.valueOf());
     }
 };
 
@@ -93,25 +82,16 @@ const drawPoints = (points: CanvasPoint[]) => {
     let previous_brightness = 0;
     const center_x = renderer.width / 2;
     const center_y = renderer.height / 2;
-    renderer.run(ctx => {
-        points
-            .map(p => {
-                return {
-                    ...p,
-                    brightness: Math.round(p.brightness * 10) / 10,
-                };
-            })
-            .sort((a, b) => a.brightness - b.brightness)
-            .forEach(point => {
-                if (point.brightness != previous_brightness) {
-                    previous_brightness = point.brightness;
-                    ctx.fillStyle = `rgba(255, 246, 176, ${(point.brightness / 2.5) * 255})`;
-                }
-                const rounded_x = center_x + direction_modifier * (renderer.background_radius * renderer.zoom_factor) * point.x;
-                const rounded_y = center_y - direction_modifier * (renderer.background_radius * renderer.zoom_factor) * point.y;
-                ctx.fillRect(rounded_x, rounded_y, 1, 1);
-            });
-    });
+    const ctx = renderer.context;
+    for (const point of points) {
+        if (point.brightness != previous_brightness) {
+            previous_brightness = point.brightness;
+            ctx.fillStyle = `rgba(255, 246, 176, ${(point.brightness / 2.5) * 255})`;
+        }
+        const rounded_x = center_x + direction_modifier * (renderer.background_radius * renderer.zoom_factor) * point.x;
+        const rounded_y = center_y - direction_modifier * (renderer.background_radius * renderer.zoom_factor) * point.y;
+        ctx.fillRect(rounded_x, rounded_y, 1, 1);
+    }
 };
 
 const drawLineWasm = (x1: number, y1: number, x2: number, y2: number) => {
@@ -179,7 +159,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     travel_button = document.getElementById('timelapse') as HTMLButtonElement;
 
-    renderer = new Renderer('star-canvas-alpha', 'star-canvas-beta');
+    renderer = new Renderer('star-canvas');
 
     brightness_input = document.getElementById('brightnessInput') as HTMLInputElement;
     brightness_input.addEventListener('change', () => {
@@ -209,14 +189,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        const getDistance = (start: Coord, end: Coord): number => {
-            const start_longitude = start.longitude < 0 ? start.longitude + 360.0 : start.longitude;
-            const end_longitude = end.longitude < 0 ? end.longitude + 360.0 : end.longitude;
-            const lat_diff = end.latitude - start.latitude;
-            const long_diff = end_longitude - start_longitude;
-            return Math.sqrt(Math.pow(lat_diff, 2) + Math.pow(long_diff, 2));
-        };
-
         const start: Coord = {
             latitude: degToRad(current_latitude),
             longitude: degToRadLong(current_longitude),
@@ -227,11 +199,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             longitude: degToRadLong(newLongitude),
         };
 
-        const coord_dist = getDistance(start, end);
-        // 4000 = 4 seconds for the whole traversal
-        // const point_interval = 4000 / coord_dist;
-
-        const waypoint_coords = await wasm_interface.findWaypoints(start, end);
+        const waypoint_coords = await worker_interface.findWaypoints(start, end);
         const waypoints = waypoint_coords.map(coord => {
             return {
                 latitude: radToDeg(coord.latitude),
@@ -303,7 +271,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                     });
                     // renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude }, nextDate);
-                    // date = nextDate;
                 }
             };
             window.requestAnimationFrame(runTimeTravel);
@@ -316,8 +283,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     constellations = [];
 
     // Fetch and instantiate the WASM module
-    wasm_interface = new WasmInterface(8);
-    await wasm_interface.init({ drawPoints }).then(() => {
+    worker_interface = new WorkerInterface(8);
+    await worker_interface.init({ drawPoints }).then(() => {
         console.log('wasm interface loaded');
         current_latitude = parseFloat(latInput.value);
         current_longitude = parseFloat(longInput.value);
@@ -352,7 +319,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // The new coordinate will be relative to the current latitude and longitude - it will be a lat/long
         // value that is measured with the current location as the origin.
         // This means that in order to calculate the actual next location, new_coord has to be added to current
-        const new_coord = await wasm_interface.dragAndMove(
+        const new_coord = await worker_interface.dragAndMove(
             { latitude: drag_start_x, longitude: drag_start_y },
             { latitude: drag_end_x, longitude: drag_end_y }
         );
@@ -417,14 +384,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     renderer.addEventListener('wheel', event => {
-        // Zoom out faster than zooming in, because usually when you zoom out you just want
-        // to go all the way out and it's annoying to have to do a ton of scrolling
-        const delta_amount = event.deltaY < 0 ? 0.05 : 0.15;
-        renderer.zoom_factor -= event.deltaY * delta_amount;
-        // Don't let the user scroll out further than the default size
-        if (renderer.zoom_factor < 1) renderer.zoom_factor = 1;
-        // Re-render the stars
-        renderStars({ latitude: current_latitude, longitude: current_longitude });
-        renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
+        if (!is_drawing) {
+            // Zoom out faster than zooming in, because usually when you zoom out you just want
+            // to go all the way out and it's annoying to have to do a ton of scrolling
+            const delta_amount = event.deltaY < 0 ? 0.05 : 0.15;
+            renderer.zoom_factor -= event.deltaY * delta_amount;
+            // Don't let the user scroll out further than the default size
+            if (renderer.zoom_factor < 1) renderer.zoom_factor = 1;
+            // Re-render the stars
+            is_drawing = true;
+            renderStars({ latitude: current_latitude, longitude: current_longitude })?.then(() => {
+                is_drawing = false;
+            });
+            renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
+        }
     });
 });

@@ -3,14 +3,11 @@
 //        This might actually be something that's happening across the whole vertical line from center up to the edge
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const util = @import("./util.zig");
-const LineIterator = util.LineIterator;
-const TokenIterator = util.TokenIterator;
+const math = std.math;
 const assert = std.debug.assert;
 const expectEqual = std.testing.expectEqual;
 const expectWithinEpsilon = std.testing.expectWithinEpsilon;
 const expectWithinMargin = std.testing.expectWithinMargin;
-const math = std.math;
 
 pub const CanvasPoint = packed struct {
     x: f32,
@@ -24,7 +21,7 @@ pub const Coord = packed struct {
 };
 
 pub const Star = struct {
-    name: []const u8 = "",
+    name: []const u8,
     right_ascension: f32 = 0.0,
     declination: f32 = 0.0,
     brightness: f32 = 0.0,
@@ -42,33 +39,6 @@ pub const ConstellationBranch = packed struct {
 
 pub var global_stars: []Star = undefined;
 
-pub const StarIterator = struct {
-    const Self = @This();
-    index: usize = 0,
-    end_index: usize = 0,
-
-    pub fn create() Self {
-        return StarIterator{
-            .end_index = global_stars.len
-        };
-    }
-
-    pub fn fromRange(start: usize, end: usize) Self {
-        return StarIterator{
-            .index = start,
-            .end_index = if (end > global_stars.len) global_stars.len else end
-        };
-    }
-
-    pub fn next(self: *Self) ?Star {
-        if (self.index < global_stars.len) {
-            defer self.index += 1;
-            return global_stars[self.index];
-        }
-        return null;
-    }
-};
-
 pub const InitError = error {
     OutOfMemory,
     ParseRA,
@@ -76,36 +46,56 @@ pub const InitError = error {
     ParseMag
 };
 
-pub fn initData(allocator: *Allocator, star_data: []const u8) InitError!void {
+pub fn initData(allocator: *Allocator, star_data: []const u8) InitError!usize {
     var star_list = std.ArrayList(Star).init(allocator);
-    var line_it = LineIterator.create(star_data);
-    while (line_it.next()) |line| {
-        var star = Star{};
-        var data_it = TokenIterator("|").create(line);
-        var data_index: usize = 0;
-        data_loop: while (data_it.next()) |value| : (data_index += 1) {
-            // @todo Parse float or int to float
-            // Only get data from the desired indices
-            switch (data_index) {
-                0 => star.name = value,
-                1 => star.right_ascension = std.fmt.parseFloat(f32, value) catch |_| return error.ParseRA,
-                5 => star.declination = std.fmt.parseFloat(f32, value) catch |_| return error.ParseDec,
-                13 => {
-                    const v_mag = std.fmt.parseFloat(f32, value) catch |_| 0.0;
-                    const dimmest_visible: f32 = 18.6;
-                    const brightest_value: f32 = -4.6;
-                    const mag_display_factor = (dimmest_visible - (v_mag - brightest_value)) / dimmest_visible;
-                    star.brightness = mag_display_factor;
-                    break :data_loop;
-                },
-                else => continue
-            }
-        }
-        if (star.brightness > 0.35) {
-            try star_list.append(star);
+    var entry_number: u32 = 0;
+    var entry_start_index: usize = 0;
+    var star: Star = undefined;
+    for (star_data) |current_char, current_index| {
+        switch (current_char) {
+            '\n' => {
+                if (star.brightness > 0.34) {
+                    star.brightness = math.round(star.brightness * 100.0) / 100.0;
+                    try star_list.append(star);
+                }
+                entry_number = 0;
+                entry_start_index = current_index + 1;
+            },
+            '|' => {
+                if (entry_number > 13) continue;
+                const value = star_data[entry_start_index..current_index];
+                switch (entry_number) {
+                    0 => star.name = value,
+                    1 => star.right_ascension = std.fmt.parseFloat(f32, value) catch |_| return error.ParseRA,
+                    5 => star.declination = std.fmt.parseFloat(f32, value) catch |_| return error.ParseDec,
+                    13 => {
+                        const v_mag = std.fmt.parseFloat(f32, value) catch |_| 0.0;
+                        const dimmest_visible: f32 = 18.6;
+                        const brightest_value: f32 = -4.6;
+                        const mag_display_factor = (dimmest_visible - (v_mag - brightest_value)) / dimmest_visible;
+                        star.brightness = mag_display_factor;
+                    },
+                    else => {}
+                }
+                entry_number += 1;
+                entry_start_index = current_index + 1;
+            },
+            else => {},
         }
     }
     global_stars = star_list.toOwnedSlice();
+
+    const S = struct {
+        fn starOrder(context: void, lhs: Star, rhs: Star) bool {
+            return lhs.brightness < rhs.brightness;
+        }
+    };
+
+    // Sorting the list by star brightness improves rendering performance by reducing the number of state changes
+    // needed by the canvas (since the fill color alpha changes based on the brightness)
+    std.sort.sort(Star, global_stars, {}, S.starOrder);
+
+    return global_stars.len;
 }
 
 fn fieldExists(comptime value: type, comptime field_name: []const u8) bool {
@@ -169,6 +159,8 @@ pub fn getProjectedCoord(altitude: f32, azimuth: f32) CanvasPoint {
     };
 }
 
+/// Find waypoints along the great circle between two coordinates. Each waypoint will be
+/// 1/num_waypoints distance beyond the previous coordinate.
 pub fn findWaypoints(allocator: *Allocator, f: Coord, t: Coord, num_waypoints: u32) []Coord {
     const quadrant_radians = comptime math.pi / 2.0;
     const circle_radians = comptime math.pi * 2.0;
@@ -204,15 +196,13 @@ pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_e
     // and vice versa
     const dist_phi = math.atan2(f32, dist_x, dist_y);
 
-    // cast comptime_float to f32
-    const zero: f32 = 0.0;
     // drag_distance is the angular distance between the starting location and the result location after a single drag
     // 2.5 is a magic number of degrees, picked because it results in what feels like an appropriate drag speed
     // Higher = move more with smaller cursor movements, and vice versa
     const drag_distance = degToRad(f32, 2.5);
 
     // Calculate asin(new_latitude), and clamp the result between [-1, 1]
-    var sin_lat_x = math.sin(zero) * math.cos(drag_distance) + math.cos(zero) * math.sin(drag_distance) * math.cos(dist_phi);
+    var sin_lat_x = math.sin(drag_distance) * math.cos(dist_phi);
     if (sin_lat_x > 1.0) {
         sin_lat_x = 1.0;
     } else if (sin_lat_x < -1.0) {
@@ -222,7 +212,7 @@ pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_e
     const new_latitude = math.asin(sin_lat_x);
 
     // Calculate acos(new_relative_longitude) and clamp the result between [-1, 1]
-    var cos_long_x = (math.cos(drag_distance) - math.sin(zero) * math.sin(new_latitude)) / (math.cos(zero) * math.cos(new_latitude));
+    var cos_long_x = math.cos(drag_distance) / math.cos(new_latitude);
     if (cos_long_x > 1.0) {
         cos_long_x = 1.0;
     } else if (cos_long_x < -1.0) {

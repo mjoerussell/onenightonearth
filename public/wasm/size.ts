@@ -120,3 +120,50 @@ export const isComplexSize = (type: Sized<any>): type is ComplexSize<any> => {
 };
 
 export type pointer = number;
+
+/**
+ * Get the number of bytes needed to store a given `WasmPrimative`.
+ * @param data The primative type being checked.
+ */
+export const sizeOfPrimative = (data: WasmPrimative): number => {
+    switch (data) {
+        case WasmPrimative.u8:
+        case WasmPrimative.i8:
+            return 1;
+        case WasmPrimative.u16:
+        case WasmPrimative.i16:
+            return 2;
+        case WasmPrimative.u32:
+        case WasmPrimative.i32:
+        case WasmPrimative.f32:
+            return 4;
+        case WasmPrimative.u64:
+        case WasmPrimative.i64:
+        case WasmPrimative.f64:
+            return 8;
+        default:
+            return data;
+    }
+};
+
+/**
+ * Get the total size required of an arbitrary `Allocatable` data type.
+ * @param type A `Sized` instance of some data type.
+ */
+export const sizeOf = <T extends Allocatable>(type: Sized<T>): number => {
+    let size = 0;
+    if (isSimpleSize(type)) {
+        for (const key in type) {
+            if (type.hasOwnProperty(key)) {
+                size += sizeOfPrimative(type[key]);
+            }
+        }
+    } else if (isComplexSize(type)) {
+        for (const key in type) {
+            if (type.hasOwnProperty(key)) {
+                size += sizeOf(type[key]);
+            }
+        }
+    }
+    return size;
+};
