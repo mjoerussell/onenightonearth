@@ -9,13 +9,6 @@ const expectEqual = std.testing.expectEqual;
 const expectWithinEpsilon = std.testing.expectWithinEpsilon;
 const expectWithinMargin = std.testing.expectWithinMargin;
 
-// pub const Pixel = packed struct {
-//     r: u8 = 0,
-//     g: u8 = 0,
-//     b: u8 = 0,
-//     a: u8 = 0,
-// };
-
 pub const CanvasSettings = packed struct {
     width: u32,
     height: u32,
@@ -76,7 +69,6 @@ pub var global_canvas: CanvasSettings = .{
     .zoom_factor = 1.0,
     .draw_north_up = true
 };
-// pub var global_pixel_data: []Pixel = undefined;
 
 pub const InitError = error {
     OutOfMemory,
@@ -140,10 +132,6 @@ pub fn initStarData(allocator: *Allocator, star_data: []const u8) InitError!usiz
 
 pub fn initCanvasData(canvas_settings: CanvasSettings) void {
     global_canvas = canvas_settings;
-    // global_pixel_data = try allocator.alloc(Pixel, global_canvas.width * global_canvas.height);
-    // for (global_pixel_data) |*pixel| {
-    //     pixel.* = Pixel{};
-    // }
 }
 
 fn fieldExists(comptime value: type, comptime field_name: []const u8) bool {
@@ -192,8 +180,6 @@ pub fn projectStar(star: Star, observer_location: Coord, observer_timestamp: i64
     star_point.brightness = star.brightness;
 
     return global_canvas.translatePoint(star_point);
-
-    // return star_point;
 }
 
 pub fn getProjectedCoord(altitude: f32, azimuth: f32) CanvasPoint {

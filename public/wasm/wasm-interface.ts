@@ -17,40 +17,16 @@ import {
 import { CanvasSettings } from '../render';
 
 export class WasmInterface {
-    private canvas_data_ptr: number = 0;
-    private canvas_data_size: number = 0;
-
     constructor(private instance: WebAssembly.Instance) {}
 
-    // initialize(stars: string, canvas_settings: CanvasSettings): number {
     initialize(stars: string, canvas_settings: CanvasSettings): void {
         const star_ptr = this.allocString(stars);
         const settings_ptr = this.allocObject(canvas_settings, sizedCanvasSettings);
 
-        // console.log(`Initializing background radius to ${canvas_settings.background_radius}`);
-        // const canvas_data_result_ptr = this.allocBytes(4);
-
-        // const num_stars = (this.instance.exports.initialize as any)(star_ptr, stars.length, settings_ptr);
-        // this.canvas_data_ptr = (this.instance.exports.initialize as any)(star_ptr, stars.length, settings_ptr, canvas_data_result_ptr);
         (this.instance.exports.initialize as any)(star_ptr, stars.length, settings_ptr);
-        // this.canvas_data_size = this.readPrimative(this.canvas_data_ptr, WasmPrimative.u32);
-        // this.freeBytes(this.canvas_data_ptr, 4);
-        // this.freeBytes(star_ptr, stars.length);
-
-        console.log('Wasm initialization done');
-        // return num_stars;
     }
 
-    // projectStars(latitude: number, longitude: number, timestamp: BigInt, result_len_ptr: number): Uint8ClampedArray | null {
     projectStars(latitude: number, longitude: number, timestamp: BigInt): CanvasPoint[] {
-        // let result_ptr: number;
-        // try {
-        //     // result_ptr = (this.instance.exports.projectStarsWasm as any)(latitude, longitude, timestamp, result_len_ptr);
-        //     // (this.instance.exports.projectStarsWasm as any)(latitude, longitude, timestamp);
-        // } catch (error) {
-        //     console.error(error);
-        //     // return null;
-        // }
         const result_len_ptr = this.allocBytes(4);
         const points_ptr: number = (this.instance.exports.projectStarsWasm as any)(latitude, longitude, timestamp, result_len_ptr);
         const result_len = this.readPrimative(result_len_ptr, WasmPrimative.u32);
@@ -59,16 +35,7 @@ export class WasmInterface {
         this.freeBytes(points_ptr, result_len * sizeOf(sizedCanvasPoint));
 
         return points;
-        // if (result_ptr === 0) {
-        //     throw new Error('Error during projectStars, got null result from WASM');
-        // }
-        // const num_bytes = this.readPrimative(result_len_ptr, WasmPrimative.u32);
-        // return new Uint8ClampedArray(this.readBytes(result_ptr, num_bytes));
     }
-
-    // getPixelData(): Uint8ClampedArray {
-    //     return new Uint8ClampedArray(this.readBytes(this.canvas_data_ptr, this.canvas_data_size));
-    // }
 
     findWaypoints(start: Coord, end: Coord, num_waypoints: number = 100): Coord[] {
         const start_ptr = this.allocObject(start, sizedCoord);
@@ -95,14 +62,6 @@ export class WasmInterface {
         const settings_ptr = this.allocObject(settings, sizedCanvasSettings);
         (this.instance.exports.updateCanvasSettings as any)(settings_ptr);
     }
-
-    // setDrawNorthUp(draw_north_up: boolean): void {
-    //     (this.instance.exports.setDrawNorthUp as any)(draw_north_up);
-    // }
-
-    // setZoomFactor(zoom_factor: number): void {
-    //     (this.instance.exports.setZoomFactor as any)(zoom_factor);
-    // }
 
     getString(ptr: pointer, len: number): string {
         const message_mem = this.readBytes(ptr, len);

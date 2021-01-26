@@ -79,31 +79,10 @@ export class Renderer {
                 previous_brightness = point.brightness;
                 this.offscreen_ctx.fillStyle = `rgb(255, 246, 176, ${(previous_brightness / 2.5) * 255})`;
             }
-            this.offscreen_ctx.fillRect(point.x, point.y, 2, 2);
+            this.offscreen_ctx.fillRect(point.x, point.y, 1, 1);
         }
         this.main_ctx.clearRect(0, 0, this.main_canvas.width, this.main_canvas.height);
         this.main_ctx.drawImage(this.offscreen_canvas, 0, 0);
-        // // const image_data = new ImageData(data, this.width, this.height);
-        // // this.offscreen_ctx.putImageData(image_data, 0, 0);
-        // const image_data = this.offscreen_ctx.getImageData(0, 0, this.width, this.height);
-        // for (let i = 0; i < data.length; i += 4) {
-        //     if (data[i + 3] === 0) continue;
-        //     image_data.data[i] = data[i];
-        //     image_data.data[i + 1] = data[i + 1];
-        //     image_data.data[i + 2] = data[i + 2];
-        //     image_data.data[i + 3] = data[i + 3];
-        // }
-        // this.offscreen_ctx.putImageData(image_data, 0, 0);
-        // image_data.data.set(data);
-        // this.main_ctx.drawImage(this.offscreen_canvas, 0, 0);
-        // try {
-        // } catch (error) {
-        //     if (error instanceof DOMException) {
-        //         const expected_size = 4 * this.width * this.height;
-        //         console.error(error);
-        //         console.error(`data: ${data.byteLength} bytes; Expected bytes: ${expected_size}`);
-        //     }
-        // }
     }
 
     /**
