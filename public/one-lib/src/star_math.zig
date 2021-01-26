@@ -9,6 +9,37 @@ const expectEqual = std.testing.expectEqual;
 const expectWithinEpsilon = std.testing.expectWithinEpsilon;
 const expectWithinMargin = std.testing.expectWithinMargin;
 
+// pub const Pixel = packed struct {
+//     r: u8 = 0,
+//     g: u8 = 0,
+//     b: u8 = 0,
+//     a: u8 = 0,
+// };
+
+pub const CanvasSettings = packed struct {
+    width: u32,
+    height: u32,
+    background_radius: f32,
+    zoom_factor: f32,
+    draw_north_up: bool,
+
+    fn translatePoint(self: CanvasSettings, pt: CanvasPoint) CanvasPoint {
+        const center_x: f32 = @intToFloat(f32, self.width) / 2.0;
+        const center_y: f32 = @intToFloat(f32, self.height) / 2.0;
+
+        // A multiplier used to convert a coordinate between [-1, 1] to a coordinate on the actual canvas, taking into
+        // account the rendering modifiers that can change based on the user zooming in/out or the travelling moving across poles
+        const direction_modifier: f32 = if (self.draw_north_up) 1.0 else -1.0;
+        const translate_factor: f32 = direction_modifier * self.background_radius * self.zoom_factor;
+
+        return .{
+            .x = center_x + (translate_factor * pt.x),
+            .y = center_y - (translate_factor * pt.y),
+            .brightness = pt.brightness
+        };
+    }
+};
+
 pub const CanvasPoint = packed struct {
     x: f32,
     y: f32,
@@ -38,6 +69,14 @@ pub const ConstellationBranch = packed struct {
 };
 
 pub var global_stars: []Star = undefined;
+pub var global_canvas: CanvasSettings = .{
+    .width = 700,
+    .height = 700,
+    .background_radius = 0.45 * 700.0,
+    .zoom_factor = 1.0,
+    .draw_north_up = true
+};
+// pub var global_pixel_data: []Pixel = undefined;
 
 pub const InitError = error {
     OutOfMemory,
@@ -46,7 +85,7 @@ pub const InitError = error {
     ParseMag
 };
 
-pub fn initData(allocator: *Allocator, star_data: []const u8) InitError!usize {
+pub fn initStarData(allocator: *Allocator, star_data: []const u8) InitError!usize {
     var star_list = std.ArrayList(Star).init(allocator);
     var entry_number: u32 = 0;
     var entry_start_index: usize = 0;
@@ -66,6 +105,7 @@ pub fn initData(allocator: *Allocator, star_data: []const u8) InitError!usize {
                 const value = star_data[entry_start_index..current_index];
                 switch (entry_number) {
                     0 => star.name = value,
+                    // 0 => star.name = try std.fmt.allocPrint(allocator, "{}", .{value}),
                     1 => star.right_ascension = std.fmt.parseFloat(f32, value) catch |_| return error.ParseRA,
                     5 => star.declination = std.fmt.parseFloat(f32, value) catch |_| return error.ParseDec,
                     13 => {
@@ -96,6 +136,14 @@ pub fn initData(allocator: *Allocator, star_data: []const u8) InitError!usize {
     std.sort.sort(Star, global_stars, {}, S.starOrder);
 
     return global_stars.len;
+}
+
+pub fn initCanvasData(canvas_settings: CanvasSettings) void {
+    global_canvas = canvas_settings;
+    // global_pixel_data = try allocator.alloc(Pixel, global_canvas.width * global_canvas.height);
+    // for (global_pixel_data) |*pixel| {
+    //     pixel.* = Pixel{};
+    // }
 }
 
 fn fieldExists(comptime value: type, comptime field_name: []const u8) bool {
@@ -141,9 +189,11 @@ pub fn projectStar(star: Star, observer_location: Coord, observer_timestamp: i64
     const azimuth = if (math.sin(hour_angle_rad) < 0) azi else two_pi - azi;
 
     var star_point = getProjectedCoord(@floatCast(f32, altitude), @floatCast(f32, azimuth));
-    star_point.brightness = comptime if (fieldExists(Star, "brightness")) star.brightness else 0.0;
+    star_point.brightness = star.brightness;
 
-    return star_point;
+    return global_canvas.translatePoint(star_point);
+
+    // return star_point;
 }
 
 pub fn getProjectedCoord(altitude: f32, azimuth: f32) CanvasPoint {

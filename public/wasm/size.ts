@@ -1,3 +1,5 @@
+import { CanvasSettings } from '../render';
+
 export enum WasmPrimative {
     u8,
     u16,
@@ -53,12 +55,20 @@ export const sizedConstellationBranch: Sized<ConstellationBranch> = {
     b: sizedStarCoord,
 };
 
+export const sizedCanvasSettings: Sized<CanvasSettings> = {
+    width: WasmPrimative.u32,
+    height: WasmPrimative.u32,
+    background_radius: WasmPrimative.f32,
+    zoom_factor: WasmPrimative.f32,
+    draw_north_up: WasmPrimative.u8,
+};
+
 /**
  * A `SimpleAlloc` is a struct whose fields are just numbers. This means that it can
  * be allocated and read just using `getPrimative` and `setPrimative`.
  */
 export type SimpleAlloc = {
-    [key: string]: number;
+    [key: string]: number | boolean;
 };
 
 /**
@@ -96,7 +106,7 @@ export type Sized<T extends Allocatable> = T extends SimpleAlloc ? SimpleSize<T>
 export const isSimpleAlloc = (data: Allocatable): data is SimpleAlloc => {
     for (const key in data) {
         if (data.hasOwnProperty(key)) {
-            if (typeof data[key] !== 'number') {
+            if (typeof data[key] !== 'number' && typeof data[key] !== 'boolean') {
                 return false;
             }
         }
@@ -107,7 +117,7 @@ export const isSimpleAlloc = (data: Allocatable): data is SimpleAlloc => {
 export const isSimpleSize = (type: Sized<any>): type is SimpleSize<any> => {
     for (const key in type) {
         if (type.hasOwnProperty(key)) {
-            if (typeof type[key] !== 'number') {
+            if (typeof type[key] !== 'number' && typeof type[key] !== 'boolean') {
                 return false;
             }
         }

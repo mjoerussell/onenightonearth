@@ -56,10 +56,10 @@ export class WorkerInterface {
                             }
                         } else if (message.data.type === 'draw_point_wasm') {
                             env.drawPoints(message.data.points);
+                            console.log(`Drew points for worker ${i}`);
                             this.workers[i].processing = false;
                             this.workers[i].saved_data = {
                                 ...this.workers[i].saved_data,
-                                projection_result_ptr: message.data.result_ptr,
                                 projection_result_len_ptr: message.data.result_len_ptr,
                             };
                         } else if (message.data.type === 'find_waypoints') {
@@ -68,6 +68,13 @@ export class WorkerInterface {
                         } else if (message.data.type === 'drag_and_move') {
                             this.workers[i].processing = false;
                             this.workers[i].saved_data.coord = message.data.coord;
+                        } else if (message.data.type === 'update_settings') {
+                            this.workers[i].processing = false;
+                        } else if (message.data.type === 'error') {
+                            this.workers[i].processing = false;
+                            console.error(`Worker ${i} encountered an error during ${message.data.during}`);
+                        } else {
+                            console.warn('Got unknown message from worker: ', message.data);
                         }
                     };
 
@@ -91,7 +98,6 @@ export class WorkerInterface {
                 longitude,
                 timestamp: BigInt(timestamp),
                 result_len_ptr: handle.saved_data.projection_result_len_ptr,
-                result_ptr: handle.saved_data.projection_result_ptr,
             });
         }
         return this.whenSettled();
@@ -142,6 +148,21 @@ export class WorkerInterface {
                 delete waypoint_worker.saved_data.coord;
             };
             window.requestAnimationFrame(check_if_done);
+        });
+    }
+
+    async updateSettings(zoom_factor: number, draw_north_up: boolean): Promise<void> {
+        return this.whenSettled().then(() => {
+            console.log('Updating settings');
+            for (const handle of this.workers) {
+                handle.processing = true;
+                handle.worker.postMessage({
+                    type: 'update_settings',
+                    zoom_factor,
+                    draw_north_up,
+                });
+            }
+            return this.whenSettled();
         });
     }
 

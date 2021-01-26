@@ -1,6 +1,7 @@
 import { Renderer } from './render';
 import { WorkerInterface } from './wasm/worker-interface';
 import { Coord, ConstellationBranch, CanvasPoint } from './wasm/size';
+import { WasmInterface } from './wasm/wasm-interface';
 
 interface ConstellationEntry {
     name: string;
@@ -14,7 +15,7 @@ let star_brightness = 0;
 let travel_button: HTMLButtonElement;
 
 let renderer: Renderer;
-let worker_interface: WorkerInterface;
+let wasm_interface: WasmInterface;
 
 let current_latitude: number = 0;
 let current_longitude: number = 0;
@@ -55,44 +56,57 @@ const renderStars = (coord: Coord, date?: Date) => {
         return;
     }
 
-    return worker_interface.projectStars(coord, timestamp).then(() => renderer.pushBuffer());
+    // const render_process = () => wasm_interface.projectStars(coord, timestamp).then(() => renderer.pushBuffer());
+
+    if (renderer.settings_did_change) {
+        console.log('Updating canvas settings');
+        wasm_interface.updateSettings(renderer.getCanvasSettings());
+        // const { zoom_factor, draw_north_up } = renderer.getCanvasSettings();
+        // return wasm_interface.updateSettings(zoom_factor, draw_north_up).then(() => render_process());
+    }
+
+    const points = wasm_interface.projectStars(coord.latitude, coord.longitude, BigInt(timestamp));
+    console.log('Drawing ', points.length, ' points');
+    console.log(points.slice(0, 10));
+    // console.log('Drawing buffer');
+    renderer.draw(points);
+
+    // return render_process();
 };
 
 const renderConstellations = (constellations: ConstellationEntry[], coord: Coord, date?: Date) => {
-    if (!constellations_on_input.checked) return;
-    if (renderer == null) return;
-
-    if (!date) {
-        if (date_input.valueAsDate) {
-            date = date_input.valueAsDate;
-        } else {
-            return;
-        }
-    }
-
-    // @todo This is just a first step for the constellations. This version is super slow, even with just 1 constellation
-    // It needs to be optimized for passing a lot of data to wasm in 1 allocation
-    for (const constellation of constellations) {
-        worker_interface.projectConstellationBranch(constellation.branches, coord, date.valueOf());
-    }
+    // if (!constellations_on_input.checked) return;
+    // if (renderer == null) return;
+    // if (!date) {
+    //     if (date_input.valueAsDate) {
+    //         date = date_input.valueAsDate;
+    //     } else {
+    //         return;
+    //     }
+    // }
+    // // @todo This is just a first step for the constellations. This version is super slow, even with just 1 constellation
+    // // It needs to be optimized for passing a lot of data to wasm in 1 allocation
+    // for (const constellation of constellations) {
+    //     wasm_interface.projectConstellationBranch(constellation.branches, coord, date.valueOf());
+    // }
 };
 
-const drawPoints = (points: CanvasPoint[]) => {
-    const direction_modifier = renderer.draw_north_up ? 1 : -1;
-    let previous_brightness = 0;
-    const center_x = renderer.width / 2;
-    const center_y = renderer.height / 2;
-    const ctx = renderer.context;
-    for (const point of points) {
-        if (point.brightness != previous_brightness) {
-            previous_brightness = point.brightness;
-            ctx.fillStyle = `rgba(255, 246, 176, ${(point.brightness / 2.5) * 255})`;
-        }
-        const rounded_x = center_x + direction_modifier * (renderer.background_radius * renderer.zoom_factor) * point.x;
-        const rounded_y = center_y - direction_modifier * (renderer.background_radius * renderer.zoom_factor) * point.y;
-        ctx.fillRect(rounded_x, rounded_y, 1, 1);
-    }
-};
+// const drawPoints = (data: Uint8ClampedArray) => {
+//     // const direction_modifier = renderer.draw_north_up ? 1 : -1;
+//     // let previous_brightness = 0;
+//     // const center_x = renderer.width / 2;
+//     // const center_y = renderer.height / 2;
+//     // const ctx = renderer.context;
+//     // for (const point of points) {
+//     //     if (point.brightness != previous_brightness) {
+//     //         previous_brightness = point.brightness;
+//     //         ctx.fillStyle = `rgba(255, 246, 176, ${(point.brightness / 2.5) * 255})`;
+//     //     }
+//     //     const rounded_x = center_x + direction_modifier * (renderer.background_radius * renderer.zoom_factor) * point.x;
+//     //     const rounded_y = center_y - direction_modifier * (renderer.background_radius * renderer.zoom_factor) * point.y;
+//     //     ctx.fillRect(rounded_x, rounded_y, 1, 1);
+//     // }
+// };
 
 const drawLineWasm = (x1: number, y1: number, x2: number, y2: number) => {
     // const direction_modifier = draw_north_up ? 1 : -1;
@@ -199,7 +213,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             longitude: degToRadLong(newLongitude),
         };
 
-        const waypoint_coords = await worker_interface.findWaypoints(start, end);
+        const waypoint_coords = await wasm_interface.findWaypoints(start, end);
         const waypoints = waypoint_coords.map(coord => {
             return {
                 latitude: radToDeg(coord.latitude),
@@ -212,19 +226,30 @@ document.addEventListener('DOMContentLoaded', async () => {
             // @todo Update this loop so that all distances get traveled at the same speed,
             // not in the same amount of time
             const runWaypointTravel = () => {
-                renderStars(waypoints[waypoint_index])?.then(() => {
-                    waypoint_index += 1;
+                renderStars(waypoints[waypoint_index]);
+                waypoint_index += 1;
+                if (waypoint_index === waypoints.length) {
+                    current_latitude = newLatitude;
+                    current_longitude = newLongitude;
 
-                    if (waypoint_index === waypoints.length) {
-                        current_latitude = newLatitude;
-                        current_longitude = newLongitude;
+                    latInput.value = current_latitude.toString();
+                    longInput.value = current_longitude.toString();
+                } else {
+                    window.requestAnimationFrame(runWaypointTravel);
+                }
+                // renderStars(waypoints[waypoint_index])?.then(() => {
+                //     waypoint_index += 1;
 
-                        latInput.value = current_latitude.toString();
-                        longInput.value = current_longitude.toString();
-                    } else {
-                        window.requestAnimationFrame(runWaypointTravel);
-                    }
-                });
+                //     if (waypoint_index === waypoints.length) {
+                //         current_latitude = newLatitude;
+                //         current_longitude = newLongitude;
+
+                //         latInput.value = current_latitude.toString();
+                //         longInput.value = current_longitude.toString();
+                //     } else {
+                //         window.requestAnimationFrame(runWaypointTravel);
+                //     }
+                // });
             };
             window.requestAnimationFrame(runWaypointTravel);
         } else {
@@ -234,9 +259,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             latInput.value = current_latitude.toString();
             longInput.value = current_longitude.toString();
 
-            renderStars({ latitude: current_latitude, longitude: current_longitude })?.then(() => {
-                renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
-            });
+            renderStars({ latitude: current_latitude, longitude: current_longitude });
+            renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
+            // renderStars({ latitude: current_latitude, longitude: current_longitude })?.then(() => {
+            //     renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
+            // });
         }
     });
 
@@ -259,18 +286,28 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const nextDate = new Date(currentDate);
                     nextDate.setTime(nextDate.getTime() + getDaysInMillis(getDaysPerFrame(20, frame_target)));
                     date_input.valueAsDate = new Date(nextDate);
-                    renderStars({ latitude: current_latitude, longitude: current_longitude }, nextDate)?.then(() => {
-                        date = nextDate;
-                        if (travelIsOn) {
-                            window.requestAnimationFrame(runTimeTravel);
-                            time_elapsed_sum += performance.now() - start_instant;
-                            frames_seen += 1;
-                            const moving_avg = time_elapsed_sum / frames_seen;
+                    renderStars({ latitude: current_latitude, longitude: current_longitude }, nextDate);
+                    date = nextDate;
+                    if (travelIsOn) {
+                        window.requestAnimationFrame(runTimeTravel);
+                        time_elapsed_sum += performance.now() - start_instant;
+                        frames_seen += 1;
+                        const moving_avg = time_elapsed_sum / frames_seen;
 
-                            console.log(`Avg FPS: ${1 / (moving_avg / 1000)}s`);
-                        }
-                    });
-                    // renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude }, nextDate);
+                        console.log(`Avg FPS: ${1 / (moving_avg / 1000)}s`);
+                    }
+                    // renderStars({ latitude: current_latitude, longitude: current_longitude }, nextDate)?.then(() => {
+                    //     date = nextDate;
+                    //     if (travelIsOn) {
+                    //         window.requestAnimationFrame(runTimeTravel);
+                    //         time_elapsed_sum += performance.now() - start_instant;
+                    //         frames_seen += 1;
+                    //         const moving_avg = time_elapsed_sum / frames_seen;
+
+                    //         console.log(`Avg FPS: ${1 / (moving_avg / 1000)}s`);
+                    //     }
+                    // });
+                    renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude }, nextDate);
                 }
             };
             window.requestAnimationFrame(runTimeTravel);
@@ -283,17 +320,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     constellations = [];
 
     // Fetch and instantiate the WASM module
-    worker_interface = new WorkerInterface(8);
-    await worker_interface.init({ drawPoints }).then(() => {
-        console.log('wasm interface loaded');
-        current_latitude = parseFloat(latInput.value);
-        current_longitude = parseFloat(longInput.value);
-
-        // Do the initial render
-        drawUIElements();
-        return renderStars({ latitude: current_latitude, longitude: current_longitude });
-        // renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
+    const stars: string[] = await fetch('/stars').then(star_result => star_result.json());
+    const wasm_result = await WebAssembly.instantiateStreaming(fetch('./one-lib/zig-cache/lib/one-math.wasm'), {
+        env: {
+            consoleLog: (msg_ptr: number, msg_len: number) => {
+                const message = wasm_interface.getString(msg_ptr, msg_len);
+                console.log(`[WASM] ${message}`);
+            },
+        },
     });
+    wasm_interface = new WasmInterface(wasm_result.instance);
+    wasm_interface.initialize(stars.join('\n'), renderer.getCanvasSettings());
+
+    current_latitude = parseFloat(latInput.value);
+    current_longitude = parseFloat(longInput.value);
+
+    drawUIElements();
+    renderStars({ latitude: current_latitude, longitude: current_longitude });
+    // worker_interface = new WorkerInterface(8);
+    // await worker_interface.init({ drawPoints: renderer.drawData.bind(renderer) }).then(() => {
+    //     console.log('wasm interface loaded');
+    //     current_latitude = parseFloat(latInput.value);
+    //     current_longitude = parseFloat(longInput.value);
+
+    //     // Do the initial render
+    //     drawUIElements();
+    //     return renderStars({ latitude: current_latitude, longitude: current_longitude });
+    //     // renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
+    // });
 
     let is_dragging = false;
     let is_drawing = false;
@@ -319,7 +373,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // The new coordinate will be relative to the current latitude and longitude - it will be a lat/long
         // value that is measured with the current location as the origin.
         // This means that in order to calculate the actual next location, new_coord has to be added to current
-        const new_coord = await worker_interface.dragAndMove(
+        const new_coord = await wasm_interface.dragAndMove(
             { latitude: drag_start_x, longitude: drag_start_y },
             { latitude: drag_end_x, longitude: drag_end_y }
         );
@@ -367,9 +421,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         drag_start_y = drag_end_y;
 
         is_drawing = true;
-        renderStars({ latitude: current_latitude, longitude: current_longitude })?.then(() => {
-            is_drawing = false;
-        });
+        renderStars({ latitude: current_latitude, longitude: current_longitude });
+        is_drawing = false;
+        // renderStars({ latitude: current_latitude, longitude: current_longitude })?.then(() => {
+        //     is_drawing = false;
+        // });
         // renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
     });
 
@@ -393,9 +449,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (renderer.zoom_factor < 1) renderer.zoom_factor = 1;
             // Re-render the stars
             is_drawing = true;
-            renderStars({ latitude: current_latitude, longitude: current_longitude })?.then(() => {
-                is_drawing = false;
-            });
+            renderStars({ latitude: current_latitude, longitude: current_longitude });
+            is_drawing = false;
+            // renderStars({ latitude: current_latitude, longitude: current_longitude })?.then(() => {
+            //     is_drawing = false;
+            // });
             renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
         }
     });

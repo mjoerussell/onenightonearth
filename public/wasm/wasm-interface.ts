@@ -1,7 +1,6 @@
 import {
     WasmPrimative,
     Allocatable,
-    sizedCanvasPoint,
     Coord,
     sizedCoord,
     pointer,
@@ -11,25 +10,65 @@ import {
     isComplexSize,
     sizeOf,
     sizeOfPrimative,
+    sizedCanvasSettings,
+    sizedCanvasPoint,
     CanvasPoint,
 } from './size';
+import { CanvasSettings } from '../render';
 
 export class WasmInterface {
+    private canvas_data_ptr: number = 0;
+    private canvas_data_size: number = 0;
+
     constructor(private instance: WebAssembly.Instance) {}
 
-    initialize(stars: string): number {
+    // initialize(stars: string, canvas_settings: CanvasSettings): number {
+    initialize(stars: string, canvas_settings: CanvasSettings): void {
         const star_ptr = this.allocString(stars);
-        const num_stars = (this.instance.exports.initialize as any)(star_ptr, stars.length);
-        this.freeBytes(star_ptr, stars.length);
-        return num_stars;
+        const settings_ptr = this.allocObject(canvas_settings, sizedCanvasSettings);
+
+        // console.log(`Initializing background radius to ${canvas_settings.background_radius}`);
+        // const canvas_data_result_ptr = this.allocBytes(4);
+
+        // const num_stars = (this.instance.exports.initialize as any)(star_ptr, stars.length, settings_ptr);
+        // this.canvas_data_ptr = (this.instance.exports.initialize as any)(star_ptr, stars.length, settings_ptr, canvas_data_result_ptr);
+        (this.instance.exports.initialize as any)(star_ptr, stars.length, settings_ptr);
+        // this.canvas_data_size = this.readPrimative(this.canvas_data_ptr, WasmPrimative.u32);
+        // this.freeBytes(this.canvas_data_ptr, 4);
+        // this.freeBytes(star_ptr, stars.length);
+
+        console.log('Wasm initialization done');
+        // return num_stars;
     }
 
-    projectStars(latitude: number, longitude: number, timestamp: BigInt, result_len_ptr: number, result_ptr: number): CanvasPoint[] {
-        (this.instance.exports.projectStarsWasm as any)(latitude, longitude, timestamp, result_len_ptr, result_ptr);
-        const num_points = this.readPrimative(result_len_ptr, WasmPrimative.u32);
-        const points = this.readArray(result_ptr, num_points, sizedCanvasPoint);
+    // projectStars(latitude: number, longitude: number, timestamp: BigInt, result_len_ptr: number): Uint8ClampedArray | null {
+    projectStars(latitude: number, longitude: number, timestamp: BigInt): CanvasPoint[] {
+        // let result_ptr: number;
+        // try {
+        //     // result_ptr = (this.instance.exports.projectStarsWasm as any)(latitude, longitude, timestamp, result_len_ptr);
+        //     // (this.instance.exports.projectStarsWasm as any)(latitude, longitude, timestamp);
+        // } catch (error) {
+        //     console.error(error);
+        //     // return null;
+        // }
+        const result_len_ptr = this.allocBytes(4);
+        const points_ptr: number = (this.instance.exports.projectStarsWasm as any)(latitude, longitude, timestamp, result_len_ptr);
+        const result_len = this.readPrimative(result_len_ptr, WasmPrimative.u32);
+        const points = this.readArray(points_ptr, result_len, sizedCanvasPoint);
+        this.freeBytes(result_len_ptr, 4);
+        this.freeBytes(points_ptr, result_len * sizeOf(sizedCanvasPoint));
+
         return points;
+        // if (result_ptr === 0) {
+        //     throw new Error('Error during projectStars, got null result from WASM');
+        // }
+        // const num_bytes = this.readPrimative(result_len_ptr, WasmPrimative.u32);
+        // return new Uint8ClampedArray(this.readBytes(result_ptr, num_bytes));
     }
+
+    // getPixelData(): Uint8ClampedArray {
+    //     return new Uint8ClampedArray(this.readBytes(this.canvas_data_ptr, this.canvas_data_size));
+    // }
 
     findWaypoints(start: Coord, end: Coord, num_waypoints: number = 100): Coord[] {
         const start_ptr = this.allocObject(start, sizedCoord);
@@ -52,8 +91,21 @@ export class WasmInterface {
         return result;
     }
 
+    updateSettings(settings: CanvasSettings): void {
+        const settings_ptr = this.allocObject(settings, sizedCanvasSettings);
+        (this.instance.exports.updateCanvasSettings as any)(settings_ptr);
+    }
+
+    // setDrawNorthUp(draw_north_up: boolean): void {
+    //     (this.instance.exports.setDrawNorthUp as any)(draw_north_up);
+    // }
+
+    // setZoomFactor(zoom_factor: number): void {
+    //     (this.instance.exports.setZoomFactor as any)(zoom_factor);
+    // }
+
     getString(ptr: pointer, len: number): string {
-        const message_mem = this.memory.slice(ptr, ptr + len);
+        const message_mem = this.readBytes(ptr, len);
         const decoder = new TextDecoder();
         return decoder.decode(message_mem);
     }
@@ -169,8 +221,7 @@ export class WasmInterface {
     }
 
     readBytes(location: pointer, num_bytes: number): ArrayBuffer {
-        const view = new DataView(this.memory, location, num_bytes);
-        return view.buffer;
+        return this.memory.slice(location, location + num_bytes);
     }
 
     allocBytes(num_bytes: number): pointer {
@@ -221,46 +272,52 @@ export class WasmInterface {
         return result;
     }
 
-    private setPrimative(mem: DataView, value: number, type: WasmPrimative, offset = 0) {
+    private setPrimative(mem: DataView, value: number | boolean, type: WasmPrimative, offset = 0) {
+        let val: number;
+        if (typeof value === 'boolean') {
+            val = value ? 1 : 0;
+        } else {
+            val = value;
+        }
         switch (type) {
             case WasmPrimative.u8: {
-                mem.setUint8(offset, value);
+                mem.setUint8(offset, val);
                 break;
             }
             case WasmPrimative.u16: {
-                mem.setUint16(offset, value, true);
+                mem.setUint16(offset, val, true);
                 break;
             }
             case WasmPrimative.u32: {
-                mem.setUint32(offset, value, true);
+                mem.setUint32(offset, val, true);
                 break;
             }
             case WasmPrimative.u64: {
-                mem.setBigUint64(offset, BigInt(value), true);
+                mem.setBigUint64(offset, BigInt(val), true);
                 break;
             }
             case WasmPrimative.i8: {
-                mem.setInt8(offset, value);
+                mem.setInt8(offset, val);
                 break;
             }
             case WasmPrimative.i16: {
-                mem.setInt16(offset, value, true);
+                mem.setInt16(offset, val, true);
                 break;
             }
             case WasmPrimative.i32: {
-                mem.setInt32(offset, value, true);
+                mem.setInt32(offset, val, true);
                 break;
             }
             case WasmPrimative.i64: {
-                mem.setBigInt64(offset, BigInt(value), true);
+                mem.setBigInt64(offset, BigInt(val), true);
                 break;
             }
             case WasmPrimative.f32: {
-                mem.setFloat32(offset, value, true);
+                mem.setFloat32(offset, val, true);
                 break;
             }
             case WasmPrimative.f64: {
-                mem.setFloat64(offset, value, true);
+                mem.setFloat64(offset, val, true);
                 break;
             }
         }
