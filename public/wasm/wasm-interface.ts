@@ -26,15 +26,28 @@ export class WasmInterface {
         (this.instance.exports.initialize as any)(star_ptr, stars.length, settings_ptr);
     }
 
-    projectStars(latitude: number, longitude: number, timestamp: BigInt): CanvasPoint[] {
-        const result_len_ptr = this.allocBytes(4);
-        const points_ptr: number = (this.instance.exports.projectStarsWasm as any)(latitude, longitude, timestamp, result_len_ptr);
-        const result_len = this.readPrimative(result_len_ptr, WasmPrimative.u32);
-        const points = this.readArray(points_ptr, result_len, sizedCanvasPoint);
-        this.freeBytes(result_len_ptr, 4);
-        this.freeBytes(points_ptr, result_len * sizeOf(sizedCanvasPoint));
+    projectStars(latitude: number, longitude: number, timestamp: BigInt): void {
+        // projectStars(latitude: number, longitude: number, timestamp: BigInt): CanvasPoint[] {
+        console.log('drawing stars');
+        (this.instance.exports.projectStarsWasm as any)(latitude, longitude, timestamp);
+        console.log('drew stars to pixel data buffer');
+        // const result_len_ptr = this.allocBytes(4);
+        // const points_ptr: number = (this.instance.exports.projectStarsWasm as any)(latitude, longitude, timestamp, result_len_ptr);
+        // const result_len = this.readPrimative(result_len_ptr, WasmPrimative.u32);
+        // const points = this.readArray(points_ptr, result_len, sizedCanvasPoint);
+        // this.freeBytes(result_len_ptr, 4);
+        // this.freeBytes(points_ptr, result_len * sizeOf(sizedCanvasPoint));
 
-        return points;
+        // return points;
+    }
+
+    getImageData(): Uint8ClampedArray {
+        const size_ptr = this.allocBytes(4);
+        const pixel_data_ptr = (this.instance.exports.getImageData as any)(size_ptr);
+        const pixel_data_size = this.readPrimative(size_ptr, WasmPrimative.u32);
+        console.log('Pixel data is ', pixel_data_size, ' bytes long');
+        this.freeBytes(size_ptr, 4);
+        return new Uint8ClampedArray(this.memory, pixel_data_ptr, pixel_data_size);
     }
 
     findWaypoints(start: Coord, end: Coord, num_waypoints: number = 100): Coord[] {

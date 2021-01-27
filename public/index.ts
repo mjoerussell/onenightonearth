@@ -56,22 +56,17 @@ const renderStars = (coord: Coord, date?: Date) => {
         return;
     }
 
-    // const render_process = () => wasm_interface.projectStars(coord, timestamp).then(() => renderer.pushBuffer());
-
     if (renderer.settings_did_change) {
         console.log('Updating canvas settings');
         wasm_interface.updateSettings(renderer.getCanvasSettings());
-        // const { zoom_factor, draw_north_up } = renderer.getCanvasSettings();
-        // return wasm_interface.updateSettings(zoom_factor, draw_north_up).then(() => render_process());
     }
 
-    const points = wasm_interface.projectStars(coord.latitude, coord.longitude, BigInt(timestamp));
-    console.log('Drawing ', points.length, ' points');
-    console.log(points.slice(0, 10));
-    // console.log('Drawing buffer');
-    renderer.draw(points);
-
-    // return render_process();
+    wasm_interface.projectStars(coord.latitude, coord.longitude, BigInt(timestamp));
+    const data = wasm_interface.getImageData();
+    renderer.drawPoint(data);
+    // renderer.render();
+    // const points = wasm_interface.projectStars(coord.latitude, coord.longitude, BigInt(timestamp));
+    // renderer.draw(points);
 };
 
 const renderConstellations = (constellations: ConstellationEntry[], coord: Coord, date?: Date) => {
@@ -129,8 +124,8 @@ const drawUIElements = () => {
     const backgroundCanvas = document.getElementById('backdrop-canvas') as HTMLCanvasElement;
     const bgCtx = backgroundCanvas?.getContext('2d');
 
-    const gridCanvas = document.getElementById('grid-canvas') as HTMLCanvasElement;
-    const gridCtx = gridCanvas?.getContext('2d');
+    // const gridCanvas = document.getElementById('grid-canvas') as HTMLCanvasElement;
+    // const gridCtx = gridCanvas?.getContext('2d');
 
     const center_x = renderer.width / 2;
     const center_y = renderer.height / 2;
@@ -140,22 +135,32 @@ const drawUIElements = () => {
         bgCtx.canvas.height = renderer.height;
 
         bgCtx.fillStyle = '#051430';
+        // bgCtx.fillStyle = '#f5f5dc';
+        // bgCtx.fillRect(0, 0, renderer.width, renderer.height);
 
-        // Draw background
+        // bgCtx.globalCompositeOperation = 'destination-out';
+        // bgCtx.beginPath();
         bgCtx.arc(center_x, center_y, renderer.background_radius, 0, Math.PI * 2);
         bgCtx.fill();
+
+        // bgCtx.fillRect(0, 0, renderer.width, renderer.height);
+
+        // bgCtx.fillStyle = 'rgba(0, 0, 0, 0)';
+
+        // Draw background
+        // bgCtx.fill();
     }
 
-    if (gridCtx) {
-        gridCtx.canvas.width = renderer.width;
-        gridCtx.canvas.height = renderer.height;
+    // if (gridCtx) {
+    //     gridCtx.canvas.width = renderer.width;
+    //     gridCtx.canvas.height = renderer.height;
 
-        gridCtx.fillStyle = '#6a818a55';
-        gridCtx.strokeStyle = '#6a818a';
-        gridCtx.arc(center_x, center_y, renderer.background_radius, 0, Math.PI * 2);
-        gridCtx.lineWidth = 3;
-        gridCtx.stroke();
-    }
+    //     gridCtx.fillStyle = '#6a818a55';
+    //     gridCtx.strokeStyle = '#6a818a';
+    //     gridCtx.arc(center_x, center_y, renderer.background_radius, 0, Math.PI * 2);
+    //     gridCtx.lineWidth = 3;
+    //     gridCtx.stroke();
+    // }
 };
 
 const getDaysInMillis = (days: number): number => days * 86400000;
@@ -164,7 +169,9 @@ const getDaysPerFrame = (daysPerSecond: number, frameTarget: number): number => 
     return daysPerSecond / frameTarget;
 };
 
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
+    renderer = new Renderer('star-canvas');
+
     // Get handles for all the input elements
     date_input = document.getElementById('dateInput') as HTMLInputElement;
     date_input.addEventListener('change', () => {
@@ -172,8 +179,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
     });
     travel_button = document.getElementById('timelapse') as HTMLButtonElement;
-
-    renderer = new Renderer('star-canvas');
 
     brightness_input = document.getElementById('brightnessInput') as HTMLInputElement;
     brightness_input.addEventListener('change', () => {
@@ -192,7 +197,37 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const latInput = document.getElementById('latInput') as HTMLInputElement;
     const longInput = document.getElementById('longInput') as HTMLInputElement;
+
+    current_latitude = parseFloat(latInput.value);
+    current_longitude = parseFloat(longInput.value);
+
     const locationUpdateButton = document.getElementById('locationUpdate') as HTMLButtonElement;
+
+    fetch('/stars')
+        .then(star_result => star_result.json())
+        .then((stars: string[]) =>
+            WebAssembly.instantiateStreaming(fetch('./one-lib/zig-cache/lib/one-math.wasm'), {
+                env: {
+                    consoleLog: (msg_ptr: number, msg_len: number) => {
+                        const message = wasm_interface.getString(msg_ptr, msg_len);
+                        console.log(`[WASM] ${message}`);
+                    },
+                    // drawPointWasm: (x: number, y: number, brightness: number) => {
+                    //     // renderer.drawPoint({ x, y, brightness });
+                    // },
+                },
+            })
+                .then(wasm_result => {
+                    wasm_interface = new WasmInterface(wasm_result.instance);
+                    wasm_interface.initialize(stars.join('\n'), renderer.getCanvasSettings());
+
+                    drawUIElements();
+                    renderStars({ latitude: current_latitude, longitude: current_longitude });
+                })
+                .catch(error => {
+                    console.error('In WebAssembly Promise: ', error);
+                })
+        );
 
     // Handle updating the viewing location
     locationUpdateButton.addEventListener('click', async () => {
@@ -237,19 +272,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else {
                     window.requestAnimationFrame(runWaypointTravel);
                 }
-                // renderStars(waypoints[waypoint_index])?.then(() => {
-                //     waypoint_index += 1;
-
-                //     if (waypoint_index === waypoints.length) {
-                //         current_latitude = newLatitude;
-                //         current_longitude = newLongitude;
-
-                //         latInput.value = current_latitude.toString();
-                //         longInput.value = current_longitude.toString();
-                //     } else {
-                //         window.requestAnimationFrame(runWaypointTravel);
-                //     }
-                // });
             };
             window.requestAnimationFrame(runWaypointTravel);
         } else {
@@ -261,9 +283,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             renderStars({ latitude: current_latitude, longitude: current_longitude });
             renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
-            // renderStars({ latitude: current_latitude, longitude: current_longitude })?.then(() => {
-            //     renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
-            // });
         }
     });
 
@@ -296,17 +315,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                         console.log(`Avg FPS: ${1 / (moving_avg / 1000)}s`);
                     }
-                    // renderStars({ latitude: current_latitude, longitude: current_longitude }, nextDate)?.then(() => {
-                    //     date = nextDate;
-                    //     if (travelIsOn) {
-                    //         window.requestAnimationFrame(runTimeTravel);
-                    //         time_elapsed_sum += performance.now() - start_instant;
-                    //         frames_seen += 1;
-                    //         const moving_avg = time_elapsed_sum / frames_seen;
-
-                    //         console.log(`Avg FPS: ${1 / (moving_avg / 1000)}s`);
-                    //     }
-                    // });
                     renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude }, nextDate);
                 }
             };
@@ -318,36 +326,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // const constellation_response = await fetch('/constellations');
     // constellations = await constellation_response.json();
     constellations = [];
-
-    // Fetch and instantiate the WASM module
-    const stars: string[] = await fetch('/stars').then(star_result => star_result.json());
-    const wasm_result = await WebAssembly.instantiateStreaming(fetch('./one-lib/zig-cache/lib/one-math.wasm'), {
-        env: {
-            consoleLog: (msg_ptr: number, msg_len: number) => {
-                const message = wasm_interface.getString(msg_ptr, msg_len);
-                console.log(`[WASM] ${message}`);
-            },
-        },
-    });
-    wasm_interface = new WasmInterface(wasm_result.instance);
-    wasm_interface.initialize(stars.join('\n'), renderer.getCanvasSettings());
-
-    current_latitude = parseFloat(latInput.value);
-    current_longitude = parseFloat(longInput.value);
-
-    drawUIElements();
-    renderStars({ latitude: current_latitude, longitude: current_longitude });
-    // worker_interface = new WorkerInterface(8);
-    // await worker_interface.init({ drawPoints: renderer.drawData.bind(renderer) }).then(() => {
-    //     console.log('wasm interface loaded');
-    //     current_latitude = parseFloat(latInput.value);
-    //     current_longitude = parseFloat(longInput.value);
-
-    //     // Do the initial render
-    //     drawUIElements();
-    //     return renderStars({ latitude: current_latitude, longitude: current_longitude });
-    //     // renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
-    // });
 
     let is_dragging = false;
     let is_drawing = false;

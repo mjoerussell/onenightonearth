@@ -9,6 +9,13 @@ const expectEqual = std.testing.expectEqual;
 const expectWithinEpsilon = std.testing.expectWithinEpsilon;
 const expectWithinMargin = std.testing.expectWithinMargin;
 
+pub const Pixel = packed struct {
+    a: u8 = 0,
+    r: u8 = 0,
+    g: u8 = 0,
+    b: u8 = 0,
+};
+
 pub const CanvasSettings = packed struct {
     width: u32,
     height: u32,
@@ -70,6 +77,8 @@ pub var global_canvas: CanvasSettings = .{
     .draw_north_up = true
 };
 
+pub var global_pixel_data: []Pixel = undefined;
+
 pub const InitError = error {
     OutOfMemory,
     ParseRA,
@@ -85,7 +94,7 @@ pub fn initStarData(allocator: *Allocator, star_data: []const u8) InitError!usiz
     for (star_data) |current_char, current_index| {
         switch (current_char) {
             '\n' => {
-                if (star.brightness > 0.34) {
+                if (star.brightness > 0.35) {
                     star.brightness = math.round(star.brightness * 100.0) / 100.0;
                     try star_list.append(star);
                 }
@@ -125,13 +134,17 @@ pub fn initStarData(allocator: *Allocator, star_data: []const u8) InitError!usiz
 
     // Sorting the list by star brightness improves rendering performance by reducing the number of state changes
     // needed by the canvas (since the fill color alpha changes based on the brightness)
-    std.sort.sort(Star, global_stars, {}, S.starOrder);
+    // std.sort.sort(Star, global_stars, {}, S.starOrder);
 
     return global_stars.len;
 }
 
-pub fn initCanvasData(canvas_settings: CanvasSettings) void {
+pub fn initCanvasData(allocator: *Allocator, canvas_settings: CanvasSettings) !void {
     global_canvas = canvas_settings;
+    global_pixel_data = try allocator.alloc(Pixel, global_canvas.width * global_canvas.height);
+    for (global_pixel_data) |*p| {
+        p.* = Pixel{};
+    }
 }
 
 fn fieldExists(comptime value: type, comptime field_name: []const u8) bool {
@@ -147,19 +160,22 @@ fn fieldExists(comptime value: type, comptime field_name: []const u8) bool {
     }
 }
 
+// pub fn projectStars(allocator: *Allocator, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ![]CanvasPoint {
 pub fn projectStar(star: Star, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?CanvasPoint {
     // @fixme There's still a bug here - For some reason, if stars are in certain locations in the sky they get blinked to (0,0) on the canvas.
     // I'm assuming that a trig function is returning NaN, but I'm not sure. Also not sure if the root cause is here or getProjectedCoord,
     // but either way it's going through this function.
+    // var point_list = try std.ArrayList(CanvasPoint).initCapacity(allocator, global_stars.len / 2);
+    
     const two_pi = comptime math.pi * 2.0;
     const half_pi = comptime math.pi / 2.0;
     const local_sideral_time = getLocalSideralTime(@intToFloat(f64, observer_timestamp), observer_location.longitude);
+    const lat_rad = degToRad(f32, observer_location.latitude);
 
-    var num_points: u32 = 0;
+    // for (global_stars) |star| {
     const hour_angle = local_sideral_time - @as(f64, star.right_ascension);
 
     const declination_rad = degToRad(f32, star.declination);
-    const lat_rad = degToRad(f32, observer_location.latitude);
     const hour_angle_rad = floatMod(degToRad(f64, hour_angle), two_pi);
 
     const sin_dec = math.sin(declination_rad);
@@ -167,8 +183,9 @@ pub fn projectStar(star: Star, observer_location: Coord, observer_timestamp: i64
     const cos_lat = math.cos(lat_rad);
 
     const sin_alt = sin_dec * sin_lat + math.cos(declination_rad) * cos_lat * math.cos(hour_angle_rad);
-    const altitude = boundedASin(sin_alt);
+    const altitude = boundedASin(sin_alt) catch |err| return null;
     if ((filter_below_horizon and altitude < 0) or (!filter_below_horizon and altitude < -(half_pi / 3.0))) {
+        // continue;
         return null;
     }
 
@@ -178,7 +195,11 @@ pub fn projectStar(star: Star, observer_location: Coord, observer_timestamp: i64
 
     var star_point = getProjectedCoord(@floatCast(f32, altitude), @floatCast(f32, azimuth));
     star_point.brightness = star.brightness;
+        
+        // try point_list.append(global_canvas.translatePoint(star_point));
+    // }
 
+    // return point_list.toOwnedSlice();
     return global_canvas.translatePoint(star_point);
 }
 
@@ -203,16 +224,16 @@ pub fn findWaypoints(allocator: *Allocator, f: Coord, t: Coord, num_waypoints: u
 
     const negative_dir = t.longitude < f.longitude and t.longitude > (f.longitude - math.pi);
 
-    const total_distance = findGreatCircleDistance(f, t);
-    const course_angle = findGreatCircleCourseAngle(f, t, total_distance);
+    const total_distance = findGreatCircleDistance(f, t) catch |err| 0;
+    const course_angle = findGreatCircleCourseAngle(f, t, total_distance) catch |err| 0;
 
     const waypoint_inc = total_distance / @intToFloat(f32, num_waypoints);
 
     var waypoints: []Coord = allocator.alloc(Coord, num_waypoints) catch unreachable;
     for (waypoints) |*waypoint, i| {
         const waypoint_rel_angle = @intToFloat(f32, i + 1) * waypoint_inc;
-        const lat = findWaypointLatitude(f, waypoint_rel_angle, course_angle);
-        const rel_long = findWaypointRelativeLongitude(f, lat, waypoint_rel_angle);
+        const lat = findWaypointLatitude(f, waypoint_rel_angle, course_angle) catch |err| 0;
+        const rel_long = findWaypointRelativeLongitude(f, lat, waypoint_rel_angle) catch |err| 0;
 
         const long = if (negative_dir) f.longitude - rel_long else f.longitude + rel_long;
 
@@ -274,10 +295,10 @@ fn getLocalSideralTime(current_timestamp: f64, longitude: f64) f64 {
 /// Find the angular distance along the equator between two points on the surface.
 /// @param f - The starting location.
 /// @param t - The ending location.
-fn findGreatCircleDistance(f: Coord, t: Coord) f32 {
+fn findGreatCircleDistance(f: Coord, t: Coord) !f32 {
     const long_diff = t.longitude - f.longitude;
     const cos_d = math.sin(f.latitude) * math.sin(t.latitude) + math.cos(f.latitude) * math.cos(t.latitude) * math.cos(long_diff);
-    return boundedACos(cos_d);
+    return try boundedACos(cos_d);
 }
 
 /// Find the course angle of the great circle path between the starting location and destination.
@@ -285,18 +306,18 @@ fn findGreatCircleDistance(f: Coord, t: Coord) f32 {
 /// @param f            - The starting location
 /// @param t            - The destination
 /// @param angular_dist - The angular distance along the equator between `f` and `t`.
-fn findGreatCircleCourseAngle(f: Coord, t: Coord, angular_dist: f32) f32 {
+fn findGreatCircleCourseAngle(f: Coord, t: Coord, angular_dist: f32) !f32 {
     var cos_c = (math.sin(t.latitude) - math.sin(f.latitude) * math.cos(angular_dist)) / (math.cos(f.latitude) * math.sin(angular_dist));
-    return boundedACos(cos_c);
+    return try boundedACos(cos_c);
 }
 
 /// Find the latitude of a waypoint.
 /// @param f             - The initial starting coordinate.
 /// @param waypoint_dist - The angular distance along the equator that the waypoint is from `f`
 /// @param course_angle  - The angle travelled from `f` along the great circle path to the destination.
-fn findWaypointLatitude(f: Coord, waypoint_dist: f32, course_angle: f32) f32 {
+fn findWaypointLatitude(f: Coord, waypoint_dist: f32, course_angle: f32) !f32 {
     const sin_lat_x = math.sin(f.latitude) * math.cos(waypoint_dist) + math.cos(f.latitude) * math.sin(waypoint_dist) * math.cos(course_angle);
-    return boundedASin(sin_lat_x);
+    return try boundedASin(sin_lat_x);
 }
 
 /// Find the relative longitude of a waypoint. This is the longitude of the waypoint with `f` as the origin, and an
@@ -304,9 +325,9 @@ fn findWaypointLatitude(f: Coord, waypoint_dist: f32, course_angle: f32) f32 {
 /// @param f             - The relative origin
 /// @param waypoint_lat  - The latitude of the waypoint.
 /// @param waypoint_dist - The angular distance between `f` and the waypoint.
-fn findWaypointRelativeLongitude(f: Coord, waypoint_lat: f32, waypoint_dist: f32) f32 {
+fn findWaypointRelativeLongitude(f: Coord, waypoint_lat: f32, waypoint_dist: f32) !f32 {
     var cos_long_x = (math.cos(waypoint_dist) - math.sin(f.latitude) * math.sin(waypoint_lat)) / (math.cos(f.latitude) * math.cos(waypoint_lat));
-    return boundedACos(cos_long_x);
+    return try boundedACos(cos_long_x);
 }
 
 /// A radian-to-degree converter specialized for longitude values.
@@ -332,44 +353,46 @@ fn radToDeg(radian: f32) f32 {
     return radian * (180.0 / math.pi);
 }
 
+const OperationError = error{NaN};
+
 /// Safely perform acos on a value without worrying about the value being outside of the range [-1.0, 1.0]. The value
 /// will be clamped to either end depending on whether it's too high or too low.
-fn boundedACos(x: anytype) @TypeOf(x) {
+fn boundedACos(x: anytype) OperationError!@TypeOf(x) {
     const T = @TypeOf(x);
-    const value: T = if (x >= 1.0)
-        1.0
-    else if (x <= -1.0)
-        -1.0
-    else
-        x;
-    switch (T) {
-        f32, f64 => {
-            return math.acos(value);
-        },
-        f128, comptime_float => {
-            return math.acos(@floatCast(f64, value));
-        },
+    // const value: T = if (x >= 1.0)
+    //     1.0
+    // else if (x <= -1.0)
+    //     -1.0
+    // else
+    //     x;
+    const value = switch (T) {
+        f32, f64 =>  math.acos(x),
+        f128, comptime_float => return math.acos(@floatCast(f64, x)),
         else => @compileError("boundedACos not implemented for type " ++ T),
-    }
+    };
+
+    if (std.math.isNan(value)) return error.NaN;
+
+    return value;
 }
 
-fn boundedASin(x: anytype) @TypeOf(x) {
+fn boundedASin(x: anytype) OperationError!@TypeOf(x) {
     const T = @TypeOf(x);
-    const value: T = if (x >= 1.0)
-        1.0
-    else if (x <= -1.0)
-        -1.0
-    else
-        x;
-    switch (T) {
-        f32, f64 => {
-            return math.asin(value);
-        },
-        f128, comptime_float => {
-            return math.asin(@floatCast(f64, value));
-        },
+    // const value: T = if (x >= 1.0)
+    //     1.0
+    // else if (x <= -1.0)
+    //     -1.0
+    // else
+    //     x;
+    const value = switch (T) {
+        f32, f64 => math.asin(x),
+        f128, comptime_float => math.asin(@floatCast(f64, x)),
         else => @compileError("boundedACos not implemented for type " ++ T),
-    }
+    };
+
+    if (std.math.isNan(value)) return error.NaN;
+
+    return value;
 }
 
 fn FloatModResult(comptime input_type: type) type {
