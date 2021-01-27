@@ -10,10 +10,10 @@ const expectWithinEpsilon = std.testing.expectWithinEpsilon;
 const expectWithinMargin = std.testing.expectWithinMargin;
 
 pub const Pixel = packed struct {
-    a: u8 = 0,
     r: u8 = 0,
     g: u8 = 0,
     b: u8 = 0,
+    a: u8 = 0,
 };
 
 pub const CanvasSettings = packed struct {
@@ -51,6 +51,12 @@ pub const Coord = packed struct {
     longitude: f32,
 };
 
+pub const WasmStar = packed struct {
+    right_ascension: f32,
+    declination: f32,
+    brightness: f32,
+};
+
 pub const Star = struct {
     name: []const u8,
     right_ascension: f32 = 0.0,
@@ -58,17 +64,7 @@ pub const Star = struct {
     brightness: f32 = 0.0,
 };
 
-pub const StarCoord = packed struct {
-    right_ascension: f32,
-    declination: f32,
-};
-
-pub const ConstellationBranch = packed struct {
-    a: StarCoord,
-    b: StarCoord
-};
-
-pub var global_stars: []Star = undefined;
+pub var global_stars: []WasmStar = undefined;
 pub var global_canvas: CanvasSettings = .{
     .width = 700,
     .height = 700,
@@ -79,62 +75,8 @@ pub var global_canvas: CanvasSettings = .{
 
 pub var global_pixel_data: []Pixel = undefined;
 
-pub const InitError = error {
-    OutOfMemory,
-    ParseRA,
-    ParseDec,
-    ParseMag
-};
-
-pub fn initStarData(allocator: *Allocator, star_data: []const u8) InitError!usize {
-    var star_list = std.ArrayList(Star).init(allocator);
-    var entry_number: u32 = 0;
-    var entry_start_index: usize = 0;
-    var star: Star = undefined;
-    for (star_data) |current_char, current_index| {
-        switch (current_char) {
-            '\n' => {
-                if (star.brightness > 0.35) {
-                    star.brightness = math.round(star.brightness * 100.0) / 100.0;
-                    try star_list.append(star);
-                }
-                entry_number = 0;
-                entry_start_index = current_index + 1;
-            },
-            '|' => {
-                if (entry_number > 13) continue;
-                const value = star_data[entry_start_index..current_index];
-                switch (entry_number) {
-                    0 => star.name = value,
-                    // 0 => star.name = try std.fmt.allocPrint(allocator, "{}", .{value}),
-                    1 => star.right_ascension = std.fmt.parseFloat(f32, value) catch |_| return error.ParseRA,
-                    5 => star.declination = std.fmt.parseFloat(f32, value) catch |_| return error.ParseDec,
-                    13 => {
-                        const v_mag = std.fmt.parseFloat(f32, value) catch |_| 0.0;
-                        const dimmest_visible: f32 = 18.6;
-                        const brightest_value: f32 = -4.6;
-                        const mag_display_factor = (dimmest_visible - (v_mag - brightest_value)) / dimmest_visible;
-                        star.brightness = mag_display_factor;
-                    },
-                    else => {}
-                }
-                entry_number += 1;
-                entry_start_index = current_index + 1;
-            },
-            else => {},
-        }
-    }
-    global_stars = star_list.toOwnedSlice();
-
-    const S = struct {
-        fn starOrder(context: void, lhs: Star, rhs: Star) bool {
-            return lhs.brightness < rhs.brightness;
-        }
-    };
-
-    // Sorting the list by star brightness improves rendering performance by reducing the number of state changes
-    // needed by the canvas (since the fill color alpha changes based on the brightness)
-    // std.sort.sort(Star, global_stars, {}, S.starOrder);
+pub fn initStarData(allocator: *Allocator, star_data: []WasmStar) !usize {
+    global_stars = star_data;
 
     return global_stars.len;
 }
@@ -145,62 +87,103 @@ pub fn initCanvasData(allocator: *Allocator, canvas_settings: CanvasSettings) !v
     for (global_pixel_data) |*p| {
         p.* = Pixel{};
     }
+    // const width = @intToFloat(f32, global_canvas.width);
+    // const height = @intToFloat(f32, global_canvas.height);
+    // for (global_pixel_data) |*p, i| {
+    //     p.* = Pixel{
+    //         .r = 255 - @floatToInt(u8, ((@mod(@intToFloat(f32, i), width)) / width) * 255),
+    //         .b = @floatToInt(u8, ((@intToFloat(f32, i) / width) / height) * 255),
+    //         .g = 0,
+    //         .a = 255
+    //     };
+    // }   
 }
 
-fn fieldExists(comptime value: type, comptime field_name: []const u8) bool {
-    const info = @typeInfo(value);
-    switch (info) {
-        .Struct => {
-            inline for (info.Struct.fields) |field| {
-                if (std.mem.eql(u8, field.name, field_name)) return true;
-            }
-            return false;
-        },
-        else => @compileError("Cannot call fieldExists on non-struct type " ++ @typeName(value))
-    }
-}
-
-// pub fn projectStars(allocator: *Allocator, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ![]CanvasPoint {
-pub fn projectStar(star: Star, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?CanvasPoint {
-    // @fixme There's still a bug here - For some reason, if stars are in certain locations in the sky they get blinked to (0,0) on the canvas.
-    // I'm assuming that a trig function is returning NaN, but I'm not sure. Also not sure if the root cause is here or getProjectedCoord,
-    // but either way it's going through this function.
-    // var point_list = try std.ArrayList(CanvasPoint).initCapacity(allocator, global_stars.len / 2);
-    
+pub fn projectStar(observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) void {
     const two_pi = comptime math.pi * 2.0;
     const half_pi = comptime math.pi / 2.0;
     const local_sideral_time = getLocalSideralTime(@intToFloat(f64, observer_timestamp), observer_location.longitude);
-    const lat_rad = degToRad(f32, observer_location.latitude);
+    const lat_rad = degToRad(observer_location.latitude);
 
-    // for (global_stars) |star| {
-    const hour_angle = local_sideral_time - @as(f64, star.right_ascension);
+    for (global_stars) |star| {
+        const hour_angle = local_sideral_time - @as(f64, star.right_ascension);
 
-    const declination_rad = degToRad(f32, star.declination);
-    const hour_angle_rad = floatMod(degToRad(f64, hour_angle), two_pi);
+        const declination_rad = @floatCast(f64, degToRad(star.declination));
+        const hour_angle_rad = floatMod(degToRad(hour_angle), two_pi);
 
-    const sin_dec = math.sin(declination_rad);
-    const sin_lat = math.sin(lat_rad);
-    const cos_lat = math.cos(lat_rad);
+        const sin_dec = math.sin(declination_rad);
+        const sin_lat = math.sin(lat_rad);
+        const cos_lat = math.cos(lat_rad);
 
-    const sin_alt = sin_dec * sin_lat + math.cos(declination_rad) * cos_lat * math.cos(hour_angle_rad);
-    const altitude = boundedASin(sin_alt) catch |err| return null;
-    if ((filter_below_horizon and altitude < 0) or (!filter_below_horizon and altitude < -(half_pi / 3.0))) {
-        // continue;
+        const sin_alt = sin_dec * sin_lat + math.cos(declination_rad) * cos_lat * math.cos(hour_angle_rad);
+        const altitude = boundedASin(sin_alt) catch |err| continue;
+        if ((filter_below_horizon and altitude < 0) or (!filter_below_horizon and altitude < -(half_pi / 3.0))) {
+            continue;
+        }
+
+        const cos_azi = (sin_dec - math.sin(altitude) * sin_lat) / (math.cos(altitude) * cos_lat);
+        const azi = math.acos(cos_azi);
+        const azimuth = if (math.sin(hour_angle_rad) < 0) azi else two_pi - azi;
+
+        const pixel_index = getPixelIndex(@floatCast(f32, altitude), @floatCast(f32, azimuth));
+        if (pixel_index) |p_index| {
+            global_pixel_data[p_index] = Pixel{
+                .r = 255, 
+                .g = 246, 
+                .b = 176, 
+                .a = @floatToInt(u8, (star.brightness / 1.5) * 255.0)
+            };
+        }
+
+    }
+
+    // debug draw grid
+    // drawGrid();
+
+}
+
+pub fn drawGrid() void {
+    var altitude: f32 = 0;
+    // var azimuth: f32 = 0;
+
+    const grid_spacing: comptime_float = 90 / 5;
+    while (altitude <= 90) : (altitude += grid_spacing) {
+        var dot_index: f32 = 0;
+        while (dot_index < 10000) : (dot_index += 1) {
+            const alt_rad = degToRad(altitude);
+            const azi_rad = degToRad((dot_index / 10000) * 360);
+            const pixel_index = getPixelIndex(alt_rad, azi_rad);
+            if (pixel_index) |pi| {
+                global_pixel_data[pi] = Pixel{
+                    .r = 255,
+                    .g = 0, 
+                    .b = 0,
+                    // .g = 246, 
+                    // .b = 176,
+                    .a = 255
+                };
+            }
+        }
+    }
+}
+
+pub fn getPixelIndex(altitude: f32, azimuth: f32) ?usize {
+    var point = getProjectedCoord(altitude, azimuth);
+    point = global_canvas.translatePoint(point);
+
+    if (std.math.isNan(point.x) or std.math.isNan(point.y) or std.math.isNan(point.brightness)) {
         return null;
     }
 
-    const cos_azi = (sin_dec - math.sin(altitude) * sin_lat) / (math.cos(altitude) * cos_lat);
-    const azi = math.acos(cos_azi);
-    const azimuth = if (math.sin(hour_angle_rad) < 0) azi else two_pi - azi;
+    if (point.x < 0 or point.y < 0) return null;
 
-    var star_point = getProjectedCoord(@floatCast(f32, altitude), @floatCast(f32, azimuth));
-    star_point.brightness = star.brightness;
-        
-        // try point_list.append(global_canvas.translatePoint(star_point));
-    // }
+    const x = @floatToInt(usize, point.x);
+    const y = @floatToInt(usize, point.y);
 
-    // return point_list.toOwnedSlice();
-    return global_canvas.translatePoint(star_point);
+    const p_index: usize = (y * @intCast(usize, global_canvas.width)) + x;
+    if (p_index >= global_pixel_data.len) return null;
+
+    return p_index;
 }
 
 pub fn getProjectedCoord(altitude: f32, azimuth: f32) CanvasPoint {
@@ -256,7 +239,7 @@ pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_e
     // drag_distance is the angular distance between the starting location and the result location after a single drag
     // 2.5 is a magic number of degrees, picked because it results in what feels like an appropriate drag speed
     // Higher = move more with smaller cursor movements, and vice versa
-    const drag_distance = degToRad(f32, 2.5);
+    const drag_distance: f32 = degToRad(2.5);
 
     // Calculate asin(new_latitude), and clamp the result between [-1, 1]
     var sin_lat_x = math.sin(drag_distance) * math.cos(dist_phi);
@@ -344,7 +327,7 @@ fn radToDegLong(radian: f32) f32 {
 }
 
 /// A standard degree-to-radian conversion function.
-fn degToRad(comptime T: type, degree: T) T {
+fn degToRad(degree: anytype) @TypeOf(degree) {
     return degree * (math.pi / 180.0);
 }
 
@@ -359,40 +342,24 @@ const OperationError = error{NaN};
 /// will be clamped to either end depending on whether it's too high or too low.
 fn boundedACos(x: anytype) OperationError!@TypeOf(x) {
     const T = @TypeOf(x);
-    // const value: T = if (x >= 1.0)
-    //     1.0
-    // else if (x <= -1.0)
-    //     -1.0
-    // else
-    //     x;
     const value = switch (T) {
         f32, f64 =>  math.acos(x),
         f128, comptime_float => return math.acos(@floatCast(f64, x)),
-        else => @compileError("boundedACos not implemented for type " ++ T),
+        else => @compileError("boundedACos not implemented for type " ++ @typeName(T)),
     };
 
-    if (std.math.isNan(value)) return error.NaN;
-
-    return value;
+    return if (std.math.isNan(value)) error.NaN else value;
 }
 
 fn boundedASin(x: anytype) OperationError!@TypeOf(x) {
     const T = @TypeOf(x);
-    // const value: T = if (x >= 1.0)
-    //     1.0
-    // else if (x <= -1.0)
-    //     -1.0
-    // else
-    //     x;
     const value = switch (T) {
         f32, f64 => math.asin(x),
         f128, comptime_float => math.asin(@floatCast(f64, x)),
-        else => @compileError("boundedACos not implemented for type " ++ T),
+        else => @compileError("boundedACos not implemented for type " ++ @typeName(T)),
     };
 
-    if (std.math.isNan(value)) return error.NaN;
-
-    return value;
+    return if (std.math.isNan(value)) error.NaN else value;
 }
 
 fn FloatModResult(comptime input_type: type) type {
@@ -422,7 +389,7 @@ fn floatMod(num: anytype, denom: @TypeOf(num)) FloatModResult(@TypeOf(num)) {
 test "degree to radian conversion" {
     const epsilon = 0.001;
     const degree = 45.0;
-    const radian = comptime degToRad(f32, degree);
+    const radian = degToRad(degree);
     expectWithinEpsilon(math.pi / 4.0, radian, epsilon);
 }
 
@@ -435,7 +402,7 @@ test "radian to degree conversion" {
 test "longitude back and forth conversion - negative" {
     const epsilon = 0.001;
     const degLong = -75.0;
-    const radLong = comptime degToRad(f32, degLong);
+    const radLong = comptime degToRad(degLong);
     const backDegLong = comptime radToDegLong(radLong);
     expectWithinEpsilon(-degLong, -backDegLong, epsilon);
 }

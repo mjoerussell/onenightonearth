@@ -1,6 +1,6 @@
 import { Renderer } from './render';
 import { WorkerInterface } from './wasm/worker-interface';
-import { Coord, ConstellationBranch, CanvasPoint } from './wasm/size';
+import { Coord, ConstellationBranch, CanvasPoint, Star } from './wasm/size';
 import { WasmInterface } from './wasm/wasm-interface';
 
 interface ConstellationEntry {
@@ -64,9 +64,7 @@ const renderStars = (coord: Coord, date?: Date) => {
     wasm_interface.projectStars(coord.latitude, coord.longitude, BigInt(timestamp));
     const data = wasm_interface.getImageData();
     renderer.drawPoint(data);
-    // renderer.render();
-    // const points = wasm_interface.projectStars(coord.latitude, coord.longitude, BigInt(timestamp));
-    // renderer.draw(points);
+    wasm_interface.resetImageData();
 };
 
 const renderConstellations = (constellations: ConstellationEntry[], coord: Coord, date?: Date) => {
@@ -205,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     fetch('/stars')
         .then(star_result => star_result.json())
-        .then((stars: string[]) =>
+        .then((stars: Star[]) =>
             WebAssembly.instantiateStreaming(fetch('./one-lib/zig-cache/lib/one-math.wasm'), {
                 env: {
                     consoleLog: (msg_ptr: number, msg_len: number) => {
@@ -219,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
             })
                 .then(wasm_result => {
                     wasm_interface = new WasmInterface(wasm_result.instance);
-                    wasm_interface.initialize(stars.join('\n'), renderer.getCanvasSettings());
+                    wasm_interface.initialize(stars, renderer.getCanvasSettings());
 
                     drawUIElements();
                     renderStars({ latitude: current_latitude, longitude: current_longitude });

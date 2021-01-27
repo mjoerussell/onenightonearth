@@ -35,6 +35,29 @@ export const sizedCanvasPoint: Sized<CanvasPoint> = {
     brightness: WasmPrimative.f32,
 };
 
+export type Star = {
+    name: string;
+    right_ascension: number;
+    declination: number;
+    brightness: number;
+};
+
+export type WasmStar = {
+    // name_ptr: number;
+    // name_length: number;
+    right_ascension: number;
+    declination: number;
+    brightness: number;
+};
+
+export const sizedWasmStar: Sized<WasmStar> = {
+    // name_ptr: WasmPrimative.u32,
+    // name_length: WasmPrimative.u32,
+    right_ascension: WasmPrimative.f32,
+    declination: WasmPrimative.f32,
+    brightness: WasmPrimative.f32,
+};
+
 export type StarCoord = {
     rightAscension: number;
     declination: number;

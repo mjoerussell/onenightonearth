@@ -3,8 +3,7 @@ const ArrayList = std.ArrayList;
 const parseFloat = std.fmt.parseFloat;
 const star_math = @import("./star_math.zig");
 const Star = star_math.Star;
-const StarCoord = star_math.StarCoord;
-const ConstellationBranch = star_math.ConstellationBranch;
+const WasmStar = star_math.WasmStar;
 const Coord = star_math.Coord;
 const CanvasPoint = star_math.CanvasPoint;
 const Pixel = star_math.Pixel;
@@ -23,19 +22,20 @@ fn log(comptime message: []const u8, args: anytype) void {
     consoleLog(fmt_msg.ptr, @intCast(u32, fmt_msg.len));
 }
 
-pub export fn initialize(star_data: [*]const u8, data_len: u32, settings: *star_math.CanvasSettings) void {
+pub export fn initialize(star_data: [*]WasmStar, data_len: u32, settings: *star_math.CanvasSettings) void {
     const num_stars = star_math.initStarData(allocator, star_data[0..data_len]) catch |err| blk: {
         switch (err) {
-            error.ParseDec => log("[ERROR] Could not parse declination", .{}),
-            error.ParseMag => log("[ERROR] Could not parse magnitude", .{}),
-            error.ParseRA => log("[ERROR] Could not parse right ascension", .{}),
-            error.OutOfMemory => log("[ERROR] Ran out of memory during initialization", .{})
+            error.OutOfMemory => log("[ERROR] Ran out of memory during initialization (needed {} kB for {} stars)", .{(data_len * @sizeOf(Star)) / 1000, data_len})
         }
         break :blk 0;
     };
-    star_math.initCanvasData(allocator, settings.*) catch unreachable;
-    log("Initialized {} pixels", .{star_math.global_pixel_data.len});
-
+    star_math.initCanvasData(allocator, settings.*) catch |err| switch (err) {
+        error.OutOfMemory => {
+            const num_pixels = star_math.global_canvas.width * star_math.global_canvas.height;
+            log("[ERROR] Ran out of memory during canvas intialization (needed {} kB for {} pixels)", .{(num_pixels * @sizeOf(Pixel)) / 1000, num_pixels});
+            unreachable;
+        }
+    };
 }
 
 pub export fn updateCanvasSettings(settings: *star_math.CanvasSettings) void {
@@ -48,55 +48,53 @@ pub export fn getImageData(size_in_bytes: *u32) [*]Pixel {
     return star_math.global_pixel_data.ptr;
 }
 
-// pub export fn projectStarsWasm(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64, result_len: *u32) [*]CanvasPoint {
-pub export fn projectStarsWasm(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
-    // var rendered_points = std.ArrayList(CanvasPoint).initCapacity(allocator, star_math.global_stars.len / 2) catch unreachable;
+pub export fn resetImageData() void {
+    for (star_math.global_pixel_data) |*p, i| {
+        p.* = Pixel{};
+    }   
+    // const width = @intToFloat(f32, star_math.global_canvas.width);
+    // const height = @intToFloat(f32, star_math.global_canvas.height);
+    // for (star_math.global_pixel_data) |*p, i| {
+    //     p.* = Pixel{
+    //         .r = @floatToInt(u8, ((@mod(@intToFloat(f32, i), width)) / width) * 255),
+    //         .b = 255 - @floatToInt(u8, ((@intToFloat(f32, i) / width) / height) * 255),
+    //         .g = 0,
+    //         .a = 255
+    //     };
+    // }   
+}
 
+pub export fn projectStarsWasm(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
     const current_coord = Coord{
         .latitude = observer_latitude,
         .longitude = observer_longitude
     };
 
-    for (star_math.global_pixel_data) |*p| {
-        p.* = Pixel{};
-    }
-
-    log("Reset pixel data", .{});
-
-    for (star_math.global_stars) |star, i| {
-        const point = star_math.projectStar(star, current_coord, observer_timestamp, true);
-        if (point) |p| {
-            if (std.math.isNan(p.x) or std.math.isNan(p.y) or std.math.isNan(p.brightness)) {
-                log("Point for star {} has NaN value", .{i});
-                continue;
-            }
-            const p_index: i32 = @floatToInt(i32, (p.y * @intToFloat(f32, star_math.global_canvas.width)) + p.x);
-            if (p_index < 0 or p_index >= star_math.global_pixel_data.len) {
-                continue;
-            }
-            // log("{}: Drawing star at {}", .{i, p_index});
-            star_math.global_pixel_data[@intCast(usize, p_index)] = Pixel{
-                .r = 255, 
-                .g = 246, 
-                .b = 176, 
-                .a = @floatToInt(u8, (p.brightness / 2.5) * 255.0)
-            };
-            // log("{}: Drew star at pixel {}", .{i, p_index});
-            // drawPointWasm(p.x, p.y, p.brightness);
-            // rendered_points.append(p) catch unreachable;
-        }
-    }   
-
-    log("Drew all stars", .{});
-
-    // const result = rendered_points.toOwnedSlice();
-    // const points = star_math.projectStars(allocator, current_coord, observer_timestamp, true) catch unreachable;
-    // log("Drawing {} points", .{points.len});
-    // for (points) |p| {
-    //     drawPointWasm(p.x, p.y, p.brightness);
+    // for (star_math.global_pixel_data) |*p| {
+    //     p.* = Pixel{};
     // }
-    // result_len.* = @intCast(u32, result.len);
-    // return result.ptr;
+
+    // const point = star_math.projectStar(current_coord, observer_timestamp, true);
+    star_math.projectStar(current_coord, observer_timestamp, true);
+    // for (star_math.global_stars) |star, i| {
+    //     const point = star_math.projectStar(star, current_coord, observer_timestamp, true);
+    //     if (point) |p| {
+    //         if (std.math.isNan(p.x) or std.math.isNan(p.y) or std.math.isNan(p.brightness)) {
+    //             continue;
+    //         }
+    //         const p_index: i32 = @floatToInt(i32, (p.y * @intToFloat(f32, star_math.global_canvas.width)) + p.x);
+    //         if (p_index < 0 or p_index >= star_math.global_pixel_data.len) {
+    //             continue;
+    //         }
+
+    //         star_math.global_pixel_data[@intCast(usize, p_index)] = Pixel{
+    //             .r = 255, 
+    //             .g = 246, 
+    //             .b = 176, 
+    //             .a = @floatToInt(u8, (p.brightness / 2.5) * 255.0)
+    //         };
+    //     }
+    // }   
 }
 
 // pub export fn projectConstellation(branches: [*]const ConstellationBranch, num_branches: u32, observer_location: *const Coord, observer_timestamp: i64) void {
