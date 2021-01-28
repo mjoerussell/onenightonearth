@@ -34,7 +34,6 @@ pub const CanvasSettings = packed struct {
         return .{
             .x = center_x + (translate_factor * pt.x),
             .y = center_y - (translate_factor * pt.y),
-            .brightness = pt.brightness
         };
     }
 };
@@ -42,7 +41,6 @@ pub const CanvasSettings = packed struct {
 pub const CanvasPoint = struct {
     x: f32,
     y: f32,
-    brightness: f32 = 0.0,
 };
 
 pub const Coord = packed struct {
@@ -149,7 +147,7 @@ pub fn getPixelIndex(altitude: f32, azimuth: f32) ?usize {
     var point = getProjectedCoord(altitude, azimuth);
     point = global_canvas.translatePoint(point);
 
-    if (std.math.isNan(point.x) or std.math.isNan(point.y) or std.math.isNan(point.brightness)) {
+    if (std.math.isNan(point.x) or std.math.isNan(point.y)) {
         return null;
     }
 
@@ -183,22 +181,35 @@ pub fn findWaypoints(allocator: *Allocator, f: Coord, t: Coord, num_waypoints: u
     const quadrant_radians = comptime math.pi / 2.0;
     const circle_radians = comptime math.pi * 2.0;
 
-    const negative_dir = t.longitude < f.longitude and t.longitude > (f.longitude - math.pi);
+    const t_radian = Coord{
+        .latitude = math_utils.degToRad(t.latitude),
+        .longitude = math_utils.degToRadLong(t.longitude)
+    };
 
-    const total_distance = findGreatCircleDistance(f, t) catch |err| 0;
-    const course_angle = findGreatCircleCourseAngle(f, t, total_distance) catch |err| 0;
+    const f_radian = Coord{
+        .latitude = math_utils.degToRad(f.latitude),
+        .longitude = math_utils.degToRadLong(f.longitude)
+    };
+
+    const negative_dir = t_radian.longitude < f_radian.longitude and t_radian.longitude > (f_radian.longitude - math.pi);
+
+    const total_distance = findGreatCircleDistance(f_radian, t_radian) catch |err| 0;
+    const course_angle = findGreatCircleCourseAngle(f_radian, t_radian, total_distance) catch |err| 0;
 
     const waypoint_inc = total_distance / @intToFloat(f32, num_waypoints);
 
     var waypoints: []Coord = allocator.alloc(Coord, num_waypoints) catch unreachable;
     for (waypoints) |*waypoint, i| {
         const waypoint_rel_angle = @intToFloat(f32, i + 1) * waypoint_inc;
-        const lat = findWaypointLatitude(f, waypoint_rel_angle, course_angle) catch |err| 0;
-        const rel_long = findWaypointRelativeLongitude(f, lat, waypoint_rel_angle) catch |err| 0;
+        const lat = findWaypointLatitude(f_radian, waypoint_rel_angle, course_angle) catch |err| 0;
+        const rel_long = findWaypointRelativeLongitude(f_radian, lat, waypoint_rel_angle) catch |err| 0;
 
-        const long = if (negative_dir) f.longitude - rel_long else f.longitude + rel_long;
+        const long = if (negative_dir) f_radian.longitude - rel_long else f_radian.longitude + rel_long;
 
-        waypoint.* = Coord{ .latitude = lat, .longitude = long };
+        waypoint.* = Coord{ 
+            .latitude = math_utils.radToDeg(lat), 
+            .longitude = math_utils.radToDegLong(long) 
+        };
     }
 
     return waypoints;

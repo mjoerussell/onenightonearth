@@ -14,24 +14,6 @@ let wasm_interface: WasmInterface;
 let current_latitude: number = 0;
 let current_longitude: number = 0;
 
-const radToDeg = (radians: number): number => {
-    return radians * 57.29577951308232;
-};
-
-const radToDegLong = (radians: number): number => {
-    const degrees = radToDeg(radians);
-    return degrees > 180.0 ? degrees - 360.0 : degrees;
-};
-
-const degToRad = (degrees: number): number => {
-    return degrees * 0.017453292519943295;
-};
-
-const degToRadLong = (degrees: number): number => {
-    const normDeg = degrees < 0 ? degrees + 360 : degrees;
-    return normDeg * 0.017453292519943295;
-};
-
 const renderStars = (latitude: number, longitude: number, date?: Date) => {
     if (!date) {
         if (date_input.valueAsDate) {
@@ -130,59 +112,52 @@ document.addEventListener('DOMContentLoaded', () => {
         );
 
     // Handle updating the viewing location
-    locationUpdateButton.addEventListener('click', async () => {
-        const newLatitude = parseFloat(latInput.value);
-        const newLongitude = parseFloat(longInput.value);
+    locationUpdateButton.addEventListener('click', () => {
+        let new_latitude = parseFloat(latInput.value);
+        let new_longitude = parseFloat(longInput.value);
 
-        if (newLatitude === current_latitude && newLongitude === current_longitude) {
+        if (new_latitude === current_latitude && new_longitude === current_longitude) {
             return;
         }
 
-        const start: Coord = {
-            latitude: degToRad(current_latitude),
-            longitude: degToRadLong(current_longitude),
-        };
+        // If the longitude is exactly opposite of the original, then there's rendering issues
+        // Introduce a slight offset to minimize this without significantly affecting end location
+        if (new_longitude === -current_longitude) {
+            new_longitude += 0.05;
+        }
 
-        const end: Coord = {
-            latitude: degToRad(newLatitude),
-            longitude: degToRadLong(newLongitude),
-        };
+        const start: Coord = { latitude: current_latitude, longitude: current_longitude };
+        const end: Coord = { latitude: new_latitude, longitude: new_longitude };
 
-        const waypoint_coords = await wasm_interface.findWaypoints(start, end);
-        const waypoints = waypoint_coords.map(coord => {
-            return {
-                latitude: radToDeg(coord.latitude),
-                longitude: radToDegLong(coord.longitude),
-            };
-        });
-
-        let waypoint_index = 0;
-        if (waypoints != null && waypoints.length > 0) {
-            // @todo Update this loop so that all distances get traveled at the same speed,
-            // not in the same amount of time
-            const runWaypointTravel = () => {
-                renderStars(waypoints[waypoint_index].latitude, waypoints[waypoint_index].longitude);
-                waypoint_index += 1;
-                if (waypoint_index === waypoints.length) {
-                    current_latitude = newLatitude;
-                    current_longitude = newLongitude;
-
-                    latInput.value = current_latitude.toString();
-                    longInput.value = current_longitude.toString();
-                } else {
-                    window.requestAnimationFrame(runWaypointTravel);
-                }
-            };
-            window.requestAnimationFrame(runWaypointTravel);
-        } else {
-            current_latitude = newLatitude;
-            current_longitude = newLongitude;
+        const waypoints = wasm_interface.findWaypoints(start, end);
+        if (waypoints == null || waypoints.length === 0) {
+            current_latitude = new_latitude;
+            current_longitude = new_longitude;
 
             latInput.value = current_latitude.toString();
             longInput.value = current_longitude.toString();
 
             renderStars(current_latitude, current_longitude);
+            return;
         }
+
+        let waypoint_index = 0;
+        // @todo Update this loop so that all distances get traveled at the same speed,
+        // not in the same amount of time
+        const runWaypointTravel = () => {
+            const waypoint = waypoints[waypoint_index];
+            renderStars(waypoint.latitude, waypoint.longitude);
+            latInput.value = waypoint.latitude.toString();
+            longInput.value = waypoint.longitude.toString();
+            waypoint_index += 1;
+            if (waypoint_index === waypoints.length) {
+                current_latitude = new_latitude;
+                current_longitude = new_longitude;
+            } else {
+                window.requestAnimationFrame(runWaypointTravel);
+            }
+        };
+        window.requestAnimationFrame(runWaypointTravel);
     });
 
     // Handle time-travelling

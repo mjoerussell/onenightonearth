@@ -22,11 +22,11 @@ pub fn radToDeg(radian: anytype) @TypeOf(radian) {
 }
 
 /// A standard degree-to-radian conversion function.
-pub fn degToRad(degree: anytype) @TypeOf(degree) {
-    return degree * deg_to_rad_constant;
+pub fn degToRad(degrees: anytype) @TypeOf(degrees) {
+    return degrees * deg_to_rad_constant;
 }
 
-pub fn degToRadLong(degrees: anytype) @TypeOf(degree) {
+pub fn degToRadLong(degrees: anytype) @TypeOf(degrees) {
     const norm_deg = if (degrees < 0) degrees + 360 else degrees;
     return degToRad(norm_deg);
 }
