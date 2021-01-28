@@ -51,20 +51,14 @@ pub const Coord = packed struct {
     longitude: f32,
 };
 
-pub const WasmStar = packed struct {
+pub const Star = packed struct {
     right_ascension: f32,
     declination: f32,
     brightness: f32,
 };
 
-pub const Star = struct {
-    name: []const u8,
-    right_ascension: f32 = 0.0,
-    declination: f32 = 0.0,
-    brightness: f32 = 0.0,
-};
+pub var global_stars: []Star = undefined;
 
-pub var global_stars: []WasmStar = undefined;
 pub var global_canvas: CanvasSettings = .{
     .width = 700,
     .height = 700,
@@ -75,7 +69,7 @@ pub var global_canvas: CanvasSettings = .{
 
 pub var global_pixel_data: []Pixel = undefined;
 
-pub fn initStarData(allocator: *Allocator, star_data: []WasmStar) !usize {
+pub fn initStarData(allocator: *Allocator, star_data: []Star) !usize {
     global_stars = star_data;
 
     return global_stars.len;
@@ -87,16 +81,6 @@ pub fn initCanvasData(allocator: *Allocator, canvas_settings: CanvasSettings) !v
     for (global_pixel_data) |*p| {
         p.* = Pixel{};
     }
-    // const width = @intToFloat(f32, global_canvas.width);
-    // const height = @intToFloat(f32, global_canvas.height);
-    // for (global_pixel_data) |*p, i| {
-    //     p.* = Pixel{
-    //         .r = 255 - @floatToInt(u8, ((@mod(@intToFloat(f32, i), width)) / width) * 255),
-    //         .b = @floatToInt(u8, ((@intToFloat(f32, i) / width) / height) * 255),
-    //         .g = 0,
-    //         .a = 255
-    //     };
-    // }   
 }
 
 pub fn projectStar(observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) void {
@@ -127,24 +111,20 @@ pub fn projectStar(observer_location: Coord, observer_timestamp: i64, filter_bel
 
         const pixel_index = getPixelIndex(@floatCast(f32, altitude), @floatCast(f32, azimuth));
         if (pixel_index) |p_index| {
-            global_pixel_data[p_index] = Pixel{
+            const pixel = Pixel{
                 .r = 255, 
                 .g = 246, 
                 .b = 176, 
                 .a = @floatToInt(u8, (star.brightness / 1.5) * 255.0)
             };
+            global_pixel_data[p_index] = pixel;
         }
 
     }
-
-    // debug draw grid
-    // drawGrid();
-
 }
 
 pub fn drawGrid() void {
     var altitude: f32 = 0;
-    // var azimuth: f32 = 0;
 
     const grid_spacing: comptime_float = 90 / 5;
     while (altitude <= 90) : (altitude += grid_spacing) {
@@ -158,8 +138,6 @@ pub fn drawGrid() void {
                     .r = 255,
                     .g = 0, 
                     .b = 0,
-                    // .g = 246, 
-                    // .b = 176,
                     .a = 255
                 };
             }

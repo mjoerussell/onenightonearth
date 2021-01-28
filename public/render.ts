@@ -90,11 +90,11 @@ export class Renderer {
 
     drawPoint(data: Uint8ClampedArray): void {
         try {
-            const start = performance.now();
+            // const start = performance.now();
             const image_data = new ImageData(data, this.main_canvas.width, this.main_canvas.height);
             this.main_ctx.putImageData(image_data, 0, 0);
-            const elapsed = performance.now() - start;
-            console.warn(`Render took ${elapsed} ms`);
+            // const elapsed = performance.now() - start;
+            // console.warn(`Render took ${elapsed} ms`);
         } catch (error) {
             if (error instanceof DOMException) {
                 console.error('DOMException in drawPoint: ', error);

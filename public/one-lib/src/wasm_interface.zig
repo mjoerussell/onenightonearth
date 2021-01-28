@@ -3,7 +3,6 @@ const ArrayList = std.ArrayList;
 const parseFloat = std.fmt.parseFloat;
 const star_math = @import("./star_math.zig");
 const Star = star_math.Star;
-const WasmStar = star_math.WasmStar;
 const Coord = star_math.Coord;
 const CanvasPoint = star_math.CanvasPoint;
 const Pixel = star_math.Pixel;
@@ -22,7 +21,7 @@ fn log(comptime message: []const u8, args: anytype) void {
     consoleLog(fmt_msg.ptr, @intCast(u32, fmt_msg.len));
 }
 
-pub export fn initialize(star_data: [*]WasmStar, data_len: u32, settings: *star_math.CanvasSettings) void {
+pub export fn initialize(star_data: [*]Star, data_len: u32, settings: *star_math.CanvasSettings) void {
     const num_stars = star_math.initStarData(allocator, star_data[0..data_len]) catch |err| blk: {
         switch (err) {
             error.OutOfMemory => log("[ERROR] Ran out of memory during initialization (needed {} kB for {} stars)", .{(data_len * @sizeOf(Star)) / 1000, data_len})
@@ -73,6 +72,7 @@ pub export fn projectStarsWasm(observer_latitude: f32, observer_longitude: f32, 
     // for (star_math.global_pixel_data) |*p| {
     //     p.* = Pixel{};
     // }
+    resetImageData();
 
     // const point = star_math.projectStar(current_coord, observer_timestamp, true);
     star_math.projectStar(current_coord, observer_timestamp, true);
