@@ -26,10 +26,8 @@ jobs:
       - uses: actions/checkout@v2
       - name: Install Zig
         run: |
-          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 379CE192D401AB61
-          echo 'deb https://dl.bintray.com/dryzig/zig-ubuntu groovy main' | sudo tee -a /etc/apt/sources.list
-          sudo apt update
-          sudo apt install zig
+          curl -L https://ziglang.org/download/zig-linux-x86_64-0.8.0-dev.1060+1ed8c54cd.tar.xz | tar zx
+          ls -l
       # Runs a single command using the runners shell
 #       - name: Run a one-line script
 #         run: echo Hello, world!
