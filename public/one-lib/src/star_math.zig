@@ -1,6 +1,4 @@
 // @todo Improve testing - find online calculators for star functions and compare against them (fingers crossed)
-// @fixme There's some flickering going on in the middle of the window while time-travelling
-//        This might actually be something that's happening across the whole vertical line from center up to the edge
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const math = std.math;
@@ -58,6 +56,7 @@ pub const Star = packed struct {
 };
 
 pub var global_stars: []Star = undefined;
+var project_start_index: usize = 0;
 
 pub var global_canvas: CanvasSettings = .{
     .width = 700,

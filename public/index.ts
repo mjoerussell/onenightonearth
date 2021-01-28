@@ -1,6 +1,5 @@
 import { Renderer } from './render';
-import { WorkerInterface } from './wasm/worker-interface';
-import { Coord, ConstellationBranch, CanvasPoint, Star } from './wasm/size';
+import { Coord, ConstellationBranch, Star } from './wasm/size';
 import { WasmInterface } from './wasm/wasm-interface';
 
 interface ConstellationEntry {
@@ -84,23 +83,6 @@ const renderConstellations = (constellations: ConstellationEntry[], coord: Coord
     // }
 };
 
-// const drawPoints = (data: Uint8ClampedArray) => {
-//     // const direction_modifier = renderer.draw_north_up ? 1 : -1;
-//     // let previous_brightness = 0;
-//     // const center_x = renderer.width / 2;
-//     // const center_y = renderer.height / 2;
-//     // const ctx = renderer.context;
-//     // for (const point of points) {
-//     //     if (point.brightness != previous_brightness) {
-//     //         previous_brightness = point.brightness;
-//     //         ctx.fillStyle = `rgba(255, 246, 176, ${(point.brightness / 2.5) * 255})`;
-//     //     }
-//     //     const rounded_x = center_x + direction_modifier * (renderer.background_radius * renderer.zoom_factor) * point.x;
-//     //     const rounded_y = center_y - direction_modifier * (renderer.background_radius * renderer.zoom_factor) * point.y;
-//     //     ctx.fillRect(rounded_x, rounded_y, 1, 1);
-//     // }
-// };
-
 const drawLineWasm = (x1: number, y1: number, x2: number, y2: number) => {
     // const direction_modifier = draw_north_up ? 1 : -1;
     // const pointX1 = center_x + direction_modifier * (background_radius * zoom_factor) * x1;
@@ -122,9 +104,6 @@ const drawUIElements = () => {
     const backgroundCanvas = document.getElementById('backdrop-canvas') as HTMLCanvasElement;
     const bgCtx = backgroundCanvas?.getContext('2d');
 
-    // const gridCanvas = document.getElementById('grid-canvas') as HTMLCanvasElement;
-    // const gridCtx = gridCanvas?.getContext('2d');
-
     const center_x = renderer.width / 2;
     const center_y = renderer.height / 2;
 
@@ -133,32 +112,9 @@ const drawUIElements = () => {
         bgCtx.canvas.height = renderer.height;
 
         bgCtx.fillStyle = '#051430';
-        // bgCtx.fillStyle = '#f5f5dc';
-        // bgCtx.fillRect(0, 0, renderer.width, renderer.height);
-
-        // bgCtx.globalCompositeOperation = 'destination-out';
-        // bgCtx.beginPath();
         bgCtx.arc(center_x, center_y, renderer.background_radius, 0, Math.PI * 2);
         bgCtx.fill();
-
-        // bgCtx.fillRect(0, 0, renderer.width, renderer.height);
-
-        // bgCtx.fillStyle = 'rgba(0, 0, 0, 0)';
-
-        // Draw background
-        // bgCtx.fill();
     }
-
-    // if (gridCtx) {
-    //     gridCtx.canvas.width = renderer.width;
-    //     gridCtx.canvas.height = renderer.height;
-
-    //     gridCtx.fillStyle = '#6a818a55';
-    //     gridCtx.strokeStyle = '#6a818a';
-    //     gridCtx.arc(center_x, center_y, renderer.background_radius, 0, Math.PI * 2);
-    //     gridCtx.lineWidth = 3;
-    //     gridCtx.stroke();
-    // }
 };
 
 const getDaysInMillis = (days: number): number => days * 86400000;
@@ -210,9 +166,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         const message = wasm_interface.getString(msg_ptr, msg_len);
                         console.log(`[WASM] ${message}`);
                     },
-                    // drawPointWasm: (x: number, y: number, brightness: number) => {
-                    //     // renderer.drawPoint({ x, y, brightness });
-                    // },
                 },
             })
                 .then(wasm_result => {
@@ -286,7 +239,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Handle time-travelling
     let travelIsOn = false;
-    // let travelInterval: number;
     const frame_target = 60;
     let frames_seen = 0;
     let time_elapsed_sum = 0;
@@ -399,9 +351,6 @@ document.addEventListener('DOMContentLoaded', () => {
         is_drawing = true;
         renderStars({ latitude: current_latitude, longitude: current_longitude });
         is_drawing = false;
-        // renderStars({ latitude: current_latitude, longitude: current_longitude })?.then(() => {
-        //     is_drawing = false;
-        // });
         // renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
     });
 
@@ -427,9 +376,6 @@ document.addEventListener('DOMContentLoaded', () => {
             is_drawing = true;
             renderStars({ latitude: current_latitude, longitude: current_longitude });
             is_drawing = false;
-            // renderStars({ latitude: current_latitude, longitude: current_longitude })?.then(() => {
-            //     is_drawing = false;
-            // });
             renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
         }
     });

@@ -1,6 +1,7 @@
 body {
-    background: linear-gradient(#01020f, #102d6b);
-    font-family: 'Martel', serif;
+    /* background: linear-gradient(#01020f, #102d6b); */
+    background: linear-gradient(#01020f, #031131);
+    font-family: 'Poppins', serif;
     margin: 0;
     height: 100vh;
 }

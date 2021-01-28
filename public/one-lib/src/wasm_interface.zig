@@ -51,16 +51,6 @@ pub export fn resetImageData() void {
     for (star_math.global_pixel_data) |*p, i| {
         p.* = Pixel{};
     }   
-    // const width = @intToFloat(f32, star_math.global_canvas.width);
-    // const height = @intToFloat(f32, star_math.global_canvas.height);
-    // for (star_math.global_pixel_data) |*p, i| {
-    //     p.* = Pixel{
-    //         .r = @floatToInt(u8, ((@mod(@intToFloat(f32, i), width)) / width) * 255),
-    //         .b = 255 - @floatToInt(u8, ((@intToFloat(f32, i) / width) / height) * 255),
-    //         .g = 0,
-    //         .a = 255
-    //     };
-    // }   
 }
 
 pub export fn projectStarsWasm(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
@@ -69,32 +59,7 @@ pub export fn projectStarsWasm(observer_latitude: f32, observer_longitude: f32, 
         .longitude = observer_longitude
     };
 
-    // for (star_math.global_pixel_data) |*p| {
-    //     p.* = Pixel{};
-    // }
-    resetImageData();
-
-    // const point = star_math.projectStar(current_coord, observer_timestamp, true);
     star_math.projectStar(current_coord, observer_timestamp, true);
-    // for (star_math.global_stars) |star, i| {
-    //     const point = star_math.projectStar(star, current_coord, observer_timestamp, true);
-    //     if (point) |p| {
-    //         if (std.math.isNan(p.x) or std.math.isNan(p.y) or std.math.isNan(p.brightness)) {
-    //             continue;
-    //         }
-    //         const p_index: i32 = @floatToInt(i32, (p.y * @intToFloat(f32, star_math.global_canvas.width)) + p.x);
-    //         if (p_index < 0 or p_index >= star_math.global_pixel_data.len) {
-    //             continue;
-    //         }
-
-    //         star_math.global_pixel_data[@intCast(usize, p_index)] = Pixel{
-    //             .r = 255, 
-    //             .g = 246, 
-    //             .b = 176, 
-    //             .a = @floatToInt(u8, (p.brightness / 2.5) * 255.0)
-    //         };
-    //     }
-    // }   
 }
 
 // pub export fn projectConstellation(branches: [*]const ConstellationBranch, num_branches: u32, observer_location: *const Coord, observer_timestamp: i64) void {

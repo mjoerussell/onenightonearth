@@ -139,9 +139,8 @@ const stars: Promise<Star[]> = readFile(path.join(__dirname, 'sao_catalog'))
       .filter(line => line.startsWith('SAO'))
   )
   .then(lines => lines.map(parseCatalogLine).filter(star => star != null) as Star[])
-  .then(stars => stars.filter(star => star.brightness > 0.4))
-  .then(stars => stars.sort((a, b) => a.right_ascension - b.right_ascension));
-// .then(stars => stars.filter(star => star.right_ascension < 45)); // debug, only get 1 quarter of the sky
+  .then(stars => stars.filter(star => star.brightness > 0.33))
+  .then(stars => stars.sort((a, b) => a.declination - b.declination));
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));

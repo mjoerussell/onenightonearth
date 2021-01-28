@@ -1,5 +1,3 @@
-import { CanvasPoint } from './wasm/size';
-
 interface CanvasOptions {
     width?: number;
     height?: number;
@@ -35,8 +33,6 @@ export class Renderer {
 
     private _settings_did_change = true;
 
-    private previous_brightness = 0.0;
-
     constructor(canvas_id: string, options?: CanvasOptions) {
         this.main_canvas = document.getElementById(canvas_id) as HTMLCanvasElement;
         this.main_ctx = this.main_canvas.getContext('2d')!;
@@ -68,61 +64,16 @@ export class Renderer {
         this.offscreen_ctx.clearRect(0, 0, this.width, this.height);
     }
 
-    // draw(data: CanvasPoint[]): void {
-    //     let previous_brightness = data[0].brightness;
-    //     this.offscreen_ctx.clearRect(0, 0, this.offscreen_canvas.width, this.offscreen_canvas.height);
-    //     this.offscreen_ctx.fillStyle = `rgb(255, 246, 176, ${(previous_brightness / 2.5) * 255})`;
-
-    //     for (const point of data) {
-    //         if (point.brightness != previous_brightness) {
-    //             previous_brightness = point.brightness;
-    //             this.offscreen_ctx.fillStyle = `rgb(255, 246, 176, ${(previous_brightness / 2.5) * 255})`;
-    //         }
-    //         this.offscreen_ctx.fillRect(point.x, point.y, 1, 1);
-    //     }
-    //     this.main_ctx.clearRect(0, 0, this.main_canvas.width, this.main_canvas.height);
-    //     this.main_ctx.drawImage(this.offscreen_canvas, 0, 0);
-    // }
-
-    // startDraw(): void {
-    //     this.offscreen_ctx.clearRect(0, 0, this.offscreen_canvas.width, this.offscreen_canvas.height);
-    // }
-
     drawPoint(data: Uint8ClampedArray): void {
         try {
-            // const start = performance.now();
             const image_data = new ImageData(data, this.main_canvas.width, this.main_canvas.height);
             this.main_ctx.putImageData(image_data, 0, 0);
-            // const elapsed = performance.now() - start;
-            // console.warn(`Render took ${elapsed} ms`);
         } catch (error) {
             if (error instanceof DOMException) {
                 console.error('DOMException in drawPoint: ', error);
             }
         }
-        // const image_data = this.offscreen_ctx.createImageData(this.offscreen_canvas.width, this.offscreen_canvas.height);
-        // const data = image_data.data;
-        // console.log('drawPoint', point);
-        // let previous_brightness = data[0].brightness;
-        // this.offscreen_ctx.clearRect(0, 0, this.offscreen_canvas.width, this.offscreen_canvas.height);
-        // this.offscreen_ctx.fillStyle = `rgb(255, 246, 176, ${(this.previous_brightness / 2.5) * 255})`;
-
-        // for (const point of data) {
-        // if (point.brightness != this.previous_brightness) {
-        //     this.previous_brightness = point.brightness;
-        //     this.offscreen_ctx.fillStyle = `rgb(255, 246, 176, ${(this.previous_brightness / 2.5) * 255})`;
-        // }
-        // this.offscreen_ctx.fillRect(point.x, point.y, 1, 1);
-        // }
-        // this.main_ctx.clearRect(0, 0, this.main_canvas.width, this.main_canvas.height);
-        // this.main_ctx.drawImage(this.offscreen_canvas, 0, 0);
     }
-
-    // render(): void {
-    //     this.main_ctx.clearRect(0, 0, this.main_canvas.width, this.main_canvas.height);
-    //     this.main_ctx.drawImage(this.offscreen_canvas, 0, 0);
-    //     this.offscreen_ctx.clearRect(0, 0, this.offscreen_canvas.width, this.offscreen_canvas.height);
-    // }
 
     /**
      * Add an event listener to the main canvas.

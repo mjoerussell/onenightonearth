@@ -11,8 +11,6 @@ import {
     sizeOf,
     sizeOfPrimative,
     sizedCanvasSettings,
-    sizedCanvasPoint,
-    CanvasPoint,
     Star,
     WasmStar,
     sizedWasmStar,
@@ -37,10 +35,7 @@ export class WasmInterface {
     }
 
     projectStars(latitude: number, longitude: number, timestamp: BigInt): void {
-        // const start = performance.now();
         (this.instance.exports.projectStarsWasm as any)(latitude, longitude, timestamp);
-        // const elapsed = performance.now() - start;
-        // console.warn(`projectStarsWasm took ${elapsed} ms`);
     }
 
     resetImageData(): void {
