@@ -138,17 +138,19 @@ const stars: Promise<Star[]> = readFile(path.join(__dirname, 'sao_catalog'))
       .split('\n')
       .filter(line => line.startsWith('SAO'))
   )
-  .then(lines => lines.map(parseCatalogLine).filter(star => star != null) as Star[])
-  .then(stars => stars.filter(star => star.brightness > 0.33))
-  .then(stars => stars.sort((a, b) => a.declination - b.declination));
+  .then(lines => lines.map(parseCatalogLine).filter(star => star != null) as Star[]);
+// .then(stars => stars.filter(star => star.brightness > 0.33))
+// .then(stars => stars.sort((a, b) => a.declination - b.declination));
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.get('/stars', async (req, res) => {
+  const brightness_param = (req.query.brightness as string) ?? '0.33';
+  const min_brightness = parseFloat(brightness_param);
   const available_stars = await stars;
-  res.send(available_stars);
+  res.send(available_stars.filter(star => star.brightness >= min_brightness));
 });
 
 app.get('/constellations', (req, res) => {

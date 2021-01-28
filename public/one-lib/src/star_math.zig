@@ -38,7 +38,7 @@ pub const CanvasSettings = packed struct {
     }
 };
 
-pub const CanvasPoint = packed struct {
+pub const CanvasPoint = struct {
     x: f32,
     y: f32,
     brightness: f32 = 0.0,

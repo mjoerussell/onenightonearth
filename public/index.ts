@@ -1,11 +1,6 @@
 import { Renderer } from './render';
-import { Coord, ConstellationBranch, Star } from './wasm/size';
+import { Coord, Star } from './wasm/size';
 import { WasmInterface } from './wasm/wasm-interface';
-
-interface ConstellationEntry {
-    name: string;
-    branches: ConstellationBranch[];
-}
 
 let date_input: HTMLInputElement;
 let brightness_input: HTMLInputElement;
@@ -18,8 +13,6 @@ let wasm_interface: WasmInterface;
 
 let current_latitude: number = 0;
 let current_longitude: number = 0;
-
-let constellations: ConstellationEntry[];
 
 const radToDeg = (radians: number): number => {
     return radians * 57.29577951308232;
@@ -39,7 +32,7 @@ const degToRadLong = (degrees: number): number => {
     return normDeg * 0.017453292519943295;
 };
 
-const renderStars = (coord: Coord, date?: Date) => {
+const renderStars = (latitude: number, longitude: number, date?: Date) => {
     if (!date) {
         if (date_input.valueAsDate) {
             date = date_input.valueAsDate;
@@ -60,44 +53,10 @@ const renderStars = (coord: Coord, date?: Date) => {
         wasm_interface.updateSettings(renderer.getCanvasSettings());
     }
 
-    wasm_interface.projectStars(coord.latitude, coord.longitude, BigInt(timestamp));
+    wasm_interface.projectStars(latitude, longitude, BigInt(timestamp));
     const data = wasm_interface.getImageData();
     renderer.drawPoint(data);
     wasm_interface.resetImageData();
-};
-
-const renderConstellations = (constellations: ConstellationEntry[], coord: Coord, date?: Date) => {
-    // if (!constellations_on_input.checked) return;
-    // if (renderer == null) return;
-    // if (!date) {
-    //     if (date_input.valueAsDate) {
-    //         date = date_input.valueAsDate;
-    //     } else {
-    //         return;
-    //     }
-    // }
-    // // @todo This is just a first step for the constellations. This version is super slow, even with just 1 constellation
-    // // It needs to be optimized for passing a lot of data to wasm in 1 allocation
-    // for (const constellation of constellations) {
-    //     wasm_interface.projectConstellationBranch(constellation.branches, coord, date.valueOf());
-    // }
-};
-
-const drawLineWasm = (x1: number, y1: number, x2: number, y2: number) => {
-    // const direction_modifier = draw_north_up ? 1 : -1;
-    // const pointX1 = center_x + direction_modifier * (background_radius * zoom_factor) * x1;
-    // const pointY1 = center_y - direction_modifier * (background_radius * zoom_factor) * y1;
-    // const pointX2 = center_x + direction_modifier * (background_radius * zoom_factor) * x2;
-    // const pointY2 = center_y - direction_modifier * (background_radius * zoom_factor) * y2;
-    // if (star_canvas != null) {
-    //     star_canvas.run(ctx => {
-    //         ctx.strokeStyle = 'rgb(255, 246, 176, 0.15)';
-    //         ctx.beginPath();
-    //         ctx.moveTo(pointX1, pointY1);
-    //         ctx.lineTo(pointX2, pointY2);
-    //         ctx.stroke();
-    //     });
-    // }
 };
 
 const drawUIElements = () => {
@@ -129,22 +88,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // Get handles for all the input elements
     date_input = document.getElementById('dateInput') as HTMLInputElement;
     date_input.addEventListener('change', () => {
-        renderStars({ latitude: current_latitude, longitude: current_longitude });
-        renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
+        renderStars(current_latitude, current_longitude);
     });
     travel_button = document.getElementById('timelapse') as HTMLButtonElement;
 
     brightness_input = document.getElementById('brightnessInput') as HTMLInputElement;
     brightness_input.addEventListener('change', () => {
-        renderStars({ latitude: current_latitude, longitude: current_longitude });
-        renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
+        renderStars(current_latitude, current_longitude);
     });
 
     constellations_on_input = document.getElementById('constellationsOn') as HTMLInputElement;
     constellations_on_input.addEventListener('click', () => {
-        const coord: Coord = { latitude: current_latitude, longitude: current_longitude };
-        renderConstellations(constellations, coord);
-        renderStars(coord);
+        renderStars(current_latitude, current_longitude);
     });
 
     star_brightness = parseInt(brightness_input.value);
@@ -173,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     wasm_interface.initialize(stars, renderer.getCanvasSettings());
 
                     drawUIElements();
-                    renderStars({ latitude: current_latitude, longitude: current_longitude });
+                    renderStars(current_latitude, current_longitude);
                 })
                 .catch(error => {
                     console.error('In WebAssembly Promise: ', error);
@@ -212,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // @todo Update this loop so that all distances get traveled at the same speed,
             // not in the same amount of time
             const runWaypointTravel = () => {
-                renderStars(waypoints[waypoint_index]);
+                renderStars(waypoints[waypoint_index].latitude, waypoints[waypoint_index].longitude);
                 waypoint_index += 1;
                 if (waypoint_index === waypoints.length) {
                     current_latitude = newLatitude;
@@ -232,8 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
             latInput.value = current_latitude.toString();
             longInput.value = current_longitude.toString();
 
-            renderStars({ latitude: current_latitude, longitude: current_longitude });
-            renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
+            renderStars(current_latitude, current_longitude);
         }
     });
 
@@ -255,7 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const nextDate = new Date(currentDate);
                     nextDate.setTime(nextDate.getTime() + getDaysInMillis(getDaysPerFrame(20, frame_target)));
                     date_input.valueAsDate = new Date(nextDate);
-                    renderStars({ latitude: current_latitude, longitude: current_longitude }, nextDate);
+                    renderStars(current_latitude, current_longitude, nextDate);
                     date = nextDate;
                     if (travelIsOn) {
                         window.requestAnimationFrame(runTimeTravel);
@@ -265,7 +219,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         console.log(`Avg FPS: ${1 / (moving_avg / 1000)}s`);
                     }
-                    renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude }, nextDate);
                 }
             };
             window.requestAnimationFrame(runTimeTravel);
@@ -273,12 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
         travelIsOn = !travelIsOn;
     });
 
-    // const constellation_response = await fetch('/constellations');
-    // constellations = await constellation_response.json();
-    constellations = [];
-
     let is_dragging = false;
-    let is_drawing = false;
     let [drag_start_x, drag_start_y] = [0, 0];
 
     const center_x = renderer.width / 2;
@@ -294,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     renderer.addEventListener('mousemove', async event => {
-        if (!is_dragging || is_drawing) return;
+        if (!is_dragging) return;
         const drag_end_x = (event.offsetX - center_x) / renderer.width;
         const drag_end_y = (event.offsetY - center_y) / renderer.height;
 
@@ -348,10 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
         drag_start_x = drag_end_x;
         drag_start_y = drag_end_y;
 
-        is_drawing = true;
-        renderStars({ latitude: current_latitude, longitude: current_longitude });
-        is_drawing = false;
-        // renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
+        renderStars(current_latitude, current_longitude);
     });
 
     renderer.addEventListener('mouseup', event => {
@@ -365,18 +310,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     renderer.addEventListener('wheel', event => {
-        if (!is_drawing) {
-            // Zoom out faster than zooming in, because usually when you zoom out you just want
-            // to go all the way out and it's annoying to have to do a ton of scrolling
-            const delta_amount = event.deltaY < 0 ? 0.05 : 0.15;
-            renderer.zoom_factor -= event.deltaY * delta_amount;
-            // Don't let the user scroll out further than the default size
-            if (renderer.zoom_factor < 1) renderer.zoom_factor = 1;
-            // Re-render the stars
-            is_drawing = true;
-            renderStars({ latitude: current_latitude, longitude: current_longitude });
-            is_drawing = false;
-            renderConstellations(constellations, { latitude: current_latitude, longitude: current_longitude });
-        }
+        // Zoom out faster than zooming in, because usually when you zoom out you just want
+        // to go all the way out and it's annoying to have to do a ton of scrolling
+        const delta_amount = event.deltaY < 0 ? 0.05 : 0.15;
+        renderer.zoom_factor -= event.deltaY * delta_amount;
+        // Don't let the user scroll out further than the default size
+        if (renderer.zoom_factor < 1) renderer.zoom_factor = 1;
+        // Re-render the stars
+        renderStars(current_latitude, current_longitude);
     });
 });

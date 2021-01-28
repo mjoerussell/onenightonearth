@@ -3,7 +3,6 @@ const path = require('path');
 module.exports = {
     entry: {
         bundle: './index.ts',
-        worker: './wasm/wasm-worker.ts'
     },
     devtool: 'inline-source-map',
     mode: 'development',
