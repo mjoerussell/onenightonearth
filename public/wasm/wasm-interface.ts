@@ -50,11 +50,14 @@ export class WasmInterface {
         return new Uint8ClampedArray(this.memory, pixel_data_ptr, pixel_data_size);
     }
 
-    findWaypoints(start: Coord, end: Coord, num_waypoints: number = 100): Coord[] {
+    findWaypoints(start: Coord, end: Coord): Coord[] {
+        const num_waypoints_ptr = this.allocBytes(4);
         const start_ptr = this.allocObject(start, sizedCoord);
         const end_ptr = this.allocObject(end, sizedCoord);
-        const result_ptr = (this.instance.exports.findWaypointsWasm as any)(start_ptr, end_ptr, num_waypoints);
+        const result_ptr = (this.instance.exports.findWaypointsWasm as any)(start_ptr, end_ptr, num_waypoints_ptr);
+        const num_waypoints = this.readPrimative(num_waypoints_ptr, WasmPrimative.u32);
         const waypoints = this.readArray(result_ptr, num_waypoints, sizedCoord);
+        this.freeBytes(num_waypoints_ptr, 4);
         this.freeBytes(result_ptr, num_waypoints * sizeOf(sizedCoord));
         return waypoints;
     }

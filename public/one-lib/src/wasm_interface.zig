@@ -68,11 +68,12 @@ pub export fn dragAndMoveWasm(drag_start_x: f32, drag_start_y: f32, drag_end_x: 
     return coord_ptr;
 }
 
-pub export fn findWaypointsWasm(f: *const Coord, t: *const Coord, num_waypoints: u32) [*]Coord {
+pub export fn findWaypointsWasm(f: *const Coord, t: *const Coord, num_waypoints: *u32) [*]Coord {
     defer allocator.destroy(f);
     defer allocator.destroy(t);
 
-    const waypoints = star_math.findWaypoints(allocator, f.*, t.*, num_waypoints);
+    const waypoints = star_math.findWaypoints(allocator, f.*, t.*);
+    num_waypoints.* = @intCast(u32, waypoints.len);
     return waypoints.ptr;
 }
 

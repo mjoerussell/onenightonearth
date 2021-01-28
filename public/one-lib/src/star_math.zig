@@ -177,9 +177,11 @@ pub fn getProjectedCoord(altitude: f32, azimuth: f32) CanvasPoint {
 
 /// Find waypoints along the great circle between two coordinates. Each waypoint will be
 /// 1/num_waypoints distance beyond the previous coordinate.
-pub fn findWaypoints(allocator: *Allocator, f: Coord, t: Coord, num_waypoints: u32) []Coord {
+pub fn findWaypoints(allocator: *Allocator, f: Coord, t: Coord) []Coord {
     const quadrant_radians = comptime math.pi / 2.0;
     const circle_radians = comptime math.pi * 2.0;
+    const waypoints_per_degree: f32 = 20;
+    const degrees_per_waypoint: f32 = 1 / waypoints_per_degree;
 
     const t_radian = Coord{
         .latitude = math_utils.degToRad(t.latitude),
@@ -194,13 +196,13 @@ pub fn findWaypoints(allocator: *Allocator, f: Coord, t: Coord, num_waypoints: u
     const negative_dir = t_radian.longitude < f_radian.longitude and t_radian.longitude > (f_radian.longitude - math.pi);
 
     const total_distance = findGreatCircleDistance(f_radian, t_radian) catch |err| 0;
+    
+    const num_waypoints = @floatToInt(usize, total_distance * waypoints_per_degree);
     const course_angle = findGreatCircleCourseAngle(f_radian, t_radian, total_distance) catch |err| 0;
-
-    const waypoint_inc = total_distance / @intToFloat(f32, num_waypoints);
 
     var waypoints: []Coord = allocator.alloc(Coord, num_waypoints) catch unreachable;
     for (waypoints) |*waypoint, i| {
-        const waypoint_rel_angle = @intToFloat(f32, i + 1) * waypoint_inc;
+        const waypoint_rel_angle = @intToFloat(f32, i + 1) * degrees_per_waypoint;
         const lat = findWaypointLatitude(f_radian, waypoint_rel_angle, course_angle) catch |err| 0;
         const rel_long = findWaypointRelativeLongitude(f_radian, lat, waypoint_rel_angle) catch |err| 0;
 
@@ -226,9 +228,9 @@ pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_e
     const dist_phi = math.atan2(f32, dist_x, dist_y);
 
     // drag_distance is the angular distance between the starting location and the result location after a single drag
-    // 2.5 is a magic number of degrees, picked because it results in what feels like an appropriate drag speed
+    // 2.35 is a magic number of degrees, picked because it results in what feels like an appropriate drag speed
     // Higher = move more with smaller cursor movements, and vice versa
-    const drag_distance: f32 = math_utils.degToRad(2.5);
+    const drag_distance: f32 = math_utils.degToRad(2.35);
 
     // Calculate asin(new_latitude), and clamp the result between [-1, 1]
     var sin_lat_x = math.sin(drag_distance) * math.cos(dist_phi);
