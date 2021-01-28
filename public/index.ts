@@ -192,38 +192,40 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Handle time-travelling
-    let travelIsOn = false;
+    let travel_is_on = false;
     const frame_target = 60;
     let frames_seen = 0;
     let time_elapsed_sum = 0;
     travel_button.addEventListener('click', async () => {
-        if (travelIsOn) {
+        if (travel_is_on) {
+            travel_is_on = false;
             travel_button.innerText = 'Time Travel';
-        } else {
-            travel_button.innerText = 'Stop';
-            let date = date_input.valueAsDate ?? new Date();
-            const runTimeTravel = () => {
-                const start_instant = performance.now();
-                const currentDate = new Date(date);
-                if (currentDate) {
-                    const nextDate = new Date(currentDate);
-                    nextDate.setTime(nextDate.getTime() + getDaysInMillis(getDaysPerFrame(20, frame_target)));
-                    date_input.valueAsDate = new Date(nextDate);
-                    renderStars(current_latitude, current_longitude, nextDate);
-                    date = nextDate;
-                    if (travelIsOn) {
-                        window.requestAnimationFrame(runTimeTravel);
-                        time_elapsed_sum += performance.now() - start_instant;
-                        frames_seen += 1;
-                        const moving_avg = time_elapsed_sum / frames_seen;
-
-                        console.log(`Avg FPS: ${1 / (moving_avg / 1000)}s`);
-                    }
-                }
-            };
-            window.requestAnimationFrame(runTimeTravel);
+            return;
         }
-        travelIsOn = !travelIsOn;
+        travel_button.innerText = 'Stop';
+        let date = date_input.valueAsDate ?? new Date();
+        const runTimeTravel = () => {
+            const start_instant = performance.now();
+            const current_date = new Date(date);
+            if (current_date == null) {
+                return;
+            }
+            const next_date = new Date(current_date);
+            next_date.setTime(next_date.getTime() + getDaysInMillis(getDaysPerFrame(20, frame_target)));
+            date_input.valueAsDate = new Date(next_date);
+            renderStars(current_latitude, current_longitude, next_date);
+            date = next_date;
+            if (travel_is_on) {
+                window.requestAnimationFrame(runTimeTravel);
+            }
+            time_elapsed_sum += performance.now() - start_instant;
+            frames_seen += 1;
+            const moving_avg = time_elapsed_sum / frames_seen;
+
+            console.log(`Avg FPS: ${1 / (moving_avg / 1000)}s`);
+        };
+        window.requestAnimationFrame(runTimeTravel);
+        travel_is_on = !travel_is_on;
     });
 
     let is_dragging = false;
