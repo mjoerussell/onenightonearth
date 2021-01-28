@@ -32,17 +32,17 @@ jobs:
           node-version: 12
       - name: Build Server
         run: |
-          cd /server
+          cd ./server
           npm install
           npm run build
       - name: Build Client
         run: |
-          cd /public
+          cd ./public
           npm install
           npm run build
       - name: Build WASM
         run: |
-          cd /public/one-lib
+          cd ./public/one-lib
           zig build
       # Runs a single command using the runners shell
 #       - name: Run a one-line script
