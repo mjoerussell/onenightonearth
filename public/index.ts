@@ -76,12 +76,6 @@ const drawUIElements = () => {
     }
 };
 
-const getDaysInMillis = (days: number): number => days * 86400000;
-
-const getDaysPerFrame = (daysPerSecond: number, frameTarget: number): number => {
-    return daysPerSecond / frameTarget;
-};
-
 document.addEventListener('DOMContentLoaded', () => {
     renderer = new Renderer('star-canvas');
 
@@ -194,30 +188,29 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle time-travelling
     let travel_is_on = false;
     const frame_target = 60;
-    let frames_seen = 0;
-    let time_elapsed_sum = 0;
-    travel_button.addEventListener('click', async () => {
+    const days_per_frame = 20 / frame_target;
+    const days_per_frame_millis = days_per_frame * 86400000;
+    travel_button.addEventListener('click', () => {
+        travel_button.innerText = travel_is_on ? 'Time Travel' : 'Stop';
         if (travel_is_on) {
             travel_is_on = false;
-            travel_button.innerText = 'Time Travel';
             return;
         }
-        travel_button.innerText = 'Stop';
+
+        let frames_seen = 0;
+        let time_elapsed_sum = 0;
         let date = date_input.valueAsDate ?? new Date();
         const runTimeTravel = () => {
             const start_instant = performance.now();
-            const current_date = new Date(date);
-            if (current_date == null) {
-                return;
-            }
-            const next_date = new Date(current_date);
-            next_date.setTime(next_date.getTime() + getDaysInMillis(getDaysPerFrame(20, frame_target)));
-            date_input.valueAsDate = new Date(next_date);
-            renderStars(current_latitude, current_longitude, next_date);
-            date = next_date;
+
+            date.setTime(date.getTime() + days_per_frame_millis);
+            date_input.valueAsDate = new Date(date);
+
+            renderStars(current_latitude, current_longitude, date);
             if (travel_is_on) {
                 window.requestAnimationFrame(runTimeTravel);
             }
+
             time_elapsed_sum += performance.now() - start_instant;
             frames_seen += 1;
             const moving_avg = time_elapsed_sum / frames_seen;
@@ -225,34 +218,38 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`Avg FPS: ${1 / (moving_avg / 1000)}s`);
         };
         window.requestAnimationFrame(runTimeTravel);
-        travel_is_on = !travel_is_on;
+        travel_is_on = true;
     });
 
-    let is_dragging = false;
-    let [drag_start_x, drag_start_y] = [0, 0];
-
-    const center_x = renderer.width / 2;
-    const center_y = renderer.height / 2;
+    const drag_state = {
+        is_dragging: false,
+        start_x: 0,
+        start_y: 0,
+    };
 
     renderer.addEventListener('mousedown', event => {
-        drag_start_x = (event.offsetX - center_x) / renderer.canvas.width;
-        drag_start_y = (event.offsetY - center_y) / renderer.canvas.height;
+        const center_x = renderer.width / 2;
+        const center_y = renderer.height / 2;
+        drag_state.start_x = (event.offsetX - center_x) / renderer.canvas.width;
+        drag_state.start_y = (event.offsetY - center_y) / renderer.canvas.height;
 
         renderer.canvas.classList.add('moving');
 
-        is_dragging = true;
+        drag_state.is_dragging = true;
     });
 
-    renderer.addEventListener('mousemove', async event => {
-        if (!is_dragging) return;
+    renderer.addEventListener('mousemove', event => {
+        if (!drag_state.is_dragging) return;
+        const center_x = renderer.width / 2;
+        const center_y = renderer.height / 2;
         const drag_end_x = (event.offsetX - center_x) / renderer.width;
         const drag_end_y = (event.offsetY - center_y) / renderer.height;
 
         // The new coordinate will be relative to the current latitude and longitude - it will be a lat/long
         // value that is measured with the current location as the origin.
         // This means that in order to calculate the actual next location, new_coord has to be added to current
-        const new_coord = await wasm_interface.dragAndMove(
-            { latitude: drag_start_x, longitude: drag_start_y },
+        const new_coord = wasm_interface.dragAndMove(
+            { latitude: drag_state.start_x, longitude: drag_state.start_y },
             { latitude: drag_end_x, longitude: drag_end_y }
         );
 
@@ -295,20 +292,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Reset the start positions to the current end positions for the next calculation
-        drag_start_x = drag_end_x;
-        drag_start_y = drag_end_y;
+        drag_state.start_x = drag_end_x;
+        drag_state.start_y = drag_end_y;
 
         renderStars(current_latitude, current_longitude);
     });
 
     renderer.addEventListener('mouseup', event => {
         renderer.canvas.classList.remove('moving');
-        is_dragging = false;
+        drag_state.is_dragging = false;
     });
 
     renderer.addEventListener('mouseleave', event => {
         renderer.canvas.classList.remove('moving');
-        is_dragging = false;
+        drag_state.is_dragging = false;
     });
 
     renderer.addEventListener('wheel', event => {
