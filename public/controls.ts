@@ -1,6 +1,12 @@
 import { Renderer } from './render';
 import { Coord } from './wasm/size';
 
+interface DragState {
+    is_dragging: boolean;
+    x: number;
+    y: number;
+}
+
 export class Controls {
     private date_input: HTMLInputElement | null;
     private lat_input: HTMLInputElement | null;
@@ -16,6 +22,12 @@ export class Controls {
     private user_changed_longitude = false;
 
     private timelapse_is_on = false;
+
+    private drag_state: DragState = {
+        is_dragging: false,
+        x: 0,
+        y: 0,
+    };
 
     /** Determine if the current device is a mobile device in portrait mode */
     private is_mobile = false;
@@ -96,6 +108,58 @@ export class Controls {
 
             window.requestAnimationFrame(run);
             this.timelapse_is_on = true;
+        });
+    }
+
+    onMapDrag(handler: (current_state: DragState, new_state: DragState) => void): void {
+        this.renderer.addEventListener('mousedown', event => {
+            const center_x = this.renderer.width / 2;
+            const center_y = this.renderer.height / 2;
+            this.drag_state.x = (event.offsetX - center_x) / this.renderer.canvas.width;
+            this.drag_state.y = (event.offsetY - center_y) / this.renderer.canvas.height;
+
+            this.renderer.canvas.classList.add('moving');
+
+            this.drag_state.is_dragging = true;
+        });
+
+        this.renderer.addEventListener('mousemove', event => {
+            if (this.drag_state.is_dragging) {
+                const center_x = this.renderer.width / 2;
+                const center_y = this.renderer.height / 2;
+                const new_drag_state: DragState = {
+                    is_dragging: true,
+                    x: (event.offsetX - center_x) / this.renderer.width,
+                    y: (event.offsetY - center_y) / this.renderer.height,
+                };
+
+                handler(this.drag_state, new_drag_state);
+
+                this.drag_state = new_drag_state;
+            }
+        });
+
+        this.renderer.addEventListener('mouseup', event => {
+            this.renderer.canvas.classList.remove('moving');
+            this.drag_state.is_dragging = false;
+        });
+
+        this.renderer.addEventListener('mouseleave', event => {
+            this.renderer.canvas.classList.remove('moving');
+            this.drag_state.is_dragging = false;
+        });
+    }
+
+    onMapZoom(handler: (zoom_factor: number) => void): void {
+        this.renderer.addEventListener('wheel', event => {
+            // Zoom out faster than zooming in, because usually when you zoom out you just want
+            // to go all the way out and it's annoying to have to do a ton of scrolling
+            const delta_amount = event.deltaY < 0 ? 0.05 : 0.15;
+            let zoom_factor = this.renderer.zoom_factor - event.deltaY * delta_amount;
+            if (zoom_factor < 1) {
+                zoom_factor = 1;
+            }
+            handler(zoom_factor);
         });
     }
 

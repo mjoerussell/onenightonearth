@@ -110,6 +110,7 @@ export class Renderer {
     }
 
     set zoom_factor(f: number) {
+        console.log('New zoom_factor = ', f);
         this.settings.zoom_factor = f;
         this._settings_did_change = true;
     }

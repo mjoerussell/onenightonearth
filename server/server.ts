@@ -89,7 +89,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/stars', async (req, res) => {
-  const brightness_param = (req.query.brightness as string) ?? '0.33';
+  const brightness_param = (req.query.brightness as string) ?? '0.31';
   const min_brightness = parseFloat(brightness_param);
   const available_stars = await stars;
   res.send(available_stars.filter(star => star.brightness >= min_brightness));
