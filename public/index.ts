@@ -2,10 +2,9 @@ import { Controls } from './controls';
 import { Coord, Star } from './wasm/size';
 import { WasmInterface } from './wasm/wasm-interface';
 
-let controls: Controls;
 let wasm_interface: WasmInterface;
 
-const renderStars = (latitude: number, longitude: number, date?: Date) => {
+const renderStars = (controls: Controls, date?: Date) => {
     const render_date = date ?? controls.date;
     const timestamp = render_date.valueOf();
 
@@ -19,13 +18,13 @@ const renderStars = (latitude: number, longitude: number, date?: Date) => {
         wasm_interface.updateSettings(controls.renderer.getCanvasSettings());
     }
 
-    wasm_interface.projectStars(latitude, longitude, BigInt(timestamp));
+    wasm_interface.projectStars(controls.latitude, controls.longitude, BigInt(timestamp));
     const data = wasm_interface.getImageData();
     controls.renderer.drawData(data);
     wasm_interface.resetImageData();
 };
 
-const drawUIElements = () => {
+const drawUIElements = (controls: Controls) => {
     const backgroundCanvas = document.getElementById('backdrop-canvas') as HTMLCanvasElement;
     const bgCtx = backgroundCanvas?.getContext('2d');
 
@@ -43,38 +42,40 @@ const drawUIElements = () => {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    controls = new Controls();
+    const controls = new Controls();
+    controls.date = new Date();
 
-    controls.onDateChange(date => {
-        renderStars(controls.latitude, controls.longitude);
-    });
-
-    fetch('/stars')
-        .then(star_result => star_result.json())
-        .then((stars: Star[]) =>
-            WebAssembly.instantiateStreaming(fetch('./one-lib/zig-cache/lib/one-math.wasm'), {
-                env: {
-                    consoleLog: (msg_ptr: number, msg_len: number) => {
-                        const message = wasm_interface.getString(msg_ptr, msg_len);
-                        console.log(`[WASM] ${message}`);
-                    },
-                },
-            })
-                .then(wasm_result => {
+    WebAssembly.instantiateStreaming(fetch('./one-lib/zig-cache/lib/one-math.wasm'), {
+        env: {
+            consoleLog: (msg_ptr: number, msg_len: number) => {
+                const message = wasm_interface.getString(msg_ptr, msg_len);
+                console.log(`[WASM] ${message}`);
+            },
+        },
+    })
+        .then(wasm_result =>
+            fetch('/stars')
+                .then(star_result => star_result.json())
+                .then((stars: Star[]) => {
                     wasm_interface = new WasmInterface(wasm_result.instance);
                     wasm_interface.initialize(stars, controls.renderer.getCanvasSettings());
 
-                    drawUIElements();
-                    renderStars(controls.latitude, controls.longitude);
+                    drawUIElements(controls);
+                    renderStars(controls);
                 })
-                .catch(error => {
-                    console.error('In WebAssembly Promise: ', error);
-                })
-        );
+        )
+        .catch(error => {
+            console.error('In WebAssembly Promise: ', error);
+        });
+
+    controls.onDateChange(date => {
+        renderStars(controls);
+    });
 
     // Handle updating the viewing location
     controls.onLocationUpdate(new_coord => {
-        // If the longitude is exactly opposite of the original, then there's rendering issues
+        // If the longitude is exactly opposite of the original, then there will be issues calculating the
+        // great circle, and the journey will look really weird.
         // Introduce a slight offset to minimize this without significantly affecting end location
         if (new_coord.longitude === -controls.longitude) {
             new_coord.longitude += 0.05;
@@ -84,15 +85,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const waypoints = wasm_interface.findWaypoints(start, new_coord);
         if (waypoints == null || waypoints.length === 0) {
-            renderStars(controls.latitude, controls.longitude);
+            renderStars(controls);
             return;
         }
 
         let waypoint_index = 0;
         const runWaypointTravel = () => {
             const waypoint = waypoints[waypoint_index];
-
-            renderStars(waypoint.latitude, waypoint.longitude);
+            controls.latitude = waypoint.latitude;
+            controls.longitude = waypoint.longitude;
+            renderStars(controls);
             waypoint_index += 1;
             if (waypoint_index < waypoints.length) {
                 window.requestAnimationFrame(runWaypointTravel);
@@ -107,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let next_date = new Date(current_date);
         next_date.setTime(next_date.getTime() + days_per_frame_millis);
 
-        renderStars(controls.latitude, controls.longitude, next_date);
+        renderStars(controls, next_date);
         return next_date;
     });
 
@@ -151,11 +153,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        renderStars(controls.latitude, controls.longitude);
+        renderStars(controls);
     });
 
     controls.onMapZoom(zoom_factor => {
         controls.renderer.zoom_factor = zoom_factor;
-        renderStars(controls.latitude, controls.longitude);
+        renderStars(controls);
     });
 });

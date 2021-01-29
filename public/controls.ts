@@ -80,8 +80,6 @@ export class Controls {
 
                 handler({ latitude: new_latitude, longitude: new_longitude });
 
-                this.current_latitude = new_latitude;
-                this.current_longitude = new_longitude;
                 this.user_changed_latitude = false;
                 this.user_changed_longitude = false;
             }
