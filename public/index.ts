@@ -3,8 +3,8 @@ import { Coord, Star } from './wasm/size';
 import { WasmInterface } from './wasm/wasm-interface';
 
 let date_input: HTMLInputElement;
-let brightness_input: HTMLInputElement;
-let constellations_on_input: HTMLInputElement;
+// let brightness_input: HTMLInputElement;
+// let constellations_on_input: HTMLInputElement;
 let star_brightness = 0;
 let travel_button: HTMLButtonElement;
 
@@ -68,17 +68,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     travel_button = document.getElementById('timelapse') as HTMLButtonElement;
 
-    brightness_input = document.getElementById('brightnessInput') as HTMLInputElement;
-    brightness_input.addEventListener('change', () => {
-        renderStars(current_latitude, current_longitude);
-    });
+    // brightness_input = document.getElementById('brightnessInput') as HTMLInputElement;
+    // brightness_input.addEventListener('change', () => {
+    //     renderStars(current_latitude, current_longitude);
+    // });
 
-    constellations_on_input = document.getElementById('constellationsOn') as HTMLInputElement;
-    constellations_on_input.addEventListener('click', () => {
-        renderStars(current_latitude, current_longitude);
-    });
+    // constellations_on_input = document.getElementById('constellationsOn') as HTMLInputElement;
+    // constellations_on_input.addEventListener('click', () => {
+    //     renderStars(current_latitude, current_longitude);
+    // });
 
-    star_brightness = parseInt(brightness_input.value);
+    // star_brightness = parseInt(brightness_input.value);
 
     const latInput = document.getElementById('latInput') as HTMLInputElement;
     const longInput = document.getElementById('longInput') as HTMLInputElement;

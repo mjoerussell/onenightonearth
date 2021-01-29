@@ -28,7 +28,7 @@ interface Star {
 //   branches: ConstellationBranch[];
 // }
 
-const PORT = 8080;
+const PORT = 80;
 const app = express();
 
 app.use(express.static(path.join(__dirname, '../public')));
