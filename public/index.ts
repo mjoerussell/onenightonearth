@@ -10,8 +10,8 @@ let travel_button: HTMLButtonElement;
 let renderer: Renderer;
 let wasm_interface: WasmInterface;
 
-let current_latitude: number = 0;
-let current_longitude: number = 0;
+// let current_latitude: number = 0;
+// let current_longitude: number = 0;
 
 const renderStars = (latitude: number, longitude: number, date?: Date) => {
     const render_date = date ?? controls.date;
@@ -55,18 +55,10 @@ document.addEventListener('DOMContentLoaded', () => {
     renderer = new Renderer('star-canvas');
 
     controls.onDateChange(date => {
-        renderStars(current_latitude, current_longitude);
+        renderStars(controls.latitude, controls.longitude);
     });
 
     travel_button = document.getElementById('timelapse') as HTMLButtonElement;
-
-    const latInput = document.getElementById('latInput') as HTMLInputElement;
-    const longInput = document.getElementById('longInput') as HTMLInputElement;
-
-    current_latitude = parseFloat(latInput.value);
-    current_longitude = parseFloat(longInput.value);
-
-    const locationUpdateButton = document.getElementById('locationUpdate') as HTMLButtonElement;
 
     fetch('/stars')
         .then(star_result => star_result.json())
@@ -84,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     wasm_interface.initialize(stars, renderer.getCanvasSettings());
 
                     drawUIElements();
-                    renderStars(current_latitude, current_longitude);
+                    renderStars(controls.latitude, controls.longitude);
                 })
                 .catch(error => {
                     console.error('In WebAssembly Promise: ', error);
@@ -92,32 +84,18 @@ document.addEventListener('DOMContentLoaded', () => {
         );
 
     // Handle updating the viewing location
-    locationUpdateButton.addEventListener('click', () => {
-        let new_latitude = parseFloat(latInput.value);
-        let new_longitude = parseFloat(longInput.value);
-
-        if (new_latitude === current_latitude && new_longitude === current_longitude) {
-            return;
-        }
-
+    controls.onLocationUpdate(new_coord => {
         // If the longitude is exactly opposite of the original, then there's rendering issues
         // Introduce a slight offset to minimize this without significantly affecting end location
-        if (new_longitude === -current_longitude) {
-            new_longitude += 0.05;
+        if (new_coord.longitude === -controls.longitude) {
+            new_coord.longitude += 0.05;
         }
 
-        const start: Coord = { latitude: current_latitude, longitude: current_longitude };
-        const end: Coord = { latitude: new_latitude, longitude: new_longitude };
+        const start: Coord = { latitude: controls.latitude, longitude: controls.longitude };
 
-        const waypoints = wasm_interface.findWaypoints(start, end);
+        const waypoints = wasm_interface.findWaypoints(start, new_coord);
         if (waypoints == null || waypoints.length === 0) {
-            current_latitude = new_latitude;
-            current_longitude = new_longitude;
-
-            latInput.value = current_latitude.toString();
-            longInput.value = current_longitude.toString();
-
-            renderStars(current_latitude, current_longitude);
+            renderStars(controls.latitude, controls.longitude);
             return;
         }
 
@@ -126,14 +104,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // not in the same amount of time
         const runWaypointTravel = () => {
             const waypoint = waypoints[waypoint_index];
+
             renderStars(waypoint.latitude, waypoint.longitude);
-            latInput.value = waypoint.latitude.toString();
-            longInput.value = waypoint.longitude.toString();
             waypoint_index += 1;
-            if (waypoint_index === waypoints.length) {
-                current_latitude = new_latitude;
-                current_longitude = new_longitude;
-            } else {
+            if (waypoint_index < waypoints.length) {
                 window.requestAnimationFrame(runWaypointTravel);
             }
         };
@@ -161,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
             date.setTime(date.getTime() + days_per_frame_millis);
             controls.date = new Date(date);
 
-            renderStars(current_latitude, current_longitude, date);
+            renderStars(controls.latitude, controls.longitude, date);
             if (travel_is_on) {
                 window.requestAnimationFrame(runTimeTravel);
             }
@@ -220,37 +194,37 @@ document.addEventListener('DOMContentLoaded', () => {
             // The user crossed a pole if the new latitude is inside the bounds [-90, 90] but the new location
             // would be outside that range
             const crossed_pole =
-                (current_latitude < 90.0 && directed_add(current_latitude, new_coord.latitude) > 90.0) ||
-                (current_latitude > -90.0 && directed_add(current_latitude, new_coord.latitude) < -90.0);
+                (controls.latitude < 90.0 && directed_add(controls.latitude, new_coord.latitude) > 90.0) ||
+                (controls.latitude > -90.0 && directed_add(controls.latitude, new_coord.latitude) < -90.0);
 
             if (crossed_pole) {
                 // Add 180 degrees to the longitude because crossing a pole in a straight line would bring you to the other side
                 // of the world
-                current_longitude += 180.0;
+                controls.longitude += 180.0;
                 // Flip draw direction because if you were going south you're now going north and vice versa
                 renderer.draw_north_up = !renderer.draw_north_up;
             }
 
-            current_latitude = directed_add(current_latitude, new_coord.latitude);
-            current_longitude = directed_add(current_longitude, -new_coord.longitude);
+            controls.latitude = directed_add(controls.latitude, new_coord.latitude);
+            controls.longitude = directed_add(controls.longitude, -new_coord.longitude);
 
             // Keep the longitude value in the range [-180, 180]
-            if (current_longitude > 180.0) {
-                current_longitude -= 360.0;
-            } else if (current_longitude < -180.0) {
-                current_longitude += 360.0;
+            if (controls.longitude > 180.0) {
+                controls.longitude -= 360.0;
+            } else if (controls.longitude < -180.0) {
+                controls.longitude += 360.0;
             }
 
             // Show the new location in the input boxes
-            latInput.value = current_latitude.toString();
-            longInput.value = current_longitude.toString();
+            // latInput.value = current_latitude.toString();
+            // longInput.value = current_longitude.toString();
         }
 
         // Reset the start positions to the current end positions for the next calculation
         drag_state.start_x = drag_end_x;
         drag_state.start_y = drag_end_y;
 
-        renderStars(current_latitude, current_longitude);
+        renderStars(controls.latitude, controls.longitude);
     });
 
     renderer.addEventListener('mouseup', event => {
@@ -271,6 +245,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Don't let the user scroll out further than the default size
         if (renderer.zoom_factor < 1) renderer.zoom_factor = 1;
         // Re-render the stars
-        renderStars(current_latitude, current_longitude);
+        renderStars(controls.latitude, controls.longitude);
     });
 });
