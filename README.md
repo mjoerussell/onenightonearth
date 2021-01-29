@@ -4,6 +4,8 @@ One Night on Earth is an interactive star map. This is not meant to be a scienti
 
 One Night on Earth is written in Typescript and Zig.
 
+[**onenightonearth.com**](https://onenightonearth.com)
+
 > Note: Currently appears to run best in Firefox, some issues have been seen in Chrome which are currently being worked on.
 
 ## Running Locally
