@@ -1,11 +1,9 @@
 const path = require('path');
 
-module.exports = {
+const config = {
     entry: {
         bundle: './index.ts',
     },
-    devtool: 'inline-source-map',
-    mode: 'development',
     module: {
         rules: [
             {
@@ -23,3 +21,18 @@ module.exports = {
         path: path.resolve(__dirname, 'dist'),
     },
 };
+
+module.exports = (env, argv) => {
+    if (argv.mode === 'development') {
+        config.devtool = 'inline-source-map';
+    }
+
+    if (argv.mode === 'production') {
+        config.optimization = {
+            minimize: true,
+            mergeDuplicateChunks: true
+        };
+    }
+
+    return config;
+}

@@ -23,18 +23,6 @@ export const sizedCoord: Sized<Coord> = {
     longitude: WasmPrimative.f32,
 };
 
-// export type CanvasPoint = {
-//     x: number;
-//     y: number;
-//     brightness: number;
-// };
-
-// export const sizedCanvasPoint: Sized<CanvasPoint> = {
-//     x: WasmPrimative.f32,
-//     y: WasmPrimative.f32,
-//     brightness: WasmPrimative.f32,
-// };
-
 export type Star = {
     name: string;
     right_ascension: number;

@@ -5,7 +5,8 @@
     "main": "index.ts",
     "scripts": {
         "start": "tsc --watch",
-        "build": "webpack",
+        "build": "webpack --mode=development",
+        "build:prod": "webpack --mode=production",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "author": "mjoerussell",

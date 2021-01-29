@@ -22,7 +22,7 @@ RUN rm zig.tar.xz
 RUN chmod +x /usr/local/bin/zig/zig-linux-x86_64-${ZIG_VERSION}/zig
 
 COPY ./public/one-lib .
-RUN /usr/local/bin/zig/zig-linux-x86_64-${ZIG_VERSION}/zig build
+RUN /usr/local/bin/zig/zig-linux-x86_64-${ZIG_VERSION}/zig build -Drelease-small=true
 
 FROM node:15 AS build
 
@@ -39,7 +39,7 @@ RUN cd /usr/src/server \
     && npm run build
 RUN cd /usr/src/public \
     && npm install \
-    && npm run build
+    && npm run build:prod
 
 FROM node:15
 
@@ -50,6 +50,7 @@ RUN mkdir server
 
 COPY --from=zig /usr/src/zig-cache/lib/one-math.wasm ./public/one-lib/zig-cache/lib/
 COPY --from=build /usr/src/public/dist ./public/dist
+COPY ./public/assets/favicon.ico ./public/assets/favicon.ico
 COPY --from=build /usr/src/public/styles ./public/styles
 COPY --from=build /usr/src/public/index.html ./public/index.html
 COPY ./server/sao_catalog ./server

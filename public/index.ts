@@ -3,9 +3,6 @@ import { Coord, Star } from './wasm/size';
 import { WasmInterface } from './wasm/wasm-interface';
 
 let date_input: HTMLInputElement;
-// let brightness_input: HTMLInputElement;
-// let constellations_on_input: HTMLInputElement;
-let star_brightness = 0;
 let travel_button: HTMLButtonElement;
 
 let renderer: Renderer;
@@ -37,7 +34,7 @@ const renderStars = (latitude: number, longitude: number, date?: Date) => {
 
     wasm_interface.projectStars(latitude, longitude, BigInt(timestamp));
     const data = wasm_interface.getImageData();
-    renderer.drawPoint(data);
+    renderer.drawData(data);
     wasm_interface.resetImageData();
 };
 
@@ -66,19 +63,12 @@ document.addEventListener('DOMContentLoaded', () => {
     date_input.addEventListener('change', () => {
         renderStars(current_latitude, current_longitude);
     });
+
+    if (date_input.valueAsDate == null) {
+        date_input.valueAsDate = new Date();
+    }
+
     travel_button = document.getElementById('timelapse') as HTMLButtonElement;
-
-    // brightness_input = document.getElementById('brightnessInput') as HTMLInputElement;
-    // brightness_input.addEventListener('change', () => {
-    //     renderStars(current_latitude, current_longitude);
-    // });
-
-    // constellations_on_input = document.getElementById('constellationsOn') as HTMLInputElement;
-    // constellations_on_input.addEventListener('click', () => {
-    //     renderStars(current_latitude, current_longitude);
-    // });
-
-    // star_brightness = parseInt(brightness_input.value);
 
     const latInput = document.getElementById('latInput') as HTMLInputElement;
     const longInput = document.getElementById('longInput') as HTMLInputElement;

@@ -55,16 +55,7 @@ export class Renderer {
         this.offscreen_canvas.height = this.height;
     }
 
-    /**
-     * Push the offscreen canvas buffer to the main buffer, then clear the offscreen buffer.
-     */
-    pushBuffer(): void {
-        this.main_ctx.clearRect(0, 0, this.width, this.height);
-        this.main_ctx.drawImage(this.offscreen_canvas, 0, 0);
-        this.offscreen_ctx.clearRect(0, 0, this.width, this.height);
-    }
-
-    drawPoint(data: Uint8ClampedArray): void {
+    drawData(data: Uint8ClampedArray): void {
         try {
             const image_data = new ImageData(data, this.main_canvas.width, this.main_canvas.height);
             this.main_ctx.putImageData(image_data, 0, 0);
