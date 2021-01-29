@@ -15,6 +15,8 @@ export class Controls {
     private user_changed_latitude = false;
     private user_changed_longitude = false;
 
+    private timelapse_is_on = false;
+
     /** Determine if the current device is a mobile device in portrait mode */
     private is_mobile = false;
 
@@ -31,22 +33,10 @@ export class Controls {
         // Listen for future changes
         mql.addEventListener('change', this.handleOrientationChange.bind(this));
         this.lat_input?.addEventListener('change', () => {
-            console.log('user changed latitude');
             this.user_changed_latitude = true;
-            // try {
-            //     this.current_latitude = parseFloat(this.lat_input!.value);
-            // } catch (err) {
-            //     this.current_latitude = 0;
-            // }
         });
         this.long_input?.addEventListener('change', () => {
-            console.log('user changed longitude');
             this.user_changed_longitude = true;
-            // try {
-            //     this.current_longitude = parseFloat(this.long_input!.value);
-            // } catch (err) {
-            //     this.current_longitude = 0;
-            // }
         });
     }
 
@@ -83,6 +73,29 @@ export class Controls {
                 this.user_changed_latitude = false;
                 this.user_changed_longitude = false;
             }
+        });
+    }
+
+    onTimelapse(handler: (next_date: Date) => Date): void {
+        this.time_travel_button?.addEventListener('click', () => {
+            this.time_travel_button!.innerText = this.timelapse_is_on ? 'Time Travel' : 'Stop';
+            if (this.timelapse_is_on) {
+                this.timelapse_is_on = false;
+                return;
+            }
+
+            let date = this.date;
+
+            const run = () => {
+                date = handler(date);
+                this.date = date;
+                if (this.timelapse_is_on) {
+                    window.requestAnimationFrame(run);
+                }
+            };
+
+            window.requestAnimationFrame(run);
+            this.timelapse_is_on = true;
         });
     }
 

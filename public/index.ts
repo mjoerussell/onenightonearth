@@ -114,40 +114,14 @@ document.addEventListener('DOMContentLoaded', () => {
         window.requestAnimationFrame(runWaypointTravel);
     });
 
-    // Handle time-travelling
-    let travel_is_on = false;
-    const frame_target = 60;
-    const days_per_frame = 20 / frame_target;
-    const days_per_frame_millis = days_per_frame * 86400000;
-    travel_button.addEventListener('click', () => {
-        travel_button.innerText = travel_is_on ? 'Time Travel' : 'Stop';
-        if (travel_is_on) {
-            travel_is_on = false;
-            return;
-        }
+    controls.onTimelapse((current_date: Date) => {
+        const days_per_frame = 0.33;
+        const days_per_frame_millis = days_per_frame * 86400000;
+        let next_date = new Date(current_date);
+        next_date.setTime(next_date.getTime() + days_per_frame_millis);
 
-        let frames_seen = 0;
-        let time_elapsed_sum = 0;
-        let date = controls.date;
-        const runTimeTravel = () => {
-            const start_instant = performance.now();
-
-            date.setTime(date.getTime() + days_per_frame_millis);
-            controls.date = new Date(date);
-
-            renderStars(controls.latitude, controls.longitude, date);
-            if (travel_is_on) {
-                window.requestAnimationFrame(runTimeTravel);
-            }
-
-            time_elapsed_sum += performance.now() - start_instant;
-            frames_seen += 1;
-            const moving_avg = time_elapsed_sum / frames_seen;
-
-            console.log(`Avg FPS: ${1 / (moving_avg / 1000)}s`);
-        };
-        window.requestAnimationFrame(runTimeTravel);
-        travel_is_on = true;
+        renderStars(controls.latitude, controls.longitude, next_date);
+        return next_date;
     });
 
     const drag_state = {
