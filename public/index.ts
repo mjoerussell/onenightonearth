@@ -1,8 +1,10 @@
+import { Controls } from './controls';
 import { Renderer } from './render';
 import { Coord, Star } from './wasm/size';
 import { WasmInterface } from './wasm/wasm-interface';
 
-let date_input: HTMLInputElement;
+let controls: Controls;
+
 let travel_button: HTMLButtonElement;
 
 let renderer: Renderer;
@@ -12,15 +14,8 @@ let current_latitude: number = 0;
 let current_longitude: number = 0;
 
 const renderStars = (latitude: number, longitude: number, date?: Date) => {
-    if (!date) {
-        if (date_input.valueAsDate) {
-            date = date_input.valueAsDate;
-        } else {
-            return;
-        }
-    }
-
-    const timestamp = date.valueOf();
+    const render_date = date ?? controls.date;
+    const timestamp = render_date.valueOf();
 
     if (renderer == null) {
         console.error('Could not get canvas context!');
@@ -56,17 +51,12 @@ const drawUIElements = () => {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    controls = new Controls();
     renderer = new Renderer('star-canvas');
 
-    // Get handles for all the input elements
-    date_input = document.getElementById('dateInput') as HTMLInputElement;
-    date_input.addEventListener('change', () => {
+    controls.onDateChange(date => {
         renderStars(current_latitude, current_longitude);
     });
-
-    if (date_input.valueAsDate == null) {
-        date_input.valueAsDate = new Date();
-    }
 
     travel_button = document.getElementById('timelapse') as HTMLButtonElement;
 
@@ -164,12 +154,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let frames_seen = 0;
         let time_elapsed_sum = 0;
-        let date = date_input.valueAsDate ?? new Date();
+        let date = controls.date;
         const runTimeTravel = () => {
             const start_instant = performance.now();
 
             date.setTime(date.getTime() + days_per_frame_millis);
-            date_input.valueAsDate = new Date(date);
+            controls.date = new Date(date);
 
             renderStars(current_latitude, current_longitude, date);
             if (travel_is_on) {
