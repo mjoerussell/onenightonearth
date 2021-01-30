@@ -3,7 +3,7 @@ body {
     background: linear-gradient(#01020f, #031131);
     font-family: 'Poppins', serif;
     margin: 0;
-    height: 100vh;
+    /* height: 100vh; */
 }
 
 h1 {
@@ -19,6 +19,10 @@ h1 {
     margin-left: 50%;
     transform: translateX(-50%);
     background-color: #f5f5dc;
+}
+
+.info-box {
+    font-size: 0.85em;
 }
 
 #settings {
@@ -56,6 +60,7 @@ h1 {
     background-color: #ffffff00;
     border: 1px solid #01020f;
     border-radius: 2px;
+    max-width: 145px;
 }
 
 #actions {
@@ -67,7 +72,7 @@ h1 {
     justify-content: space-evenly;
 }
 
-#actions button {
+button {
     width: 100%;
     padding: 2px 0;
     border: 1px solid #01020f;
@@ -76,7 +81,7 @@ h1 {
     background-color: #ffffff00;
 }
 
-#actions button:hover {
+button:hover {
     color: #fff;
     background-color: #01020f;
     cursor: pointer;

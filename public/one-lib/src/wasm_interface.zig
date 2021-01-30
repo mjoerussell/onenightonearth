@@ -21,12 +21,7 @@ fn log(comptime message: []const u8, args: anytype) void {
 }
 
 pub export fn initialize(star_data: [*]Star, data_len: u32, settings: *star_math.CanvasSettings) void {
-    const num_stars = star_math.initStarData(allocator, star_data[0..data_len]) catch |err| blk: {
-        switch (err) {
-            error.OutOfMemory => log("[ERROR] Ran out of memory during initialization (needed {} kB for {} stars)", .{(data_len * @sizeOf(Star)) / 1000, data_len})
-        }
-        break :blk 0;
-    };
+    const num_stars = star_math.initStarData(star_data[0..data_len]);
     star_math.initCanvasData(allocator, settings.*) catch |err| switch (err) {
         error.OutOfMemory => {
             const num_pixels = star_math.global_canvas.width * star_math.global_canvas.height;

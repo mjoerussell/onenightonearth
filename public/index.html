@@ -11,6 +11,16 @@
     <body>
         <div class="page-container">
             <h1>One night, on Earth...</h1>
+            <div class="info-box">
+                <h2>Controls</h2>
+                <ul>
+                    <li>Click & Drag on the map to move. Scroll while hovering over the map to zoom in/out.</li>
+                    <li>Click "Use My Location" to move the map to your current location.</li>
+                    <li>Enter a latitude & longitude, then click "Update Location" to move to that location.</li>
+                    <li>Click "Time Travel" to start a timelapse view. Click again to stop.</li>
+                </ul>
+            </div>
+            <hr />
             <div id="settings">
                 <div id="main-settings">
                     <div class="input-fields">
@@ -34,9 +44,11 @@
                     <div id="actions">
                         <button id="timelapse">Time Travel</button>
                         <button id="locationUpdate">Update Location</button>
+                        <button id="currentPosition">Use My Location</button>
                     </div>
                 </div>
             </div>
+            
             <div class="canvas-container">
                 <div id="loading-icon-container">
                     <div class="loading-icon"></div>
@@ -44,6 +56,7 @@
                 <canvas id="backdrop-canvas" width="800" height="800"></canvas>
                 <canvas id="star-canvas" width="800" height="800"></canvas>
             </div>
+            
         </div>
     </body>
 </html>
