@@ -1,4 +1,4 @@
-import { Renderer } from './render';
+import { Renderer } from './renderer';
 import { Coord } from './wasm/size';
 
 interface DragState {

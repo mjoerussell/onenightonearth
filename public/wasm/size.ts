@@ -1,4 +1,4 @@
-import { CanvasSettings } from '../render';
+import { CanvasSettings } from '../renderer';
 
 export enum WasmPrimative {
     u8,

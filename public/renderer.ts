@@ -26,8 +26,8 @@ export class Renderer {
     private offscreen_canvas: HTMLCanvasElement;
     private offscreen_ctx: CanvasRenderingContext2D;
 
-    private readonly default_width = 700;
-    private readonly default_height = 700;
+    // private readonly default_width = 700;
+    // private readonly default_height = 700;
 
     private settings: CanvasSettings;
 
@@ -37,8 +37,8 @@ export class Renderer {
         this.main_canvas = document.getElementById(canvas_id) as HTMLCanvasElement;
         this.main_ctx = this.main_canvas.getContext('2d')!;
 
-        this.main_canvas.width = options?.width ?? this.default_width;
-        this.main_canvas.height = options?.height ?? this.default_height;
+        // this.main_canvas.width = options?.width ?? this.default_width;
+        // this.main_canvas.height = options?.height ?? this.default_height;
 
         this.settings = {
             width: this.main_canvas.width,

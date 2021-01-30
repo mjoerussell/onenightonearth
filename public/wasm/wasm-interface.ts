@@ -15,7 +15,7 @@ import {
     WasmStar,
     sizedWasmStar,
 } from './size';
-import { CanvasSettings } from '../render';
+import { CanvasSettings } from '../renderer';
 
 export class WasmInterface {
     constructor(private instance: WebAssembly.Instance) {}
