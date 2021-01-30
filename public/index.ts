@@ -72,8 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderStars(controls);
     });
 
-    // Handle updating the viewing location
-    controls.onLocationUpdate(new_coord => {
+    const updateLocation = (new_coord: Coord): void => {
         // If the longitude is exactly opposite of the original, then there will be issues calculating the
         // great circle, and the journey will look really weird.
         // Introduce a slight offset to minimize this without significantly affecting end location
@@ -84,7 +83,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const start: Coord = { latitude: controls.latitude, longitude: controls.longitude };
 
         const waypoints = wasm_interface.findWaypoints(start, new_coord);
+        console.log(waypoints);
         if (waypoints == null || waypoints.length === 0) {
+            console.log('No waypoints recieved');
             renderStars(controls);
             return;
         }
@@ -101,7 +102,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         window.requestAnimationFrame(runWaypointTravel);
-    });
+    };
+
+    controls.onLocationUpdate(updateLocation);
+    controls.onUseCurrentPosition(updateLocation);
 
     controls.onTimelapse(current_date => {
         const days_per_frame = 0.33;

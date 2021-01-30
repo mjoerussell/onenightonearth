@@ -13,6 +13,7 @@ export class Controls {
     private long_input: HTMLInputElement | null;
     private time_travel_button: HTMLButtonElement | null;
     private update_location_button: HTMLButtonElement | null;
+    private current_position_button: HTMLButtonElement | null;
 
     public renderer: Renderer;
 
@@ -38,6 +39,7 @@ export class Controls {
         this.long_input = document.getElementById('longInput') as HTMLInputElement;
         this.time_travel_button = document.getElementById('timelapse') as HTMLButtonElement;
         this.update_location_button = document.getElementById('locationUpdate') as HTMLButtonElement;
+        this.current_position_button = document.getElementById('currentPosition') as HTMLButtonElement;
         this.renderer = new Renderer('star-canvas');
 
         const mql = window.matchMedia('only screen and (max-width: 760px)');
@@ -82,6 +84,16 @@ export class Controls {
 
                 this.user_changed_latitude = false;
                 this.user_changed_longitude = false;
+            }
+        });
+    }
+
+    onUseCurrentPosition(handler: (_: Coord) => void): void {
+        this.current_position_button?.addEventListener('click', () => {
+            if ('geolocation' in navigator) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    handler({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+                });
             }
         });
     }
@@ -152,8 +164,8 @@ export class Controls {
         this.renderer.addEventListener('wheel', event => {
             // Zoom out faster than zooming in, because usually when you zoom out you just want
             // to go all the way out and it's annoying to have to do a ton of scrolling
-            const delta_amount = event.deltaY < 0 ? 0.05 : 0.15;
-            let zoom_factor = this.renderer.zoom_factor - event.deltaY * delta_amount;
+            const delta_amount = event.deltaY < 0 ? -0.05 : 0.15;
+            let zoom_factor = this.renderer.zoom_factor - this.renderer.zoom_factor * delta_amount;
             if (zoom_factor < 1) {
                 zoom_factor = 1;
             }

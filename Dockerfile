@@ -58,13 +58,13 @@ RUN mkdir public
 RUN mkdir server
 
 # Copy over necessary files from build images
-COPY --from=zig /usr/src/zig-cache/lib/one-math.wasm ./public/one-lib/zig-cache/lib/
-COPY --from=build /usr/src/public/dist ./public/dist
+COPY ./server/sao_catalog ./server
 COPY ./public/assets/favicon.ico ./public/assets/favicon.ico
 COPY --from=build /usr/src/public/styles ./public/styles
 COPY --from=build /usr/src/public/index.html ./public/index.html
-COPY ./server/sao_catalog ./server
 COPY --from=build /usr/src/server/server.js ./server/server.js
+COPY --from=build /usr/src/public/dist ./public/dist
+COPY --from=zig /usr/src/zig-cache/lib/one-math.wasm ./public/one-lib/zig-cache/lib/
 
 COPY --from=build /usr/src/server/node_modules ./server/node_modules 
 
