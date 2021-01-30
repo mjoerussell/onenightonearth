@@ -4,9 +4,6 @@ const math_utils = @import("./math_utils.zig");
 const Allocator = std.mem.Allocator;
 const math = std.math;
 const assert = std.debug.assert;
-const expectEqual = std.testing.expectEqual;
-const expectWithinEpsilon = std.testing.expectWithinEpsilon;
-const expectWithinMargin = std.testing.expectWithinMargin;
 
 pub const Pixel = packed struct {
     r: u8 = 0,
@@ -55,7 +52,6 @@ pub const Star = packed struct {
 };
 
 pub var global_stars: []Star = undefined;
-var project_start_index: usize = 0;
 
 pub var global_canvas: CanvasSettings = .{
     .width = 700,
@@ -67,7 +63,7 @@ pub var global_canvas: CanvasSettings = .{
 
 pub var global_pixel_data: []Pixel = undefined;
 
-pub fn initStarData(allocator: *Allocator, star_data: []Star) !usize {
+pub fn initStarData(star_data: []Star) usize {
     global_stars = star_data;
 
     return global_stars.len;
@@ -118,28 +114,6 @@ pub fn projectStar(observer_location: Coord, observer_timestamp: i64, filter_bel
             global_pixel_data[p_index] = pixel;
         }
 
-    }
-}
-
-pub fn drawGrid() void {
-    var altitude: f32 = 0;
-
-    const grid_spacing: comptime_float = 90 / 5;
-    while (altitude <= 90) : (altitude += grid_spacing) {
-        var dot_index: f32 = 0;
-        while (dot_index < 10000) : (dot_index += 1) {
-            const alt_rad = math_utils.degToRad(altitude);
-            const azi_rad = math_utils.degToRad((dot_index / 10000) * 360);
-            const pixel_index = getPixelIndex(alt_rad, azi_rad);
-            if (pixel_index) |pi| {
-                global_pixel_data[pi] = Pixel{
-                    .r = 255,
-                    .g = 0, 
-                    .b = 0,
-                    .a = 255
-                };
-            }
-        }
     }
 }
 
@@ -197,7 +171,7 @@ pub fn findWaypoints(allocator: *Allocator, f: Coord, t: Coord) []Coord {
 
     const total_distance = findGreatCircleDistance(f_radian, t_radian) catch |err| 0;
     
-    const num_waypoints: usize = 150;
+    const num_waypoints: usize = 100;
     const waypoint_inc: f32 = total_distance / @intToFloat(f32, num_waypoints);
     const course_angle = findGreatCircleCourseAngle(f_radian, t_radian, total_distance) catch |err| 0;
 

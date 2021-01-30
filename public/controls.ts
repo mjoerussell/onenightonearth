@@ -162,6 +162,7 @@ export class Controls {
 
     onMapZoom(handler: (zoom_factor: number) => void): void {
         this.renderer.addEventListener('wheel', event => {
+            event.preventDefault();
             // Zoom out faster than zooming in, because usually when you zoom out you just want
             // to go all the way out and it's annoying to have to do a ton of scrolling
             const delta_amount = event.deltaY < 0 ? -0.05 : 0.15;
