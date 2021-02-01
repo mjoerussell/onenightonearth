@@ -1,55 +1,13 @@
 // @todo Improve testing - find online calculators for star functions and compare against them (fingers crossed)
 const std = @import("std");
 const math_utils = @import("./math_utils.zig");
+const render = @import("./render.zig");
 const Allocator = std.mem.Allocator;
 const math = std.math;
 const assert = std.debug.assert;
-
-pub const Pixel = packed struct {
-    r: u8 = 0,
-    g: u8 = 0,
-    b: u8 = 0,
-    a: u8 = 0,
-
-    pub fn rgb(r: u8, g: u8, b: u8) Pixel {
-        return Pixel{ .r = r, .g = g, .b = b, .a = 255 };
-    }
-
-};
-
-pub const CanvasSettings = packed struct {
-    width: u32,
-    height: u32,
-    background_radius: f32,
-    zoom_factor: f32,
-    draw_north_up: bool,
-
-    fn translatePoint(self: CanvasSettings, pt: CanvasPoint) ?CanvasPoint {
-        const center_x: f32 = @intToFloat(f32, self.width) / 2.0;
-        const center_y: f32 = @intToFloat(f32, self.height) / 2.0;
-
-        // A multiplier used to convert a coordinate between [-1, 1] to a coordinate on the actual canvas, taking into
-        // account the rendering modifiers that can change based on the user zooming in/out or the travelling moving across poles
-        const direction_modifier: f32 = if (self.draw_north_up) 1.0 else -1.0;
-        const translate_factor: f32 = direction_modifier * self.background_radius * self.zoom_factor;
-
-        const translated_x = center_x + (translate_factor * pt.x);
-        const translated_y = center_y - (translate_factor * pt.y);
-
-        const dist_from_center = math.sqrt(math.pow(f32, translated_x - center_x, 2.0) + math.pow(f32, translated_y - center_y, 2.0));
-        if (dist_from_center > self.background_radius) return null;
-
-        return CanvasPoint{
-            .x = translated_x,
-            .y = translated_y,
-        };
-    }
-};
-
-pub const CanvasPoint = struct {
-    x: f32,
-    y: f32,
-};
+const Pixel = render.Pixel;
+const Point = render.Point;
+const Canvas = render.Canvas;
 
 pub const Coord = packed struct {
     latitude: f32,
@@ -101,31 +59,13 @@ pub const SpectralType = packed enum(u8) {
 
 pub var global_stars: []Star = undefined;
 
-pub var global_canvas: CanvasSettings = .{
-    .width = 700,
-    .height = 700,
-    .background_radius = 0.45 * 700.0,
-    .zoom_factor = 1.0,
-    .draw_north_up = true
-};
-
-pub var global_pixel_data: []Pixel = undefined;
-
 pub fn initStarData(star_data: []Star) usize {
     global_stars = star_data;
 
     return global_stars.len;
 }
 
-pub fn initCanvasData(allocator: *Allocator, canvas_settings: CanvasSettings) !void {
-    global_canvas = canvas_settings;
-    global_pixel_data = try allocator.alloc(Pixel, global_canvas.width * global_canvas.height);
-    for (global_pixel_data) |*p| {
-        p.* = Pixel{};
-    }
-}
-
-pub fn projectStar(observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) void {
+pub fn projectStar(canvas: *Canvas, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) void {
     const two_pi = comptime math.pi * 2.0;
     const half_pi = comptime math.pi / 2.0;
     const local_sideral_time = getLocalSideralTime(@intToFloat(f64, observer_timestamp), observer_location.longitude);
@@ -151,37 +91,37 @@ pub fn projectStar(observer_location: Coord, observer_timestamp: i64, filter_bel
         const azi = math.acos(cos_azi);
         const azimuth = if (math.sin(hour_angle_rad) < 0) azi else two_pi - azi;
 
-        const pixel_index = getPixelIndex(@floatCast(f32, altitude), @floatCast(f32, azimuth));
+        const pixel_index = getPixelIndex(canvas, @floatCast(f32, altitude), @floatCast(f32, azimuth));
         if (pixel_index) |p_index| {
             var base_color = star.spec_type.getColor();
             base_color.a = @floatToInt(u8, star.brightness * 255.0); 
-            global_pixel_data[p_index] = base_color;
+            canvas.data[p_index] = base_color;
         }
 
     }
 }
 
-pub fn getPixelIndex(altitude: f32, azimuth: f32) ?usize {
+pub fn getPixelIndex(canvas: *Canvas, altitude: f32, azimuth: f32) ?usize {
     var point = getProjectedCoord(altitude, azimuth);
-    point = global_canvas.translatePoint(point) orelse return null;
+    point = canvas.translatePoint(point) orelse return null;
 
     if (std.math.isNan(point.x) or std.math.isNan(point.y)) {
         return null;
     }
 
     if (point.x < 0 or point.y < 0) return null;
-    if (point.x > @intToFloat(f32, global_canvas.width) or point.y > @intToFloat(f32, global_canvas.height)) return null;
+    if (point.x > @intToFloat(f32, canvas.settings.width) or point.y > @intToFloat(f32, canvas.settings.height)) return null;
 
     const x = @floatToInt(usize, point.x);
     const y = @floatToInt(usize, point.y);
 
-    const p_index: usize = (y * @intCast(usize, global_canvas.width)) + x;
-    if (p_index >= global_pixel_data.len) return null;
+    const p_index: usize = (y * @intCast(usize, canvas.settings.width)) + x;
+    if (p_index >= canvas.data.len ) return null;
 
     return p_index;
 }
 
-pub fn getProjectedCoord(altitude: f32, azimuth: f32) CanvasPoint {
+pub fn getProjectedCoord(altitude: f32, azimuth: f32) Point {
     const radius = comptime 2.0 / math.pi;
     // s is the distance from the center of the projection circle to the point
     // aka 1 - the angular distance along the surface of the sky sphere

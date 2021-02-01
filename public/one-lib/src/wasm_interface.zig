@@ -2,11 +2,14 @@ const std = @import("std");
 const ArrayList = std.ArrayList;
 const parseFloat = std.fmt.parseFloat;
 const star_math = @import("./star_math.zig");
+const render = @import("./render.zig");
+const Canvas = render.Canvas;
+const Pixel = render.Pixel;
 const Star = star_math.Star;
 const Coord = star_math.Coord;
-const Pixel = star_math.Pixel;
 
 const allocator = std.heap.page_allocator;
+var canvas: Canvas = undefined;
 
 pub extern fn drawPointWasm(x: f32, y: f32, brightness: f32) void;
 
@@ -20,29 +23,29 @@ fn log(comptime message: []const u8, args: anytype) void {
     consoleLog(fmt_msg.ptr, @intCast(u32, fmt_msg.len));
 }
 
-pub export fn initialize(star_data: [*]Star, data_len: u32, settings: *star_math.CanvasSettings) void {
+pub export fn initialize(star_data: [*]Star, data_len: u32, settings: *Canvas.Settings) void {
     const num_stars = star_math.initStarData(star_data[0..data_len]);
-    star_math.initCanvasData(allocator, settings.*) catch |err| switch (err) {
+    canvas = Canvas.init(allocator, settings.*) catch |err| switch (err) {
         error.OutOfMemory => {
-            const num_pixels = star_math.global_canvas.width * star_math.global_canvas.height;
+            const num_pixels = canvas.settings.width * canvas.settings.height;
             log("[ERROR] Ran out of memory during canvas intialization (needed {} kB for {} pixels)", .{(num_pixels * @sizeOf(Pixel)) / 1000, num_pixels});
             unreachable;
         }
     };
 }
 
-pub export fn updateCanvasSettings(settings: *star_math.CanvasSettings) void {
-    star_math.global_canvas = settings.*;
+pub export fn updateCanvasSettings(settings: *Canvas.Settings) void {
+    canvas.settings = settings.*;
     allocator.destroy(settings);
 }
 
 pub export fn getImageData(size_in_bytes: *u32) [*]Pixel {
-    size_in_bytes.* = @intCast(u32, star_math.global_pixel_data.len * @sizeOf(star_math.Pixel));
-    return star_math.global_pixel_data.ptr;
+    size_in_bytes.* = @intCast(u32, canvas.data.len * @sizeOf(Pixel));
+    return canvas.data.ptr;
 }
 
 pub export fn resetImageData() void {
-    for (star_math.global_pixel_data) |*p, i| {
+    for (canvas.data) |*p, i| {
         p.* = Pixel{};
     }   
 }
@@ -53,7 +56,7 @@ pub export fn projectStarsWasm(observer_latitude: f32, observer_longitude: f32, 
         .longitude = observer_longitude
     };
 
-    star_math.projectStar(current_coord, observer_timestamp, true);
+    star_math.projectStar(&canvas, current_coord, observer_timestamp, true);
 }
 
 pub export fn dragAndMoveWasm(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_end_y: f32) *Coord {
