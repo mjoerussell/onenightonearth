@@ -72,6 +72,23 @@ document.addEventListener('DOMContentLoaded', () => {
         renderStars(controls);
     });
 
+    controls.onSetToday((current, target) => {
+        const days_per_frame = 2;
+        const days_per_frame_millis = days_per_frame * 86400000;
+
+        let next_date = new Date(current);
+        let diff = Math.abs(current.valueOf() - target.valueOf());
+        const delta = diff > days_per_frame_millis ? days_per_frame_millis : diff;
+        if (current > target) {
+            next_date.setTime(next_date.getTime() - delta);
+        } else {
+            next_date.setTime(next_date.getTime() + delta);
+        }
+
+        renderStars(controls, next_date);
+        return next_date;
+    });
+
     const updateLocation = (new_coord: Coord): void => {
         // If the longitude is exactly opposite of the original, then there will be issues calculating the
         // great circle, and the journey will look really weird.
@@ -108,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
     controls.onUseCurrentPosition(updateLocation);
 
     controls.onTimelapse(current_date => {
-        const days_per_frame = 0.33;
+        const days_per_frame = 0.25;
         const days_per_frame_millis = days_per_frame * 86400000;
         let next_date = new Date(current_date);
         next_date.setTime(next_date.getTime() + days_per_frame_millis);

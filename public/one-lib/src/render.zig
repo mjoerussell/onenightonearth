@@ -13,7 +13,7 @@ pub const Pixel = packed struct {
 
 };
 
-pub const Point = packed struct {
+pub const Point = struct {
     x: f32,
     y: f32,
 
@@ -42,6 +42,23 @@ pub const Canvas = struct {
             p.* = Pixel{};
         }
         return canvas;
+    }
+
+    pub fn setPixelAt(self: *Canvas, point: Point, new_pixel: Pixel) void {
+        if (std.math.isNan(point.x) or std.math.isNan(point.y)) {
+            return;
+        }
+
+        if (point.x < 0 or point.y < 0) return;
+        if (point.x > @intToFloat(f32, self.settings.width) or point.y > @intToFloat(f32, self.settings.height)) return;
+
+        const x = @floatToInt(usize, point.x);
+        const y = @floatToInt(usize, point.y);
+
+        const p_index: usize = (y * @intCast(usize, self.settings.width)) + x;
+        if (p_index >= self.data.len) return;
+
+        self.data[p_index] = new_pixel;
     }
 
     pub fn translatePoint(self: *Canvas, pt: Point) ?Point {

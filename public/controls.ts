@@ -11,7 +11,10 @@ export class Controls {
     private date_input: HTMLInputElement | null;
     private lat_input: HTMLInputElement | null;
     private long_input: HTMLInputElement | null;
+
     private time_travel_button: HTMLButtonElement | null;
+    private today_button: HTMLButtonElement | null;
+
     private update_location_button: HTMLButtonElement | null;
     private current_position_button: HTMLButtonElement | null;
 
@@ -37,7 +40,10 @@ export class Controls {
         this.date_input = document.getElementById('dateInput') as HTMLInputElement;
         this.lat_input = document.getElementById('latInput') as HTMLInputElement;
         this.long_input = document.getElementById('longInput') as HTMLInputElement;
+
         this.time_travel_button = document.getElementById('timelapse') as HTMLButtonElement;
+        this.today_button = document.getElementById('today') as HTMLButtonElement;
+
         this.update_location_button = document.getElementById('locationUpdate') as HTMLButtonElement;
         this.current_position_button = document.getElementById('currentPosition') as HTMLButtonElement;
         this.renderer = new Renderer('star-canvas');
@@ -61,6 +67,29 @@ export class Controls {
                 return;
             }
             handler(new_date);
+        });
+    }
+
+    onSetToday(handler: (current: Date, target: Date) => Date): void {
+        this.today_button?.addEventListener('click', () => {
+            // handler(new Date());
+            let current = this.date;
+            let target = new Date();
+
+            const moving_backwards = current.valueOf() > target.valueOf();
+
+            const run = () => {
+                current = handler(current, target);
+                this.date = current;
+                if (
+                    (moving_backwards && current.valueOf() > target.valueOf()) ||
+                    (!moving_backwards && current.valueOf() < target.valueOf())
+                ) {
+                    window.requestAnimationFrame(run);
+                }
+            };
+
+            window.requestAnimationFrame(run);
         });
     }
 
@@ -100,7 +129,7 @@ export class Controls {
 
     onTimelapse(handler: (next_date: Date) => Date): void {
         this.time_travel_button?.addEventListener('click', () => {
-            this.time_travel_button!.innerText = this.timelapse_is_on ? 'Time Travel' : 'Stop';
+            this.time_travel_button!.innerText = this.timelapse_is_on ? 'Timelapse' : 'Stop';
             if (this.timelapse_is_on) {
                 this.timelapse_is_on = false;
                 return;

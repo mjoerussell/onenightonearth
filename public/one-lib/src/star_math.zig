@@ -91,34 +91,13 @@ pub fn projectStar(canvas: *Canvas, observer_location: Coord, observer_timestamp
         const azi = math.acos(cos_azi);
         const azimuth = if (math.sin(hour_angle_rad) < 0) azi else two_pi - azi;
 
-        const pixel_index = getPixelIndex(canvas, @floatCast(f32, altitude), @floatCast(f32, azimuth));
-        if (pixel_index) |p_index| {
+        const point = canvas.translatePoint(getProjectedCoord(@floatCast(f32, altitude), @floatCast(f32, azimuth)));
+        if (point) |p| {
             var base_color = star.spec_type.getColor();
             base_color.a = @floatToInt(u8, star.brightness * 255.0); 
-            canvas.data[p_index] = base_color;
+            canvas.setPixelAt(p, base_color);
         }
-
     }
-}
-
-pub fn getPixelIndex(canvas: *Canvas, altitude: f32, azimuth: f32) ?usize {
-    var point = getProjectedCoord(altitude, azimuth);
-    point = canvas.translatePoint(point) orelse return null;
-
-    if (std.math.isNan(point.x) or std.math.isNan(point.y)) {
-        return null;
-    }
-
-    if (point.x < 0 or point.y < 0) return null;
-    if (point.x > @intToFloat(f32, canvas.settings.width) or point.y > @intToFloat(f32, canvas.settings.height)) return null;
-
-    const x = @floatToInt(usize, point.x);
-    const y = @floatToInt(usize, point.y);
-
-    const p_index: usize = (y * @intCast(usize, canvas.settings.width)) + x;
-    if (p_index >= canvas.data.len ) return null;
-
-    return p_index;
 }
 
 pub fn getProjectedCoord(altitude: f32, azimuth: f32) Point {
