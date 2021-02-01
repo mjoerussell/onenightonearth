@@ -75,9 +75,11 @@ pub fn projectStar(canvas: *Canvas, star: Star, observer_location: Coord, observ
         true
     );
     if (point) |p| {
-        var base_color = star.spec_type.getColor();
-        base_color.a = @floatToInt(u8, star.brightness * 255.0); 
-        canvas.setPixelAt(p, base_color);
+        if (canvas.isInsideCircle(p)) {
+            var base_color = star.spec_type.getColor();
+            base_color.a = @floatToInt(u8, star.brightness * 255.0); 
+            canvas.setPixelAt(p, base_color);
+        }
     }
 }
 

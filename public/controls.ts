@@ -18,6 +18,8 @@ export class Controls {
     private update_location_button: HTMLButtonElement | null;
     private current_position_button: HTMLButtonElement | null;
 
+    private show_constellations_input: HTMLInputElement | null;
+
     public renderer: Renderer;
 
     private current_latitude = 0;
@@ -46,6 +48,9 @@ export class Controls {
 
         this.update_location_button = document.getElementById('locationUpdate') as HTMLButtonElement;
         this.current_position_button = document.getElementById('currentPosition') as HTMLButtonElement;
+
+        this.show_constellations_input = document.getElementById('showConstellations') as HTMLInputElement;
+
         this.renderer = new Renderer('star-canvas');
 
         const mql = window.matchMedia('only screen and (max-width: 760px)');
@@ -203,6 +208,10 @@ export class Controls {
         });
     }
 
+    onChangeConstellationView(handler: () => void): void {
+        this.show_constellations_input?.addEventListener('change', handler);
+    }
+
     get date(): Date {
         const current_date = this.date_input?.valueAsDate;
         return current_date ?? new Date();
@@ -233,6 +242,16 @@ export class Controls {
         this.current_longitude = value;
         if (this.long_input) {
             this.long_input.value = value.toString();
+        }
+    }
+
+    get show_constellations(): boolean {
+        return this.show_constellations_input?.checked ?? false;
+    }
+
+    set show_constellations(should_show: boolean) {
+        if (this.show_constellations_input) {
+            this.show_constellations_input.checked = should_show;
         }
     }
 

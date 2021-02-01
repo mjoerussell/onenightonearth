@@ -65,7 +65,7 @@ pub const Canvas = struct {
         self.data[p_index] = new_pixel;
     }
 
-    pub fn translatePoint(self: *Canvas, pt: Point) ?Point {
+    pub fn translatePoint(self: *Canvas, pt: Point) Point {
         const center = Point{
             .x = @intToFloat(f32, self.settings.width) / 2.0,
             .y = @intToFloat(f32, self.settings.height) / 2.0,
@@ -76,16 +76,23 @@ pub const Canvas = struct {
         const direction_modifier: f32 = if (self.settings.draw_north_up) 1.0 else -1.0;
         const translate_factor: f32 = direction_modifier * self.settings.background_radius * self.settings.zoom_factor;
 
-        const translated_point = Point{
+        return Point{
             .x = center.x + (translate_factor * pt.x),
             .y = center.y - (translate_factor * pt.y)
         };
+    }
 
-        return if (translated_point.getDist(center) <= self.settings.background_radius) translated_point else null; 
+    pub fn isInsideCircle(self: *Canvas, point: Point) bool {
+        const center = Point{
+            .x = @intToFloat(f32, self.settings.width) / 2.0,
+            .y = @intToFloat(f32, self.settings.height) / 2.0,
+        };
+
+        return point.getDist(center) <= self.settings.background_radius;
     }
 
     pub fn drawLine(self: *Canvas, a: Point, b: Point) void {
-        const line_color = Pixel.rgba(255, 245, 194, 180);
+        const line_color = Pixel.rgba(255, 245, 194, 125);
         // const line_color = Pixel.rgb(255, 0, 0);
         const num_points = 500;
         const total_dist = a.getDist(b);
@@ -96,7 +103,9 @@ pub const Canvas = struct {
                 .x = a.x + (point_dist / total_dist) * (b.x - a.x),
                 .y = a.y + (point_dist / total_dist) * (b.y - a.y)
             };
-            self.setPixelAt(next_point, line_color);
+            if (self.isInsideCircle(next_point)) {
+                self.setPixelAt(next_point, line_color);
+            } else break;
         }
     }
 

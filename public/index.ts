@@ -19,7 +19,9 @@ const renderStars = (controls: Controls, date?: Date) => {
     }
 
     wasm_interface.projectStars(controls.latitude, controls.longitude, BigInt(timestamp));
-    wasm_interface.projectConstellations(controls.latitude, controls.longitude, BigInt(timestamp));
+    if (controls.show_constellations) {
+        wasm_interface.projectConstellations(controls.latitude, controls.longitude, BigInt(timestamp));
+    }
     const data = wasm_interface.getImageData();
     controls.renderer.drawData(data);
     wasm_interface.resetImageData();
@@ -73,6 +75,10 @@ document.addEventListener('DOMContentLoaded', () => {
     );
 
     controls.onDateChange(date => {
+        renderStars(controls);
+    });
+
+    controls.onChangeConstellationView(() => {
         renderStars(controls);
     });
 
