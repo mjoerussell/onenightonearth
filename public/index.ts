@@ -1,5 +1,5 @@
 import { Controls } from './controls';
-import { Coord, Star } from './wasm/size';
+import { Constellation, Coord, Star } from './wasm/size';
 import { WasmInterface } from './wasm/wasm-interface';
 
 let wasm_interface: WasmInterface;
@@ -19,6 +19,7 @@ const renderStars = (controls: Controls, date?: Date) => {
     }
 
     wasm_interface.projectStars(controls.latitude, controls.longitude, BigInt(timestamp));
+    wasm_interface.projectConstellations(controls.latitude, controls.longitude, BigInt(timestamp));
     const data = wasm_interface.getImageData();
     controls.renderer.drawData(data);
     wasm_interface.resetImageData();
@@ -52,21 +53,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log(`[WASM] ${message}`);
             },
         },
-    })
-        .then(wasm_result =>
-            fetch('/stars')
-                .then(star_result => star_result.json())
-                .then((stars: Star[]) => {
-                    wasm_interface = new WasmInterface(wasm_result.instance);
-                    wasm_interface.initialize(stars, controls.renderer.getCanvasSettings());
+    }).then(wasm_result =>
+        fetch('/stars')
+            .then(star_result => star_result.json())
+            .then((stars: Star[]) =>
+                fetch('/constellations')
+                    .then(cosnt_result => cosnt_result.json())
+                    .then((constellations: Constellation[]) => {
+                        wasm_interface = new WasmInterface(wasm_result.instance);
+                        wasm_interface.initialize(stars, constellations, controls.renderer.getCanvasSettings());
 
-                    drawUIElements(controls);
-                    renderStars(controls);
-                })
-        )
-        .catch(error => {
-            console.error('In WebAssembly Promise: ', error);
-        });
+                        drawUIElements(controls);
+                        renderStars(controls);
+                    })
+            )
+            .catch(error => {
+                console.error('In WebAssembly Promise: ', error);
+            })
+    );
 
     controls.onDateChange(date => {
         renderStars(controls);

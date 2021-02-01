@@ -14,13 +14,15 @@ import {
     Star,
     WasmStar,
     sizedWasmStar,
+    Constellation,
+    sizedSkyCoord,
 } from './size';
 import { CanvasSettings } from '../render';
 
 export class WasmInterface {
     constructor(private instance: WebAssembly.Instance) {}
 
-    initialize(stars: Star[], canvas_settings: CanvasSettings): void {
+    initialize(stars: Star[], constellations: Constellation[], canvas_settings: CanvasSettings): void {
         let wasm_stars: WasmStar[] = stars.map(star => {
             return {
                 right_ascension: star.right_ascension,
@@ -29,14 +31,37 @@ export class WasmInterface {
                 spec_type: star.spec_type,
             };
         });
+        const boundaries: pointer[] = [];
+        for (const c of constellations) {
+            const coords_ptr = this.allocArray(c.boundaries, sizedSkyCoord);
+            boundaries.push(coords_ptr);
+        }
+        let test = this.readArray(boundaries[0], constellations[0].boundaries.length, sizedSkyCoord);
+        for (const coord of test) {
+            console.log(coord);
+        }
+        const constellation_lengths = constellations.map(c => c.boundaries.length);
+        const constellation_ptr = this.allocPrimativeArray(boundaries, WasmPrimative.u32);
+        const coord_lens_ptr = this.allocPrimativeArray(constellation_lengths, WasmPrimative.u32);
         const star_ptr = this.allocArray(wasm_stars, sizedWasmStar);
         const settings_ptr = this.allocObject(canvas_settings, sizedCanvasSettings);
 
-        (this.instance.exports.initialize as any)(star_ptr, wasm_stars.length, settings_ptr);
+        (this.instance.exports.initialize as any)(
+            star_ptr,
+            wasm_stars.length,
+            constellation_ptr,
+            coord_lens_ptr,
+            constellations.length,
+            settings_ptr
+        );
     }
 
     projectStars(latitude: number, longitude: number, timestamp: BigInt): void {
         (this.instance.exports.projectStarsWasm as any)(latitude, longitude, timestamp);
+    }
+
+    projectConstellations(latitude: number, longitude: number, timestamp: BigInt): void {
+        (this.instance.exports.projectConstellations as any)(latitude, longitude, timestamp);
     }
 
     resetImageData(): void {
@@ -163,6 +188,19 @@ export class WasmInterface {
             current_offset = this.setObject(data_mem, item, size, current_offset);
         }
 
+        return ptr;
+    }
+
+    allocPrimativeArray(data: number[], size: WasmPrimative): pointer {
+        const item_bytes = sizeOfPrimative(size);
+        const total_bytes = item_bytes * data.length;
+        const ptr = this.allocBytes(total_bytes);
+        const data_mem = new DataView(this.memory, ptr, total_bytes);
+        let current_offset = 0;
+        for (const item of data) {
+            this.setPrimative(data_mem, item, size, current_offset);
+            current_offset += item_bytes;
+        }
         return ptr;
     }
 

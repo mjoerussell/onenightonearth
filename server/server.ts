@@ -22,6 +22,16 @@ interface Star {
   spec_type: SpectralType;
 }
 
+interface SkyCoord {
+  right_ascension: number;
+  declination: number;
+}
+
+interface Constellation {
+  name: string;
+  boundaries: SkyCoord[];
+}
+
 const PORT = 8080;
 const app = express();
 
@@ -108,6 +118,55 @@ const parseCatalogLine = (line: string): Star | null => {
   return result;
 };
 
+const parseRightAscension = (ra: string): number => {
+  // console.log('Getting right ascension from ', ra);
+  const parts = ra.split(' ');
+  const hours = parseInt(parts[0]);
+  const minutes = parseInt(parts[1]);
+  const seconds = parseFloat(parts[2]);
+
+  const hours_deg = hours * 15;
+  const minutes_deg = (minutes / 60) * 15;
+  const seconds_deg = (seconds / 3600) * 15;
+
+  return hours_deg + minutes_deg + seconds_deg;
+};
+
+const parseConstallations = (lines: string[]): Constellation[] => {
+  const constellations: Constellation[] = [];
+  // let current_constellation_name: string = '';
+  let current_constellation: Constellation | null = null;
+  for (const line of lines) {
+    // console.log('Parsing constellation line ', line);
+    if (line.startsWith('#')) {
+      continue;
+    }
+    const parts: string[] = line.split('|');
+    if (current_constellation == null) {
+      current_constellation = {
+        name: parts[0],
+        boundaries: [],
+      };
+    } else if (parts[0] !== current_constellation?.name) {
+      constellations.push(current_constellation);
+      current_constellation = {
+        name: parts[0],
+        boundaries: [],
+      };
+    }
+
+    const coord: SkyCoord = {
+      right_ascension: parseRightAscension(parts[1]),
+      declination: parseFloat(parts[2]),
+    };
+
+    current_constellation.boundaries.push(coord);
+  }
+
+  constellations.push(current_constellation!);
+  return constellations;
+};
+
 const stars: Promise<Star[]> = readFile(path.join(__dirname, 'sao_catalog'))
   .then(catalog =>
     catalog
@@ -116,6 +175,10 @@ const stars: Promise<Star[]> = readFile(path.join(__dirname, 'sao_catalog'))
       .filter(line => line.startsWith('SAO'))
   )
   .then(lines => lines.map(parseCatalogLine).filter(star => star != null) as Star[]);
+
+const constellations: Promise<Constellation[]> = readFile(path.join(__dirname, 'constellations.txt'))
+  .then(catalog => catalog.toString().split('\n'))
+  .then(lines => parseConstallations(lines));
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -126,6 +189,10 @@ app.get('/stars', async (req, res) => {
   const min_brightness = parseFloat(brightness_param);
   const available_stars = await stars;
   res.send(available_stars.filter(star => star.brightness >= min_brightness));
+});
+
+app.get('/constellations', async (req, res) => {
+  res.send(await constellations);
 });
 
 http.createServer(app).listen(PORT, () => console.log(`Listening on port ${PORT}`));

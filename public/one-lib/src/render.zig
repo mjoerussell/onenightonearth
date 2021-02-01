@@ -11,6 +11,10 @@ pub const Pixel = packed struct {
         return Pixel{ .r = r, .g = g, .b = b, .a = 255 };
     }
 
+    pub fn rgba(r: u8, g: u8, b: u8, a: u8) Pixel {
+        return Pixel{ .r = r, .g = g, .b = b, .a = a };
+    }
+
 };
 
 pub const Point = struct {
@@ -78,6 +82,22 @@ pub const Canvas = struct {
         };
 
         return if (translated_point.getDist(center) <= self.settings.background_radius) translated_point else null; 
+    }
+
+    pub fn drawLine(self: *Canvas, a: Point, b: Point) void {
+        const line_color = Pixel.rgba(255, 245, 194, 180);
+        // const line_color = Pixel.rgb(255, 0, 0);
+        const num_points = 500;
+        const total_dist = a.getDist(b);
+        var point_index: u32 = 0;
+        while (point_index < num_points) : (point_index += 1) {
+            const point_dist = (total_dist / @intToFloat(f32, num_points)) * @intToFloat(f32, point_index);
+            const next_point = Point{
+                .x = a.x + (point_dist / total_dist) * (b.x - a.x),
+                .y = a.y + (point_dist / total_dist) * (b.y - a.y)
+            };
+            self.setPixelAt(next_point, line_color);
+        }
     }
 
 };

@@ -14,11 +14,20 @@ pub const Coord = packed struct {
     longitude: f32,
 };
 
+pub const SkyCoord = packed struct {
+    right_ascension: f32,
+    declination: f32
+};
+
 pub const Star = packed struct {
     right_ascension: f32,
     declination: f32,
     brightness: f32,
     spec_type: SpectralType,
+};
+
+pub const Constellation = struct {
+    boundaries: []SkyCoord,
 };
 
 pub const SpectralType = packed enum(u8) {
@@ -57,47 +66,67 @@ pub const SpectralType = packed enum(u8) {
     }
 };
 
-pub var global_stars: []Star = undefined;
-
-pub fn initStarData(star_data: []Star) usize {
-    global_stars = star_data;
-
-    return global_stars.len;
+pub fn projectStar(canvas: *Canvas, star: Star, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) void {
+    const point = projectToCanvas(
+        canvas, 
+        SkyCoord{ .right_ascension = star.right_ascension, .declination = star.declination }, 
+        observer_location, 
+        observer_timestamp, 
+        true
+    );
+    if (point) |p| {
+        var base_color = star.spec_type.getColor();
+        base_color.a = @floatToInt(u8, star.brightness * 255.0); 
+        canvas.setPixelAt(p, base_color);
+    }
 }
 
-pub fn projectStar(canvas: *Canvas, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) void {
+pub fn projectConstellation(canvas: *Canvas, constellation: Constellation, observer_location: Coord, observer_timestamp: i64) void {
+    var branch_index: usize = 0;
+    while (branch_index < constellation.boundaries.len - 1) : (branch_index += 1) {
+        const point_a = projectToCanvas(canvas, constellation.boundaries[branch_index], observer_location, observer_timestamp, false);
+        const point_b = projectToCanvas(canvas, constellation.boundaries[branch_index + 1], observer_location, observer_timestamp, false);
+        
+        if (point_a == null or point_b == null) continue;
+
+        canvas.drawLine(point_a.?, point_b.?);
+    }
+
+    // Connect final point to first point
+    const point_a = projectToCanvas(canvas, constellation.boundaries[constellation.boundaries.len - 1], observer_location, observer_timestamp, false);
+    const point_b = projectToCanvas(canvas, constellation.boundaries[0], observer_location, observer_timestamp, false);
+
+    if (point_a == null or point_b == null) return;
+
+    canvas.drawLine(point_a.?, point_b.?);
+}
+
+pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?Point {
     const two_pi = comptime math.pi * 2.0;
     const half_pi = comptime math.pi / 2.0;
     const local_sideral_time = getLocalSideralTime(@intToFloat(f64, observer_timestamp), observer_location.longitude);
     const lat_rad = math_utils.degToRad(observer_location.latitude);
 
-    for (global_stars) |star| {
-        const hour_angle = local_sideral_time - @as(f64, star.right_ascension);
+    const hour_angle = local_sideral_time - @as(f64, sky_coord.right_ascension);
 
-        const declination_rad = @floatCast(f64, math_utils.degToRad(star.declination));
-        const hour_angle_rad = math_utils.floatMod(math_utils.degToRad(hour_angle), two_pi);
+    const declination_rad = @floatCast(f64, math_utils.degToRad(sky_coord.declination));
+    const hour_angle_rad = math_utils.floatMod(math_utils.degToRad(hour_angle), two_pi);
 
-        const sin_dec = math.sin(declination_rad);
-        const sin_lat = math.sin(lat_rad);
-        const cos_lat = math.cos(lat_rad);
+    const sin_dec = math.sin(declination_rad);
+    const sin_lat = math.sin(lat_rad);
+    const cos_lat = math.cos(lat_rad);
 
-        const sin_alt = sin_dec * sin_lat + math.cos(declination_rad) * cos_lat * math.cos(hour_angle_rad);
-        const altitude = math_utils.boundedASin(sin_alt) catch |err| continue;
-        if ((filter_below_horizon and altitude < 0) or (!filter_below_horizon and altitude < -(half_pi / 3.0))) {
-            continue;
-        }
-
-        const cos_azi = (sin_dec - math.sin(altitude) * sin_lat) / (math.cos(altitude) * cos_lat);
-        const azi = math.acos(cos_azi);
-        const azimuth = if (math.sin(hour_angle_rad) < 0) azi else two_pi - azi;
-
-        const point = canvas.translatePoint(getProjectedCoord(@floatCast(f32, altitude), @floatCast(f32, azimuth)));
-        if (point) |p| {
-            var base_color = star.spec_type.getColor();
-            base_color.a = @floatToInt(u8, star.brightness * 255.0); 
-            canvas.setPixelAt(p, base_color);
-        }
+    const sin_alt = sin_dec * sin_lat + math.cos(declination_rad) * cos_lat * math.cos(hour_angle_rad);
+    const altitude = math_utils.boundedASin(sin_alt) catch |err| return null;
+    if (filter_below_horizon and altitude < 0) {
+        return null;
     }
+
+    const cos_azi = (sin_dec - math.sin(altitude) * sin_lat) / (math.cos(altitude) * cos_lat);
+    const azi = math.acos(cos_azi);
+    const azimuth = if (math.sin(hour_angle_rad) < 0) azi else two_pi - azi;
+
+    return canvas.translatePoint(getProjectedCoord(@floatCast(f32, altitude), @floatCast(f32, azimuth)));
 }
 
 pub fn getProjectedCoord(altitude: f32, azimuth: f32) Point {

@@ -55,24 +55,29 @@ export const sizedWasmStar: Sized<WasmStar> = {
     spec_type: WasmPrimative.u8,
 };
 
-export type StarCoord = {
-    rightAscension: number;
+export type Constellation = {
+    name: string;
+    boundaries: SkyCoord[];
+};
+
+export type WasmConstellation = {
+    boundaries_ptr: number;
+    boundaries_len: number;
+};
+
+export const sizedWasmConstellation: Sized<WasmConstellation> = {
+    boundaries_ptr: WasmPrimative.u32,
+    boundaries_len: WasmPrimative.u32,
+};
+
+export type SkyCoord = {
+    right_ascension: number;
     declination: number;
 };
 
-const sizedStarCoord: Sized<StarCoord> = {
-    rightAscension: WasmPrimative.f32,
+export const sizedSkyCoord: Sized<SkyCoord> = {
+    right_ascension: WasmPrimative.f32,
     declination: WasmPrimative.f32,
-};
-
-export type ConstellationBranch = {
-    a: StarCoord;
-    b: StarCoord;
-};
-
-export const sizedConstellationBranch: Sized<ConstellationBranch> = {
-    a: sizedStarCoord,
-    b: sizedStarCoord,
 };
 
 export const sizedCanvasSettings: Sized<CanvasSettings> = {
