@@ -10,6 +10,11 @@ pub const Pixel = packed struct {
     g: u8 = 0,
     b: u8 = 0,
     a: u8 = 0,
+
+    pub fn rgb(r: u8, g: u8, b: u8) Pixel {
+        return Pixel{ .r = r, .g = g, .b = b, .a = 255 };
+    }
+
 };
 
 pub const CanvasSettings = packed struct {
@@ -49,6 +54,43 @@ pub const Star = packed struct {
     right_ascension: f32,
     declination: f32,
     brightness: f32,
+    spec_type: SpectralType,
+};
+
+pub const SpectralType = packed enum(u8) {
+    /// > 30,000 K
+    O,
+    /// 10,000 K <> 30,000 K
+    B,
+    /// 7,500 K <> 10,000 K
+    A,
+    /// 6,000 K <> 7,500 K
+    F,
+    /// 5,200 K <> 6,000 K
+    G,
+    /// 3,700 K <> 5,200 K
+    K,
+    /// 2,400 K <> 3,700 K
+    M,
+
+    pub fn getColor(spec: SpectralType) Pixel {
+        return switch (spec) {
+            // Blue
+            .O => Pixel.rgb(2, 89, 156),
+            // Blue-white
+            .B => Pixel.rgb(131, 195, 222),
+            // White
+            .A => Pixel.rgb(255, 255, 255),
+            // Yellow-white
+            .F => Pixel.rgb(249, 250, 192),
+            // Yellow
+            .G => Pixel.rgb(253, 255, 133),
+            // Orange
+            .K => Pixel.rgb(255, 142, 61),
+            // Red
+            .M => Pixel.rgb(207, 32, 23)
+        };
+    }
 };
 
 pub var global_stars: []Star = undefined;
@@ -105,13 +147,16 @@ pub fn projectStar(observer_location: Coord, observer_timestamp: i64, filter_bel
 
         const pixel_index = getPixelIndex(@floatCast(f32, altitude), @floatCast(f32, azimuth));
         if (pixel_index) |p_index| {
-            const pixel = Pixel{
-                .r = 255, 
-                .g = 246, 
-                .b = 176, 
-                .a = @floatToInt(u8, star.brightness * 255.0)
-            };
-            global_pixel_data[p_index] = pixel;
+            var base_color = star.spec_type.getColor();
+            base_color.a = @floatToInt(u8, star.brightness * 255.0); 
+            // const pixel = Pixel{
+            //     .r = 255, 
+            //     .g = 246, 
+            //     .b = 176, 
+            //     .a = @floatToInt(u8, star.brightness * 255.0)
+            // };
+            // global_pixel_data[p_index] = pixel;
+            global_pixel_data[p_index] = base_color;
         }
 
     }

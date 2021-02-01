@@ -26,6 +26,7 @@ export class WasmInterface {
                 right_ascension: star.right_ascension,
                 declination: star.declination,
                 brightness: star.brightness,
+                spec_type: star.spec_type,
             };
         });
         const star_ptr = this.allocArray(wasm_stars, sizedWasmStar);

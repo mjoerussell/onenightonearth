@@ -4,11 +4,22 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 
+enum SpectralType {
+  O = 0,
+  B = 1,
+  A = 2,
+  F = 3,
+  G = 4,
+  K = 5,
+  M = 6,
+}
+
 interface Star {
   name: string;
   right_ascension: number;
   declination: number;
   brightness: number;
+  spec_type: SpectralType;
 }
 
 const PORT = 8080;
@@ -35,10 +46,11 @@ const parseCatalogLine = (line: string): Star | null => {
     right_ascension: 0,
     declination: 0,
     brightness: 0,
+    spec_type: 0,
   };
   let current_entry = 0;
   for (const entry of data_values) {
-    if (current_entry > 13) break;
+    if (current_entry > 14) break;
     switch (current_entry) {
       case 0:
         result.name = entry;
@@ -66,6 +78,27 @@ const parseCatalogLine = (line: string): Star | null => {
           result.brightness = mag_display_factor;
         } catch (err) {
           return null;
+        }
+        break;
+      case 14:
+        const type = entry.charAt(0).toLowerCase();
+        if (type === 'o') {
+          result.spec_type = SpectralType.O;
+        } else if (type === 'b') {
+          result.spec_type = SpectralType.B;
+        } else if (type === 'a') {
+          result.spec_type = SpectralType.A;
+        } else if (type === 'f') {
+          result.spec_type = SpectralType.F;
+        } else if (type === 'g') {
+          result.spec_type = SpectralType.G;
+        } else if (type === 'k') {
+          result.spec_type = SpectralType.K;
+        } else if (type === 'm') {
+          result.spec_type = SpectralType.M;
+        } else {
+          // Default to white for now, probably should update later
+          result.spec_type = SpectralType.A;
         }
         break;
     }

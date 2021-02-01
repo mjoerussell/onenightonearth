@@ -23,23 +23,36 @@ export const sizedCoord: Sized<Coord> = {
     longitude: WasmPrimative.f32,
 };
 
+export enum SpectralType {
+    O = 0,
+    B = 1,
+    A = 2,
+    F = 3,
+    G = 4,
+    K = 5,
+    M = 6,
+}
+
 export type Star = {
     name: string;
     right_ascension: number;
     declination: number;
     brightness: number;
+    spec_type: SpectralType;
 };
 
 export type WasmStar = {
     right_ascension: number;
     declination: number;
     brightness: number;
+    spec_type: SpectralType;
 };
 
 export const sizedWasmStar: Sized<WasmStar> = {
     right_ascension: WasmPrimative.f32,
     declination: WasmPrimative.f32,
     brightness: WasmPrimative.f32,
+    spec_type: WasmPrimative.u8,
 };
 
 export type StarCoord = {
