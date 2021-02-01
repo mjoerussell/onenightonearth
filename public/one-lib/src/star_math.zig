@@ -24,7 +24,7 @@ pub const CanvasSettings = packed struct {
     zoom_factor: f32,
     draw_north_up: bool,
 
-    fn translatePoint(self: CanvasSettings, pt: CanvasPoint) CanvasPoint {
+    fn translatePoint(self: CanvasSettings, pt: CanvasPoint) ?CanvasPoint {
         const center_x: f32 = @intToFloat(f32, self.width) / 2.0;
         const center_y: f32 = @intToFloat(f32, self.height) / 2.0;
 
@@ -33,9 +33,15 @@ pub const CanvasSettings = packed struct {
         const direction_modifier: f32 = if (self.draw_north_up) 1.0 else -1.0;
         const translate_factor: f32 = direction_modifier * self.background_radius * self.zoom_factor;
 
-        return .{
-            .x = center_x + (translate_factor * pt.x),
-            .y = center_y - (translate_factor * pt.y),
+        const translated_x = center_x + (translate_factor * pt.x);
+        const translated_y = center_y - (translate_factor * pt.y);
+
+        const dist_from_center = math.sqrt(math.pow(f32, translated_x - center_x, 2.0) + math.pow(f32, translated_y - center_y, 2.0));
+        if (dist_from_center > self.background_radius) return null;
+
+        return CanvasPoint{
+            .x = translated_x,
+            .y = translated_y,
         };
     }
 };
@@ -149,13 +155,6 @@ pub fn projectStar(observer_location: Coord, observer_timestamp: i64, filter_bel
         if (pixel_index) |p_index| {
             var base_color = star.spec_type.getColor();
             base_color.a = @floatToInt(u8, star.brightness * 255.0); 
-            // const pixel = Pixel{
-            //     .r = 255, 
-            //     .g = 246, 
-            //     .b = 176, 
-            //     .a = @floatToInt(u8, star.brightness * 255.0)
-            // };
-            // global_pixel_data[p_index] = pixel;
             global_pixel_data[p_index] = base_color;
         }
 
@@ -164,7 +163,7 @@ pub fn projectStar(observer_location: Coord, observer_timestamp: i64, filter_bel
 
 pub fn getPixelIndex(altitude: f32, azimuth: f32) ?usize {
     var point = getProjectedCoord(altitude, azimuth);
-    point = global_canvas.translatePoint(point);
+    point = global_canvas.translatePoint(point) orelse return null;
 
     if (std.math.isNan(point.x) or std.math.isNan(point.y)) {
         return null;

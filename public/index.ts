@@ -35,7 +35,7 @@ const drawUIElements = (controls: Controls) => {
         bgCtx.canvas.width = controls.renderer.width;
         bgCtx.canvas.height = controls.renderer.height;
 
-        bgCtx.fillStyle = '#051430';
+        bgCtx.fillStyle = '#030b1c';
         bgCtx.arc(center_x, center_y, controls.renderer.background_radius, 0, Math.PI * 2);
         bgCtx.fill();
     }
