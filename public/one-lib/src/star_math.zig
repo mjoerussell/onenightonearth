@@ -141,7 +141,7 @@ pub fn getProjectedCoord(altitude: f32, azimuth: f32) Point {
 
     // Convert from polar to cartesian coordinates
     return .{ 
-        .x = s * math.sin(azimuth), 
+        .x = -(s * math.sin(azimuth)), 
         .y = s * math.cos(azimuth) 
     };
 }
@@ -258,7 +258,7 @@ pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_e
     // Usually atan2 is used with the parameters in the reverse order (atan2(y, x)).
     // The order here (x, y) is intentional, since otherwise horizontal drags would result in vertical movement
     // and vice versa
-    const dist_phi = math.atan2(f32, dist_x, dist_y);
+    const dist_phi = -math.atan2(f32, dist_x, dist_y);
 
     // drag_distance is the angular distance between the starting location and the result location after a single drag
     // 2.35 is a magic number of degrees, picked because it results in what feels like an appropriate drag speed
