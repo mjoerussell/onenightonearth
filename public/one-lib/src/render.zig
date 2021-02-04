@@ -1,6 +1,11 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+const log = @import("./log.zig").log;
+const math_utils = @import("./math_utils.zig");
+const Point = math_utils.Point;
+const Line = math_utils.Line;
+
 pub const Pixel = packed struct {
     r: u8 = 0,
     g: u8 = 0,
@@ -17,12 +22,22 @@ pub const Pixel = packed struct {
 
 };
 
-pub const Point = struct {
-    x: f32,
-    y: f32,
 
-    fn getDist(self: Point, other: Point) f32 {
-        return std.math.sqrt(std.math.pow(f32, self.x - other.x, 2.0) + std.math.pow(f32, self.y - other.y, 2.0));
+
+const Orientation = enum {
+    Clockwise,
+    Counterclockwise,
+    Colinear,
+
+    fn fromPoints(p: Point, q: Point, r: Point) Orientation {
+        const value = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+        if (value == 0) {
+            return .Colinear;
+        } else if (value > 0) {
+            return .Clockwise;
+        } else {
+            return .Counterclockwise;
+        }
     }
 };
 
@@ -91,20 +106,76 @@ pub const Canvas = struct {
         return point.getDist(center) <= self.settings.background_radius;
     }
 
-    pub fn drawLine(self: *Canvas, a: Point, b: Point) void {
-        const line_color = Pixel.rgba(255, 245, 194, 125);
-        // const line_color = Pixel.rgb(255, 0, 0);
-        const num_points = 500;
-        const total_dist = a.getDist(b);
+    pub fn isInsidePolygon(self: *Canvas, polygon: []Point, point: Point) bool {
+        const point_ray = Line{
+            .a = point,
+            .b = Point{ .x = @intToFloat(f32, self.settings.width), .y = point.y }
+        };
+        var num_intersections: u32 = 0;
+        var index: usize = 0;
+        // self.drawLine(point_ray, Pixel.rgb(255, 0, 255));
+        while (index < polygon.len - 1) : (index += 1) {
+            const bound = Line{
+                .a = polygon[index],
+                .b = polygon[index + 1]
+            };
+
+            if (point_ray.intersection(bound)) |inter_point| {
+                const bound_min_x = std.math.min(bound.a.x, bound.b.x);
+                const bound_max_x = std.math.max(bound.a.x, bound.b.x);
+                if (inter_point.x >= bound_min_x and inter_point.x <= bound_max_x) {
+                    self.drawSquare(inter_point, 4, Pixel.rgb(255, 0, 0));
+                    num_intersections += 1;
+                }
+            }
+            // const ori_1 = Orientation.fromPoints(point, q1, ray_end);
+            // const ori_2 = Orientation.fromPoints(point, q1, q2);
+            // const ori_3 = Orientation.fromPoints(ray_end, q2, point);
+            // const ori_4 = Orientation.fromPoints(ray_end, q2, q1);
+
+            // log(.Debug, "{}<>{} | {}<>{}", .{@tagName(ori_1), @tagName(ori_2), @tagName(ori_3), @tagName(ori_4)});
+            // Not considering all-colinear points right now, I don't think
+            // it needs to handle that edge case
+            // if (ori_1 != ori_2 and ori_3 != ori_4) {
+            //     num_intersections += 1;
+            // }
+        }
+        log(.Debug, "Num intersections: {d:.0}", .{num_intersections});
+        return num_intersections % 2 == 1;
+    }
+
+    pub fn drawSquare(self: *Canvas, p: Point, width: usize, color: Pixel) void {
+        var index: f32 = 0;
+        var w = @intToFloat(f32, width);
+        while (index < w) : (index += 1) {
+            self.setPixelAt(Point{ .x = p.x + index, .y = p.y }, color);
+            self.setPixelAt(Point{ .x = p.x + index, .y = p.y + (w - 1) }, color);
+            self.setPixelAt(Point{ .x = p.x, .y = p.y + index }, color);
+            self.setPixelAt(Point{ .x = p.x + (w - 1), .y = p.y + index }, color);
+        }
+    }
+
+    pub fn drawLine(self: *Canvas, line: Line, color: Pixel) void {
+        // const line_color = Pixel;
+        const num_points = @floatToInt(u32, 75 * self.settings.zoom_factor);
+
+        // Draw the line to the edge of the circle no matter what.
+        // If `a` is outside the circle to begin with then the line won't be drawn,
+        // so if that's the case then start from b and draw to a
+        const is_a_inside_circle = self.isInsideCircle(line.a);
+        const start = if (is_a_inside_circle) line.a else line.b;
+        const end = if (is_a_inside_circle) line.b else line.a;
+
+        const total_dist = start.getDist(end);
         var point_index: u32 = 0;
         while (point_index < num_points) : (point_index += 1) {
             const point_dist = (total_dist / @intToFloat(f32, num_points)) * @intToFloat(f32, point_index);
             const next_point = Point{
-                .x = a.x + (point_dist / total_dist) * (b.x - a.x),
-                .y = a.y + (point_dist / total_dist) * (b.y - a.y)
+                .x = start.x + (point_dist / total_dist) * (end.x - start.x),
+                .y = start.y + (point_dist / total_dist) * (end.y - start.y)
             };
             if (self.isInsideCircle(next_point)) {
-                self.setPixelAt(next_point, line_color);
+                self.setPixelAt(next_point, color);
             } else break;
         }
     }

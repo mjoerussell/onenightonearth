@@ -2,6 +2,7 @@ import { Controls } from './controls';
 import { Constellation, Coord, Star } from './wasm/size';
 import { WasmInterface } from './wasm/wasm-interface';
 
+let constellation_names: string[] = [];
 let wasm_interface: WasmInterface;
 
 const renderStars = (controls: Controls, date?: Date) => {
@@ -17,14 +18,14 @@ const renderStars = (controls: Controls, date?: Date) => {
         console.log('Updating canvas settings');
         wasm_interface.updateSettings(controls.renderer.getCanvasSettings());
     }
+    wasm_interface.resetImageData();
 
     wasm_interface.projectStars(controls.latitude, controls.longitude, BigInt(timestamp));
     if (controls.show_constellations) {
-        wasm_interface.projectConstellations(controls.latitude, controls.longitude, BigInt(timestamp));
+        wasm_interface.projectConstellationGrids(controls.latitude, controls.longitude, BigInt(timestamp));
     }
     const data = wasm_interface.getImageData();
     controls.renderer.drawData(data);
-    wasm_interface.resetImageData();
 };
 
 const drawUIElements = (controls: Controls) => {
@@ -54,13 +55,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 const message = wasm_interface.getString(msg_ptr, msg_len);
                 console.log(`[WASM] ${message}`);
             },
+            consoleWarn: (msg_ptr: number, msg_len: number) => {
+                const message = wasm_interface.getString(msg_ptr, msg_len);
+                console.warn(`[WASM] ${message}`);
+            },
+            consoleError: (msg_ptr: number, msg_len: number) => {
+                const message = wasm_interface.getString(msg_ptr, msg_len);
+                console.error(`[WASM] ${message}`);
+            },
         },
     }).then(wasm_result =>
         fetch('/stars')
             .then(star_result => star_result.json())
             .then((stars: Star[]) =>
-                fetch('/constellations')
-                    .then(cosnt_result => cosnt_result.json())
+                fetch('/constellation/bounds')
+                    .then(const_result => const_result.json())
                     .then((constellations: Constellation[]) => {
                         wasm_interface = new WasmInterface(wasm_result.instance);
                         wasm_interface.initialize(stars, constellations, controls.renderer.getCanvasSettings());
@@ -73,6 +82,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('In WebAssembly Promise: ', error);
             })
     );
+
+    fetch('/constellation/info')
+        .then(result => result.json())
+        .then((names: string[]) => {
+            constellation_names = names;
+        });
 
     controls.onDateChange(date => {
         renderStars(controls);
@@ -190,5 +205,22 @@ document.addEventListener('DOMContentLoaded', () => {
     controls.onMapZoom(zoom_factor => {
         controls.renderer.zoom_factor = zoom_factor;
         renderStars(controls);
+    });
+
+    controls.onMapHover(point => {
+        if (controls.show_constellations) {
+            const index = wasm_interface.getConstellationAtPoint(
+                point,
+                controls.latitude,
+                controls.longitude,
+                BigInt(controls.date.valueOf())
+            );
+            const data = wasm_interface.getImageData();
+            controls.renderer.drawData(data);
+            if (index > 0) {
+                console.log(`Mouse inside constellation ${constellation_names[index]}`);
+                controls.constellation_name = constellation_names[index];
+            }
+        }
     });
 });

@@ -1,7 +1,7 @@
-interface CanvasOptions {
-    width?: number;
-    height?: number;
-}
+// interface CanvasOptions {
+//     width?: number;
+//     height?: number;
+// }
 
 export type CanvasSettings = {
     width: number;
@@ -23,22 +23,22 @@ export class Renderer {
      * The offscreen canvas gets drawn to continuously by each worker. Once all the workers are done, then the
      * content of this canvas is copied onto the main canvas so that the user can see it.
      */
-    private offscreen_canvas: HTMLCanvasElement;
-    private offscreen_ctx: CanvasRenderingContext2D;
+    // private offscreen_canvas: HTMLCanvasElement;
+    // private offscreen_ctx: CanvasRenderingContext2D;
 
-    private readonly default_width = 700;
-    private readonly default_height = 700;
+    // private readonly default_width = 750;
+    // private readonly default_height = 750;
 
     private settings: CanvasSettings;
 
     private _settings_did_change = true;
 
-    constructor(canvas_id: string, options?: CanvasOptions) {
+    constructor(canvas_id: string) {
         this.main_canvas = document.getElementById(canvas_id) as HTMLCanvasElement;
         this.main_ctx = this.main_canvas.getContext('2d')!;
 
-        this.main_canvas.width = options?.width ?? this.default_width;
-        this.main_canvas.height = options?.height ?? this.default_height;
+        // this.main_canvas.width = options?.width ?? this.default_width;
+        // this.main_canvas.height = options?.height ?? this.default_height;
 
         this.settings = {
             width: this.main_canvas.width,
@@ -48,11 +48,20 @@ export class Renderer {
             draw_north_up: true,
         };
 
-        this.offscreen_canvas = document.createElement('canvas');
-        this.offscreen_ctx = this.offscreen_canvas.getContext('2d')!;
+        console.log('Canvas width: ', this.settings.width);
+        console.log('Canvas height: ', this.settings.height);
 
-        this.offscreen_canvas.width = this.width;
-        this.offscreen_canvas.height = this.height;
+        this.main_canvas.addEventListener('resize', event => {
+            this.width = this.main_canvas.width;
+            this.height = this.main_canvas.height;
+            console.log('resize');
+        });
+
+        // this.offscreen_canvas = document.createElement('canvas');
+        // this.offscreen_ctx = this.offscreen_canvas.getContext('2d')!;
+
+        // this.offscreen_canvas.width = this.width;
+        // this.offscreen_canvas.height = this.height;
     }
 
     drawData(data: Uint8ClampedArray): void {
@@ -89,11 +98,21 @@ export class Renderer {
         return this.settings.width;
     }
 
+    set width(value: number) {
+        this._settings_did_change = true;
+        this.settings.width = value;
+    }
+
     /**
      * The height of the canvas.
      */
     get height(): number {
         return this.settings.height;
+    }
+
+    set height(value: number) {
+        this._settings_did_change = true;
+        this.settings.height = value;
     }
 
     get background_radius() {
@@ -136,6 +155,6 @@ export class Renderer {
     }
 
     get context() {
-        return this.offscreen_ctx;
+        return this.main_ctx;
     }
 }

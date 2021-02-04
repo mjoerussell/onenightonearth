@@ -17,12 +17,11 @@ pub fn build(b: *Builder) !void {
     var star_math_tests = b.addTest("src/star_math.zig");
     star_math_tests.setBuildMode(mode);
 
-    var util_tests = b.addTest("src/util.zig");
-    util_tests.setBuildMode(mode);
-    // star_math_tests.setTarget(target);
+    var math_tests = b.addTest("src/math_utils.zig");
+    math_tests.setBuildMode(mode);
 
     const test_step = b.step("test", "Run library tests");
     // test_step.dependOn(&main_tests.step);
     test_step.dependOn(&star_math_tests.step);
-    test_step.dependOn(&util_tests.step);
+    test_step.dependOn(&math_tests.step);
 }

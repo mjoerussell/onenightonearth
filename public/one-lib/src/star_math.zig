@@ -1,13 +1,15 @@
 // @todo Improve testing - find online calculators for star functions and compare against them (fingers crossed)
 const std = @import("std");
-const math_utils = @import("./math_utils.zig");
-const render = @import("./render.zig");
 const Allocator = std.mem.Allocator;
 const math = std.math;
 const assert = std.debug.assert;
+const log = @import("./log.zig").log;
+const render = @import("./render.zig");
 const Pixel = render.Pixel;
-const Point = render.Point;
 const Canvas = render.Canvas;
+const math_utils = @import("./math_utils.zig");
+const Point = math_utils.Point;
+const Line = math_utils.Line;
 
 pub const Coord = packed struct {
     latitude: f32,
@@ -26,7 +28,7 @@ pub const Star = packed struct {
     spec_type: SpectralType,
 };
 
-pub const Constellation = struct {
+pub const ConstellationGrid = struct {
     boundaries: []SkyCoord,
 };
 
@@ -83,15 +85,16 @@ pub fn projectStar(canvas: *Canvas, star: Star, observer_location: Coord, observ
     }
 }
 
-pub fn projectConstellation(canvas: *Canvas, constellation: Constellation, observer_location: Coord, observer_timestamp: i64) void {
+pub fn projectConstellationGrid(canvas: *Canvas, constellation: ConstellationGrid, observer_location: Coord, observer_timestamp: i64) void {
     var branch_index: usize = 0;
+    const line_color = Pixel.rgba(255, 245, 194, 105);
     while (branch_index < constellation.boundaries.len - 1) : (branch_index += 1) {
         const point_a = projectToCanvas(canvas, constellation.boundaries[branch_index], observer_location, observer_timestamp, false);
         const point_b = projectToCanvas(canvas, constellation.boundaries[branch_index + 1], observer_location, observer_timestamp, false);
         
         if (point_a == null or point_b == null) continue;
 
-        canvas.drawLine(point_a.?, point_b.?);
+        canvas.drawLine(Line{ .a = point_a.?, .b = point_b.?}, line_color);
     }
 
     // Connect final point to first point
@@ -100,7 +103,7 @@ pub fn projectConstellation(canvas: *Canvas, constellation: Constellation, obser
 
     if (point_a == null or point_b == null) return;
 
-    canvas.drawLine(point_a.?, point_b.?);
+    canvas.drawLine(.{ .a = point_a.?, .b = point_b.?}, line_color);
 }
 
 pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?Point {
@@ -142,6 +145,68 @@ pub fn getProjectedCoord(altitude: f32, azimuth: f32) Point {
         .x = s * math.sin(azimuth), 
         .y = s * math.cos(azimuth) 
     };
+}
+
+pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []ConstellationGrid, observer_location: Coord, observer_timestamp: i64) ?usize {
+    if (!canvas.isInsideCircle(point)) return null;
+
+    const point_ray_right = Line{ 
+        .a = point, 
+        .b = Point{ .x = @intToFloat(f32, canvas.settings.width), .y = point.y } 
+    };
+    const point_ray_left = Line{ 
+        .a = point, 
+        .b = Point{ .x = -@intToFloat(f32, canvas.settings.width), .y = point.y } 
+    };
+
+    for (constellations) |c, constellation_index| {
+        var b_index: usize = 0;
+        var num_intersections_right: u32 = 0;
+        var num_intersections_left: u32 = 0;
+        while (b_index < c.boundaries.len - 1) : (b_index += 1) {
+            const b_a = projectToCanvas(canvas, c.boundaries[b_index], observer_location, observer_timestamp, false);
+            const b_b = projectToCanvas(canvas, c.boundaries[b_index + 1], observer_location, observer_timestamp, false);
+
+            if (b_a == null or b_b == null) continue;
+
+            const bound = Line{ .a = b_a.?, .b = b_b.? };
+            if (point_ray_right.segmentIntersection(bound)) |inter_point| {
+                if (canvas.isInsideCircle(inter_point)) {
+                    num_intersections_right += 1;
+                }
+            }
+
+            if (point_ray_left.segmentIntersection(bound)) |inter_point| {
+                if (canvas.isInsideCircle(inter_point)) {
+                    num_intersections_left += 1;
+                }
+            }
+
+        }
+
+        const b_a = projectToCanvas(canvas, c.boundaries[c.boundaries.len - 1], observer_location, observer_timestamp, false);
+        const b_b = projectToCanvas(canvas, c.boundaries[0], observer_location, observer_timestamp, false);
+
+        if (b_a == null or b_b == null) continue;
+
+        const bound = Line{ .a = b_a.?, .b = b_b.? };
+        if (point_ray_right.segmentIntersection(bound)) |inter_point| {
+            if (canvas.isInsideCircle(inter_point)) {
+                num_intersections_right += 1;
+            }
+        }
+         if (point_ray_left.segmentIntersection(bound)) |inter_point| {
+                if (canvas.isInsideCircle(inter_point)) {
+                    num_intersections_left += 1;
+                }
+            }
+        if (
+            (num_intersections_left % 2 == 1 and num_intersections_right % 2 == 1)
+        ) {
+            return constellation_index;
+        }
+    }
+    return null;
 }
 
 /// Find waypoints along the great circle between two coordinates. Each waypoint will be

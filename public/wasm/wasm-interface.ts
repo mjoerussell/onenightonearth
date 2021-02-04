@@ -16,6 +16,8 @@ import {
     sizedWasmStar,
     Constellation,
     sizedSkyCoord,
+    CanvasPoint,
+    sizedCanvasPoint,
 } from './size';
 import { CanvasSettings } from '../render';
 
@@ -35,10 +37,6 @@ export class WasmInterface {
         for (const c of constellations) {
             const coords_ptr = this.allocArray(c.boundaries, sizedSkyCoord);
             boundaries.push(coords_ptr);
-        }
-        let test = this.readArray(boundaries[0], constellations[0].boundaries.length, sizedSkyCoord);
-        for (const coord of test) {
-            console.log(coord);
         }
         const constellation_lengths = constellations.map(c => c.boundaries.length);
         const constellation_ptr = this.allocPrimativeArray(boundaries, WasmPrimative.u32);
@@ -60,8 +58,14 @@ export class WasmInterface {
         (this.instance.exports.projectStarsWasm as any)(latitude, longitude, timestamp);
     }
 
-    projectConstellations(latitude: number, longitude: number, timestamp: BigInt): void {
-        (this.instance.exports.projectConstellations as any)(latitude, longitude, timestamp);
+    projectConstellationGrids(latitude: number, longitude: number, timestamp: BigInt): void {
+        (this.instance.exports.projectConstellationGrids as any)(latitude, longitude, timestamp);
+    }
+
+    getConstellationAtPoint(point: CanvasPoint, latitude: number, longitude: number, timestamp: BigInt): number {
+        const point_ptr = this.allocObject(point, sizedCanvasPoint);
+        const constellation_index = (this.instance.exports.getConstellationAtPoint as any)(point_ptr, latitude, longitude, timestamp);
+        return constellation_index;
     }
 
     resetImageData(): void {
