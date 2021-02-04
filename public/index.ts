@@ -224,5 +224,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 controls.constellation_name = constellation_names[index];
             }
         }
+        const sky_coord = wasm_interface.getSkyCoordForCanvasPoint(
+            point,
+            controls.latitude,
+            controls.longitude,
+            BigInt(controls.date.valueOf())
+        );
+        controls.cursor_sky_location = sky_coord;
+    });
+
+    controls.onGoToAndromeda(sky_coord => {
+        const new_coord = wasm_interface.getCoordForSkyCoord(sky_coord, BigInt(controls.date.valueOf()));
+        updateLocation(new_coord);
     });
 });

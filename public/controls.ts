@@ -1,5 +1,5 @@
 import { Renderer } from './renderer';
-import { CanvasPoint, Coord } from './wasm/size';
+import { CanvasPoint, Coord, SkyCoord } from './wasm/size';
 
 interface DragState {
     is_dragging: boolean;
@@ -19,6 +19,9 @@ export class Controls {
 
     private show_constellations_input: HTMLInputElement | null;
     private constellation_name_display: HTMLSpanElement | null;
+    private sky_location_display: HTMLSpanElement | null;
+
+    private andromeda_button: HTMLButtonElement | null;
 
     public renderer: Renderer;
 
@@ -50,6 +53,8 @@ export class Controls {
 
         this.show_constellations_input = document.getElementById('showConstellations') as HTMLInputElement;
         this.constellation_name_display = document.getElementById('constellationName') as HTMLSpanElement;
+        this.sky_location_display = document.getElementById('skyLocation') as HTMLSpanElement;
+        this.andromeda_button = document.getElementById('debugGoAnd') as HTMLButtonElement;
 
         this.renderer = new Renderer('star-canvas');
 
@@ -227,6 +232,15 @@ export class Controls {
         this.show_constellations_input?.addEventListener('change', handler);
     }
 
+    onGoToAndromeda(handler: (_: SkyCoord) => void): void {
+        this.andromeda_button?.addEventListener('click', () => {
+            handler({
+                right_ascension: 15,
+                declination: 40,
+            });
+        });
+    }
+
     get date(): Date {
         const current_date = this.date_input?.valueAsDate;
         return current_date ?? new Date();
@@ -279,6 +293,35 @@ export class Controls {
     set constellation_name(value: string) {
         if (this.constellation_name_display) {
             this.constellation_name_display.innerText = value;
+        }
+    }
+
+    get cursor_sky_location(): SkyCoord | null {
+        if (this.sky_location_display) {
+            const value = this.sky_location_display.innerText;
+            const [ra_text, dec_text] = value.split(',');
+            try {
+                const ra = parseFloat(ra_text);
+                const dec = parseFloat(dec_text);
+                return {
+                    right_ascension: ra,
+                    declination: dec,
+                };
+            } catch (err) {
+                return null;
+            }
+        } else {
+            return null;
+        }
+    }
+
+    set cursor_sky_location(value: SkyCoord | null) {
+        if (this.sky_location_display) {
+            if (value == null) {
+                this.sky_location_display.innerText = '';
+            } else {
+                this.sky_location_display.innerText = `${value.right_ascension.toPrecision(6)}, ${value.declination.toPrecision(5)}`;
+            }
         }
     }
 

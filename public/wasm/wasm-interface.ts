@@ -18,6 +18,7 @@ import {
     sizedSkyCoord,
     CanvasPoint,
     sizedCanvasPoint,
+    SkyCoord,
 } from './size';
 import { CanvasSettings } from '../renderer';
 
@@ -55,7 +56,7 @@ export class WasmInterface {
     }
 
     projectStars(latitude: number, longitude: number, timestamp: BigInt): void {
-        (this.instance.exports.projectStarsWasm as any)(latitude, longitude, timestamp);
+        (this.instance.exports.projectStars as any)(latitude, longitude, timestamp);
     }
 
     projectConstellationGrids(latitude: number, longitude: number, timestamp: BigInt): void {
@@ -84,7 +85,7 @@ export class WasmInterface {
         const num_waypoints_ptr = this.allocBytes(4);
         const start_ptr = this.allocObject(start, sizedCoord);
         const end_ptr = this.allocObject(end, sizedCoord);
-        const result_ptr = (this.instance.exports.findWaypointsWasm as any)(start_ptr, end_ptr, num_waypoints_ptr);
+        const result_ptr = (this.instance.exports.findWaypoints as any)(start_ptr, end_ptr, num_waypoints_ptr);
         const num_waypoints = this.readPrimative(num_waypoints_ptr, WasmPrimative.u32);
         const waypoints = this.readArray(result_ptr, num_waypoints, sizedCoord);
         this.freeBytes(num_waypoints_ptr, 4);
@@ -93,7 +94,7 @@ export class WasmInterface {
     }
 
     dragAndMove(drag_start: Coord, drag_end: Coord): Coord {
-        const result_ptr = (this.instance.exports.dragAndMoveWasm as any)(
+        const result_ptr = (this.instance.exports.dragAndMove as any)(
             drag_start.latitude,
             drag_start.longitude,
             drag_end.latitude,
@@ -102,6 +103,36 @@ export class WasmInterface {
         const result: Coord = this.readObject(result_ptr, sizedCoord);
         this.freeBytes(result_ptr, sizeOf(sizedCoord));
         return result;
+    }
+
+    getCoordForSkyCoord(sky_coord: SkyCoord, timestamp: BigInt): Coord {
+        const sky_coord_ptr = this.allocObject(sky_coord, sizedSkyCoord);
+        const coord_ptr = (this.instance.exports.getCoordForSkyCoord as any)(sky_coord_ptr, timestamp);
+        const coord = this.readObject(coord_ptr, sizedCoord);
+        this.freeBytes(coord_ptr, sizeOf(sizedCoord));
+        return coord;
+    }
+
+    getSkyCoordForCanvasPoint(
+        point: CanvasPoint,
+        observer_latitude: number,
+        observer_longitude: number,
+        observer_timestamp: BigInt
+    ): SkyCoord | null {
+        const point_ptr = this.allocObject(point, sizedCanvasPoint);
+        const sky_coord_ptr = (this.instance.exports.getSkyCoordForCanvasPoint as any)(
+            point_ptr,
+            observer_latitude,
+            observer_longitude,
+            observer_timestamp
+        );
+        if (sky_coord_ptr === 0) {
+            return null;
+        } else {
+            const sky_coord = this.readObject(sky_coord_ptr, sizedSkyCoord);
+            this.freeBytes(sky_coord_ptr, sizeOf(sizedSkyCoord));
+            return sky_coord;
+        }
     }
 
     updateSettings(settings: CanvasSettings): void {

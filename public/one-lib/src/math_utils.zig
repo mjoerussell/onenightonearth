@@ -86,6 +86,8 @@ pub fn radToDegLong(radian: anytype) @TypeOf(radian) {
     const deg = radToDeg(radian);
     if (deg > 180.0) {
         return deg - 360.0;
+    } else if (deg < -180.0) {
+        return deg + 360.0;
     } else {
         return deg;
     }

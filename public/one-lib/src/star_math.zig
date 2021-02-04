@@ -108,15 +108,15 @@ pub fn projectConstellationGrid(canvas: *Canvas, constellation: ConstellationGri
 pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?Point {
     const two_pi = comptime math.pi * 2.0;
     const half_pi = comptime math.pi / 2.0;
-    const local_sideral_time = getLocalSideralTime(@intToFloat(f64, observer_timestamp), observer_location.longitude);
-    const lat_rad = math_utils.degToRad(observer_location.latitude);
 
-    const hour_angle = local_sideral_time - @as(f64, sky_coord.right_ascension);
-
-    const declination_rad = @floatCast(f64, math_utils.degToRad(sky_coord.declination));
+    const local_sidereal_time = getLocalSiderealTime(@intToFloat(f64, observer_timestamp), observer_location.longitude);
+    const hour_angle = local_sidereal_time - @as(f64, sky_coord.right_ascension);
     const hour_angle_rad = math_utils.floatMod(math_utils.degToRad(hour_angle), two_pi);
 
+    const declination_rad = @floatCast(f64, math_utils.degToRad(sky_coord.declination));
     const sin_dec = math.sin(declination_rad);
+    
+    const lat_rad = math_utils.degToRad(observer_location.latitude);
     const sin_lat = math.sin(lat_rad);
     const cos_lat = math.cos(lat_rad);
 
@@ -141,6 +141,8 @@ pub fn getProjectedCoord(altitude: f32, azimuth: f32) Point {
 
     // Convert from polar to cartesian coordinates
     return .{ 
+        // TODO without negating x here, the whole chart is rendered backwards. Not sure if this is where the negations
+        // is SUPPOSED to go, or if I messed up a negation somewhere else and this is just a hack that makes it work
         .x = -(s * math.sin(azimuth)), 
         .y = s * math.cos(azimuth) 
     };
@@ -258,6 +260,7 @@ pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_e
     // Usually atan2 is used with the parameters in the reverse order (atan2(y, x)).
     // The order here (x, y) is intentional, since otherwise horizontal drags would result in vertical movement
     // and vice versa
+    // TODO Maybe hack to fix issue with backwards display? See getProjectedCoord
     const dist_phi = -math.atan2(f32, dist_x, dist_y);
 
     // drag_distance is the angular distance between the starting location and the result location after a single drag
@@ -292,10 +295,56 @@ pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_e
     };
 }
 
-fn getLocalSideralTime(current_timestamp: f64, longitude: f64) f64 {
+pub fn getCoordForSkyCoord(sky_coord: SkyCoord, observer_timestamp: i64) Coord {
+    const j2000_offset_millis: f64 = 949_428_000_000.0;
+    const days_since_j2000 = (@intToFloat(f64, observer_timestamp) - j2000_offset_millis) / 86400000.0;
+    var longitude = -sky_coord.right_ascension - (100.46 + (0.985647 * days_since_j2000) + (15 * @intToFloat(f64, observer_timestamp)));
+    longitude = math_utils.floatMod(longitude, 360);
+    if (longitude < -180) {
+        longitude += 360;
+    } else if (longitude > 180) {
+        longitude -= 360;
+    }
+
+    return Coord{
+        .latitude = sky_coord.declination,
+        .longitude = @floatCast(f32, longitude)
+    };
+}
+
+pub fn getSkyCoordForCanvasPoint(canvas: *Canvas, point: Point, observer_location: Coord, observer_timestamp: i64) ?SkyCoord {
+    const raw_point = canvas.untranslatePoint(point);
+    // Distance from raw_point to the center of the sky circle
+    const s = math.sqrt(math.pow(f32, raw_point.x, 2.0) + math.pow(f32, raw_point.y, 2.0));
+    const altitude = (math.pi * (1 - s)) / 2;
+
+    const observer_lat_rad = math_utils.degToRad(observer_location.latitude);
+    const sin_lat = math.sin(observer_lat_rad);
+    const cos_lat = math.cos(observer_lat_rad);
+
+    const declination = math_utils.boundedASin(((raw_point.y / s) * math.cos(altitude) * cos_lat) + (math.sin(altitude) * sin_lat)) catch |_| {
+        log(.Error, "Error computing declination", .{});
+        return null;
+    };
+
+    const hour_angle_rad = math_utils.boundedACos((math.sin(altitude) - (math.sin(declination) * sin_lat)) / (math.cos(declination) * cos_lat)) catch |_| {
+        log(.Error, "Error computing hour angle. Declination was {d:.3}", .{declination});
+        return null;
+    };
+    const hour_angle = math_utils.radToDeg(hour_angle_rad);
+    const lst = getLocalSiderealTime(@intToFloat(f64, observer_timestamp), @floatCast(f64, observer_location.longitude));
+    const right_ascension = math_utils.floatMod(lst - hour_angle, 360);
+
+    return SkyCoord{
+        .right_ascension = @floatCast(f32, right_ascension),
+        .declination = math_utils.radToDeg(declination)
+    };
+}
+
+fn getLocalSiderealTime(current_timestamp: f64, longitude: f64) f64 {
     // The number of milliseconds between January 1st, 1970 and the J2000 epoch
     const j2000_offset_millis: f64 = 949_428_000_000.0;
-    const days_since_j2000 = (current_timestamp - j2000_offset_millis) / 86400000.0;
+    const days_since_j2000 = (current_timestamp - j2000_offset_millis) / 86_400_000.0;
     return 100.46 + (0.985647 * days_since_j2000) + longitude + (15.0 * current_timestamp);
 }
 

@@ -78,6 +78,20 @@ pub const Canvas = struct {
         };
     }
 
+    pub fn untranslatePoint(self: *Canvas, pt: Point) Point {
+        const center = Point{
+            .x = @intToFloat(f32, self.settings.width) / 2.0,
+            .y = @intToFloat(f32, self.settings.height) / 2.0
+        };
+        const direction_modifier: f32 = if (self.settings.draw_north_up) 1.0 else -1.0;
+        const translate_factor: f32 = direction_modifier * self.settings.background_radius * self.settings.zoom_factor;
+
+        return Point{
+            .x = (pt.x - center.x) / translate_factor,
+            .y = (pt.y - center.y) / -translate_factor
+        };
+    }
+
     pub fn isInsideCircle(self: *Canvas, point: Point) bool {
         const center = Point{
             .x = @intToFloat(f32, self.settings.width) / 2.0,
@@ -160,3 +174,28 @@ pub const Canvas = struct {
     }
 
 };
+
+test "translate point" {
+    const canvas_settings = Canvas.Settings{
+        .width = 700,
+        .height = 700,
+        .draw_north_up = true,
+        .background_radius = 0.45 * 700.0,
+        .zoom_factor = 1.0
+    };
+
+    var canvas = try Canvas.init(std.testing.allocator, canvas_settings);
+    defer std.testing.allocator.free(canvas.data);
+    
+    const point = Point{
+        .x = 0.5,
+        .y = -0.3
+    };
+
+    const translated_point = canvas.translatePoint(point);
+    const untranslated_point = canvas.untranslatePoint(translated_point);
+
+    std.testing.expectWithinMargin(untranslated_point.x, point.x, 0.005);
+    std.testing.expectWithinMargin(untranslated_point.y, point.y, 0.005);
+
+}

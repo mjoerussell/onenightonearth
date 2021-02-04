@@ -59,7 +59,7 @@ pub export fn resetImageData() void {
     }   
 }
 
-pub export fn projectStarsWasm(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
+pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
     const current_coord = Coord{
         .latitude = observer_latitude,
         .longitude = observer_longitude
@@ -87,7 +87,6 @@ pub export fn getConstellationAtPoint(point: *Point, observer_latitude: f32, obs
         .longitude = observer_longitude
     };
     defer allocator.destroy(point);
-    // const index = star_math.getConstellationAtPoint(allocator, &canvas, point.*, constellation_grids, observer_coord, observer_timestamp);
     const index = star_math.getConstellationAtPoint(&canvas, point.*, constellation_grids, observer_coord, observer_timestamp);
     if (index) |i| {
         star_math.projectConstellationGrid(&canvas, constellation_grids[i], Pixel.rgb(255, 255, 255), 2, observer_coord, observer_timestamp);
@@ -95,20 +94,44 @@ pub export fn getConstellationAtPoint(point: *Point, observer_latitude: f32, obs
     } else return -1;
 }
 
-pub export fn dragAndMoveWasm(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_end_y: f32) *Coord {
+pub export fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_end_y: f32) *Coord {
     const coord = star_math.dragAndMove(drag_start_x, drag_start_y, drag_end_x, drag_end_y);
     const coord_ptr = allocator.create(Coord) catch unreachable;
     coord_ptr.* = coord;
     return coord_ptr;
 }
 
-pub export fn findWaypointsWasm(f: *const Coord, t: *const Coord, num_waypoints: *u32) [*]Coord {
+pub export fn findWaypoints(f: *const Coord, t: *const Coord, num_waypoints: *u32) [*]Coord {
     defer allocator.destroy(f);
     defer allocator.destroy(t);
 
     const waypoints = star_math.findWaypoints(allocator, f.*, t.*);
     num_waypoints.* = @intCast(u32, waypoints.len);
     return waypoints.ptr;
+}
+
+pub export fn getCoordForSkyCoord(sky_coord: *SkyCoord, observer_timestamp: i64) *Coord {
+    defer allocator.destroy(sky_coord);
+    const coord = star_math.getCoordForSkyCoord(sky_coord.*, observer_timestamp);
+    const coord_ptr = allocator.create(Coord) catch unreachable;
+    coord_ptr.* = coord;
+    return coord_ptr;
+}
+
+pub export fn getSkyCoordForCanvasPoint(point: *Point, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) ?*SkyCoord {
+    defer allocator.destroy(point);
+    const observer_location = Coord{
+        .latitude = observer_latitude,
+        .longitude = observer_longitude
+    };
+    const sky_coord = star_math.getSkyCoordForCanvasPoint(&canvas, point.*, observer_location, observer_timestamp);
+    if (sky_coord) |sk| {
+        const sky_coord_ptr = allocator.create(SkyCoord) catch unreachable;
+        sky_coord_ptr.* = sk;
+        return sky_coord_ptr;
+    } else {
+        return null;
+    }
 }
 
 pub export fn _wasm_alloc(byte_len: u32) ?[*]u8 {
