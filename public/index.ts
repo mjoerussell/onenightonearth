@@ -219,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
             controls.renderer.drawData(data);
             renderStars(controls);
             // wasm_interface.resetImageData();
-            if (index > 0) {
+            if (index >= 0) {
                 console.log(`Mouse inside constellation ${index}: ${constellation_names[index]}`);
                 controls.constellation_name = constellation_names[index];
             }
