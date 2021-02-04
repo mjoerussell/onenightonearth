@@ -1,5 +1,4 @@
 body {
-    /* background: linear-gradient(#01020f, #102d6b); */
     background: linear-gradient(#01020f, #031131);
     font-family: 'Poppins', serif;
     margin: 0;
@@ -9,20 +8,26 @@ body {
 h1 {
     margin: 0 auto;
     font-weight: 600;
-    font-size: 36px;
+    font-size: 2.8em;
 }
 
 .page-container {
-    width: 700px;
+    width: 65vw;
     height: 100%;
     padding: 0 5%;
     margin-left: 50%;
     transform: translateX(-50%);
-    background-color: #f5f5dc;
+    background-color: #f5f5ec;
+}
+
+.info-box {
+    font-size: 0.85em;
 }
 
 #settings {
     padding: 2% 0;
+    display: flex;
+    flex-direction: row;
 }
 
 #settings > div {
@@ -30,69 +35,121 @@ h1 {
 }
 
 #settings label {
-    min-width: 200px;
-}
-
-#main-settings {
-    display: flex;
-    flex-direction: row;
-}
-
-.input-fields {
-    width: 70%;
-    padding: 10px;
-    padding-left: 0;
-}
-
-.input-fields .input-row {
+    display: block;
     width: 100%;
+    font-weight: 550;
     margin: 5px 0;
 }
 
-.input-fields input {
-    padding: 3px;
-    margin: 0 5px;
-    color: #01020f;
-    background-color: #ffffff00;
-    border: 1px solid #01020f;
-    border-radius: 2px;
+#main-settings {
+    width: 25%;
 }
 
-#actions {
-    width: 20%;
-    padding: 5px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: space-evenly;
-}
-
-#actions button {
+.input-row {
     width: 100%;
-    padding: 2px 0;
-    border: 1px solid #01020f;
-    border-radius: 2px;
-    color: #01020f;
-    background-color: #ffffff00;
+    margin: 10% 5px;
 }
 
-#actions button:hover {
+.input-row > input {
+    padding: 3px;
+    /* margin: 0 5px; */
+    color: #01020f;
+    background-color: #ffffff00;
+    border: 1px solid #01020f;
+    border-radius: 2px;
+}
+
+.input-row > button {
+    width: 100%;
+    padding: 0.3em 0;
+    margin: 5px 0;
+    font-weight: 550;
+    font-family: 'Poppins', serif;
+    letter-spacing: 0.05em;
+    border: 1px solid #081f41;
+    border-radius: 3px;
+    color: #ffffff;
+    background-color: #081f41;
+}
+
+.input-row > button:hover {
     color: #fff;
-    background-color: #01020f;
+    background-color: #030b1c;
+    cursor: pointer;
+}
+
+.inline-input {
+    background-color: #fff;
+    border: 1px solid #bdbdbd;
+    border-radius: 3px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 0.2em 0.3em;
+}
+
+.inline-input:focus-within {
+    border-color: #065596;
+}
+
+.inline-input * {
+    font-size: 1.1em;
+    color: #4d4d4d;
+}
+
+.inline-input input {
+    border: none;
+}
+
+input[type='date'] {
+    appearance: none;
+    -webkit-appearance: none;
+    font-family: 'Poppins', serif;
+    font-size: 1.1em;
+    color: #4d4d4d;
+    background-color: #fff;
+    border: 1px solid #bdbdbd;
+    border-radius: 3px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.2em 0.3em;
+}
+
+input[type='date']::-webkit-clear-button {
+    display: none;
+}
+
+.inline-input input:focus-visible {
+    outline: none;
+    border: none;
+}
+
+.inline-input button {
+    background-color: #ffffff00;
+    border: none;
+}
+
+.inline-input button:hover {
+    font-style: italic;
+    color: #222222;
     cursor: pointer;
 }
 
 .canvas-container {
     display: inline-block;
     position: relative;
-    width: 700px;
-    min-height: 700px;
+    margin-left: 10%;
+    width: 850px;
+    min-height: 850px;
 }
 
 .canvas-container canvas {
     cursor: grab;
     display: inline;
     position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
 }
 
 .canvas-container #loading-icon-container {

@@ -1,168 +1,139 @@
 // @todo Improve testing - find online calculators for star functions and compare against them (fingers crossed)
 const std = @import("std");
-const math_utils = @import("./math_utils.zig");
 const Allocator = std.mem.Allocator;
 const math = std.math;
 const assert = std.debug.assert;
-const expectEqual = std.testing.expectEqual;
-const expectWithinEpsilon = std.testing.expectWithinEpsilon;
-const expectWithinMargin = std.testing.expectWithinMargin;
-
-pub const Pixel = packed struct {
-    r: u8 = 0,
-    g: u8 = 0,
-    b: u8 = 0,
-    a: u8 = 0,
-};
-
-pub const CanvasSettings = packed struct {
-    width: u32,
-    height: u32,
-    background_radius: f32,
-    zoom_factor: f32,
-    draw_north_up: bool,
-
-    fn translatePoint(self: CanvasSettings, pt: CanvasPoint) CanvasPoint {
-        const center_x: f32 = @intToFloat(f32, self.width) / 2.0;
-        const center_y: f32 = @intToFloat(f32, self.height) / 2.0;
-
-        // A multiplier used to convert a coordinate between [-1, 1] to a coordinate on the actual canvas, taking into
-        // account the rendering modifiers that can change based on the user zooming in/out or the travelling moving across poles
-        const direction_modifier: f32 = if (self.draw_north_up) 1.0 else -1.0;
-        const translate_factor: f32 = direction_modifier * self.background_radius * self.zoom_factor;
-
-        return .{
-            .x = center_x + (translate_factor * pt.x),
-            .y = center_y - (translate_factor * pt.y),
-        };
-    }
-};
-
-pub const CanvasPoint = struct {
-    x: f32,
-    y: f32,
-};
+const log = @import("./log.zig").log;
+const render = @import("./render.zig");
+const Pixel = render.Pixel;
+const Canvas = render.Canvas;
+const math_utils = @import("./math_utils.zig");
+const Point = math_utils.Point;
+const Line = math_utils.Line;
 
 pub const Coord = packed struct {
     latitude: f32,
     longitude: f32,
 };
 
+pub const SkyCoord = packed struct {
+    right_ascension: f32,
+    declination: f32
+};
+
 pub const Star = packed struct {
     right_ascension: f32,
     declination: f32,
     brightness: f32,
+    spec_type: SpectralType,
 };
 
-pub var global_stars: []Star = undefined;
-var project_start_index: usize = 0;
-
-pub var global_canvas: CanvasSettings = .{
-    .width = 700,
-    .height = 700,
-    .background_radius = 0.45 * 700.0,
-    .zoom_factor = 1.0,
-    .draw_north_up = true
+pub const ConstellationGrid = struct {
+    boundaries: []SkyCoord,
 };
 
-pub var global_pixel_data: []Pixel = undefined;
+pub const SpectralType = packed enum(u8) {
+    /// > 30,000 K
+    O,
+    /// 10,000 K <> 30,000 K
+    B,
+    /// 7,500 K <> 10,000 K
+    A,
+    /// 6,000 K <> 7,500 K
+    F,
+    /// 5,200 K <> 6,000 K
+    G,
+    /// 3,700 K <> 5,200 K
+    K,
+    /// 2,400 K <> 3,700 K
+    M,
 
-pub fn initStarData(allocator: *Allocator, star_data: []Star) !usize {
-    global_stars = star_data;
+    pub fn getColor(spec: SpectralType) Pixel {
+        return switch (spec) {
+            // Blue
+            .O => Pixel.rgb(2, 89, 156),
+            // Blue-white
+            .B => Pixel.rgb(131, 195, 222),
+            // White
+            .A => Pixel.rgb(255, 255, 255),
+            // Yellow-white
+            .F => Pixel.rgb(249, 250, 192),
+            // Yellow
+            .G => Pixel.rgb(253, 255, 133),
+            // Orange
+            .K => Pixel.rgb(255, 142, 61),
+            // Red
+            .M => Pixel.rgb(207, 32, 23)
+        };
+    }
+};
 
-    return global_stars.len;
-}
-
-pub fn initCanvasData(allocator: *Allocator, canvas_settings: CanvasSettings) !void {
-    global_canvas = canvas_settings;
-    global_pixel_data = try allocator.alloc(Pixel, global_canvas.width * global_canvas.height);
-    for (global_pixel_data) |*p| {
-        p.* = Pixel{};
+pub fn projectStar(canvas: *Canvas, star: Star, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) void {
+    const point = projectToCanvas(
+        canvas, 
+        SkyCoord{ .right_ascension = star.right_ascension, .declination = star.declination }, 
+        observer_location, 
+        observer_timestamp, 
+        true
+    );
+    if (point) |p| {
+        if (canvas.isInsideCircle(p)) {
+            var base_color = star.spec_type.getColor();
+            base_color.a = @floatToInt(u8, star.brightness * 255.0); 
+            canvas.setPixelAt(p, base_color);
+        }
     }
 }
 
-pub fn projectStar(observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) void {
+pub fn projectConstellationGrid(canvas: *Canvas, constellation: ConstellationGrid, color: Pixel, line_width: u32, observer_location: Coord, observer_timestamp: i64) void {
+    var branch_index: usize = 0;
+    while (branch_index < constellation.boundaries.len - 1) : (branch_index += 1) {
+        const point_a = projectToCanvas(canvas, constellation.boundaries[branch_index], observer_location, observer_timestamp, false);
+        const point_b = projectToCanvas(canvas, constellation.boundaries[branch_index + 1], observer_location, observer_timestamp, false);
+        
+        if (point_a == null or point_b == null) continue;
+
+        canvas.drawLine(Line{ .a = point_a.?, .b = point_b.?}, color, line_width);
+    }
+
+    // Connect final point to first point
+    const point_a = projectToCanvas(canvas, constellation.boundaries[constellation.boundaries.len - 1], observer_location, observer_timestamp, false);
+    const point_b = projectToCanvas(canvas, constellation.boundaries[0], observer_location, observer_timestamp, false);
+
+    if (point_a == null or point_b == null) return;
+
+    canvas.drawLine(.{ .a = point_a.?, .b = point_b.?}, color, line_width);
+}
+
+pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?Point {
     const two_pi = comptime math.pi * 2.0;
     const half_pi = comptime math.pi / 2.0;
     const local_sideral_time = getLocalSideralTime(@intToFloat(f64, observer_timestamp), observer_location.longitude);
     const lat_rad = math_utils.degToRad(observer_location.latitude);
 
-    for (global_stars) |star| {
-        const hour_angle = local_sideral_time - @as(f64, star.right_ascension);
+    const hour_angle = local_sideral_time - @as(f64, sky_coord.right_ascension);
 
-        const declination_rad = @floatCast(f64, math_utils.degToRad(star.declination));
-        const hour_angle_rad = math_utils.floatMod(math_utils.degToRad(hour_angle), two_pi);
+    const declination_rad = @floatCast(f64, math_utils.degToRad(sky_coord.declination));
+    const hour_angle_rad = math_utils.floatMod(math_utils.degToRad(hour_angle), two_pi);
 
-        const sin_dec = math.sin(declination_rad);
-        const sin_lat = math.sin(lat_rad);
-        const cos_lat = math.cos(lat_rad);
+    const sin_dec = math.sin(declination_rad);
+    const sin_lat = math.sin(lat_rad);
+    const cos_lat = math.cos(lat_rad);
 
-        const sin_alt = sin_dec * sin_lat + math.cos(declination_rad) * cos_lat * math.cos(hour_angle_rad);
-        const altitude = math_utils.boundedASin(sin_alt) catch |err| continue;
-        if ((filter_below_horizon and altitude < 0) or (!filter_below_horizon and altitude < -(half_pi / 3.0))) {
-            continue;
-        }
-
-        const cos_azi = (sin_dec - math.sin(altitude) * sin_lat) / (math.cos(altitude) * cos_lat);
-        const azi = math.acos(cos_azi);
-        const azimuth = if (math.sin(hour_angle_rad) < 0) azi else two_pi - azi;
-
-        const pixel_index = getPixelIndex(@floatCast(f32, altitude), @floatCast(f32, azimuth));
-        if (pixel_index) |p_index| {
-            const pixel = Pixel{
-                .r = 255, 
-                .g = 246, 
-                .b = 176, 
-                .a = @floatToInt(u8, (star.brightness / 1.5) * 255.0)
-            };
-            global_pixel_data[p_index] = pixel;
-        }
-
-    }
-}
-
-pub fn drawGrid() void {
-    var altitude: f32 = 0;
-
-    const grid_spacing: comptime_float = 90 / 5;
-    while (altitude <= 90) : (altitude += grid_spacing) {
-        var dot_index: f32 = 0;
-        while (dot_index < 10000) : (dot_index += 1) {
-            const alt_rad = math_utils.degToRad(altitude);
-            const azi_rad = math_utils.degToRad((dot_index / 10000) * 360);
-            const pixel_index = getPixelIndex(alt_rad, azi_rad);
-            if (pixel_index) |pi| {
-                global_pixel_data[pi] = Pixel{
-                    .r = 255,
-                    .g = 0, 
-                    .b = 0,
-                    .a = 255
-                };
-            }
-        }
-    }
-}
-
-pub fn getPixelIndex(altitude: f32, azimuth: f32) ?usize {
-    var point = getProjectedCoord(altitude, azimuth);
-    point = global_canvas.translatePoint(point);
-
-    if (std.math.isNan(point.x) or std.math.isNan(point.y)) {
+    const sin_alt = sin_dec * sin_lat + math.cos(declination_rad) * cos_lat * math.cos(hour_angle_rad);
+    const altitude = math_utils.boundedASin(sin_alt) catch |err| return null;
+    if (filter_below_horizon and altitude < 0) {
         return null;
     }
 
-    if (point.x < 0 or point.y < 0) return null;
+    const cos_azi = (sin_dec - math.sin(altitude) * sin_lat) / (math.cos(altitude) * cos_lat);
+    const azi = math.acos(cos_azi);
+    const azimuth = if (math.sin(hour_angle_rad) < 0) azi else two_pi - azi;
 
-    const x = @floatToInt(usize, point.x);
-    const y = @floatToInt(usize, point.y);
-
-    const p_index: usize = (y * @intCast(usize, global_canvas.width)) + x;
-    if (p_index >= global_pixel_data.len) return null;
-
-    return p_index;
+    return canvas.translatePoint(getProjectedCoord(@floatCast(f32, altitude), @floatCast(f32, azimuth)));
 }
 
-pub fn getProjectedCoord(altitude: f32, azimuth: f32) CanvasPoint {
+pub fn getProjectedCoord(altitude: f32, azimuth: f32) Point {
     const radius = comptime 2.0 / math.pi;
     // s is the distance from the center of the projection circle to the point
     // aka 1 - the angular distance along the surface of the sky sphere
@@ -175,34 +146,96 @@ pub fn getProjectedCoord(altitude: f32, azimuth: f32) CanvasPoint {
     };
 }
 
+pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []ConstellationGrid, observer_location: Coord, observer_timestamp: i64) ?usize {
+    if (!canvas.isInsideCircle(point)) return null;
+
+    const point_ray_right = Line{ 
+        .a = point, 
+        .b = Point{ .x = @intToFloat(f32, canvas.settings.width), .y = point.y } 
+    };
+    const point_ray_left = Line{ 
+        .a = point, 
+        .b = Point{ .x = -@intToFloat(f32, canvas.settings.width), .y = point.y } 
+    };
+
+    for (constellations) |c, constellation_index| {
+        var b_index: usize = 0;
+        var num_intersections_right: u32 = 0;
+        var num_intersections_left: u32 = 0;
+        while (b_index < c.boundaries.len - 1) : (b_index += 1) {
+            const b_a = projectToCanvas(canvas, c.boundaries[b_index], observer_location, observer_timestamp, false);
+            const b_b = projectToCanvas(canvas, c.boundaries[b_index + 1], observer_location, observer_timestamp, false);
+
+            if (b_a == null or b_b == null) continue;
+
+            const bound = Line{ .a = b_a.?, .b = b_b.? };
+            if (point_ray_right.segmentIntersection(bound)) |inter_point| {
+                if (canvas.isInsideCircle(inter_point)) {
+                    num_intersections_right += 1;
+                }
+            }
+
+            if (point_ray_left.segmentIntersection(bound)) |inter_point| {
+                if (canvas.isInsideCircle(inter_point)) {
+                    num_intersections_left += 1;
+                }
+            }
+
+        }
+
+        const b_a = projectToCanvas(canvas, c.boundaries[c.boundaries.len - 1], observer_location, observer_timestamp, false);
+        const b_b = projectToCanvas(canvas, c.boundaries[0], observer_location, observer_timestamp, false);
+
+        if (b_a == null or b_b == null) continue;
+
+        const bound = Line{ .a = b_a.?, .b = b_b.? };
+        if (point_ray_right.segmentIntersection(bound)) |inter_point| {
+            if (canvas.isInsideCircle(inter_point)) {
+                num_intersections_right += 1;
+            }
+        }
+         if (point_ray_left.segmentIntersection(bound)) |inter_point| {
+                if (canvas.isInsideCircle(inter_point)) {
+                    num_intersections_left += 1;
+                }
+            }
+        if (
+            (num_intersections_left % 2 == 1 and num_intersections_right % 2 == 1)
+        ) {
+            return constellation_index;
+        }
+    }
+    return null;
+}
+
 /// Find waypoints along the great circle between two coordinates. Each waypoint will be
 /// 1/num_waypoints distance beyond the previous coordinate.
 pub fn findWaypoints(allocator: *Allocator, f: Coord, t: Coord) []Coord {
     const quadrant_radians = comptime math.pi / 2.0;
     const circle_radians = comptime math.pi * 2.0;
-    const waypoints_per_degree: f32 = 20;
-    const degrees_per_waypoint: f32 = 1 / waypoints_per_degree;
+    const waypoints_per_radian: f32 = 20;
 
     const t_radian = Coord{
         .latitude = math_utils.degToRad(t.latitude),
-        .longitude = math_utils.degToRadLong(t.longitude)
+        .longitude = math_utils.degToRad(t.longitude)
     };
 
     const f_radian = Coord{
         .latitude = math_utils.degToRad(f.latitude),
-        .longitude = math_utils.degToRadLong(f.longitude)
+        .longitude = math_utils.degToRad(f.longitude)
     };
 
     const negative_dir = t_radian.longitude < f_radian.longitude and t_radian.longitude > (f_radian.longitude - math.pi);
 
     const total_distance = findGreatCircleDistance(f_radian, t_radian) catch |err| 0;
     
-    const num_waypoints = @floatToInt(usize, total_distance * waypoints_per_degree);
+    const num_waypoints: usize = 100;
+    const waypoint_inc: f32 = total_distance / @intToFloat(f32, num_waypoints);
     const course_angle = findGreatCircleCourseAngle(f_radian, t_radian, total_distance) catch |err| 0;
 
     var waypoints: []Coord = allocator.alloc(Coord, num_waypoints) catch unreachable;
     for (waypoints) |*waypoint, i| {
-        const waypoint_rel_angle = @intToFloat(f32, i + 1) * degrees_per_waypoint;
+        const waypoint_rel_angle = @intToFloat(f32, i + 1) * waypoint_inc;
         const lat = findWaypointLatitude(f_radian, waypoint_rel_angle, course_angle) catch |err| 0;
         const rel_long = findWaypointRelativeLongitude(f_radian, lat, waypoint_rel_angle) catch |err| 0;
 
@@ -230,7 +263,7 @@ pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_e
     // drag_distance is the angular distance between the starting location and the result location after a single drag
     // 2.35 is a magic number of degrees, picked because it results in what feels like an appropriate drag speed
     // Higher = move more with smaller cursor movements, and vice versa
-    const drag_distance: f32 = math_utils.degToRad(2.35);
+    const drag_distance: f32 = math_utils.degToRad(1.5);
 
     // Calculate asin(new_latitude), and clamp the result between [-1, 1]
     var sin_lat_x = math.sin(drag_distance) * math.cos(dist_phi);

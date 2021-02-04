@@ -1,53 +1,60 @@
 const std = @import("std");
 const ArrayList = std.ArrayList;
 const parseFloat = std.fmt.parseFloat;
+
+const log = @import("./log.zig").log;
+
+const render = @import("./render.zig");
+const Canvas = render.Canvas;
+const Pixel = render.Pixel;
+
+const math_utils = @import("./math_utils.zig");
+const Point = math_utils.Point;
+
 const star_math = @import("./star_math.zig");
 const Star = star_math.Star;
+const ConstellationGrid = star_math.ConstellationGrid;
+const SkyCoord = star_math.SkyCoord;
 const Coord = star_math.Coord;
-const Pixel = star_math.Pixel;
 
 const allocator = std.heap.page_allocator;
+var canvas: Canvas = undefined;
+var stars: []Star = undefined;
+var constellation_grids: []ConstellationGrid = undefined;
 
-pub extern fn drawPointWasm(x: f32, y: f32, brightness: f32) void;
+pub export fn initialize(star_data: [*]Star, star_len: u32, constellation_data: [*][*]SkyCoord, coord_lens: [*]u32, num_constellations: u32, settings: *Canvas.Settings) void {
+    stars = star_data[0..star_len];
 
-pub extern fn drawLineWasm(x1: f32, y1: f32, x2: f32, y2: f32) void;
+    constellation_grids = allocator.alloc(ConstellationGrid, num_constellations) catch unreachable;
+    defer allocator.free(coord_lens[0..num_constellations]);
+    for (constellation_grids) |*c, i| {
+        c.* = ConstellationGrid{
+            .boundaries = constellation_data[i][0..coord_lens[i]]
+        };
+    }
 
-pub extern fn consoleLog(message: [*]const u8, message_len: u32) void;
-
-fn log(comptime message: []const u8, args: anytype) void {
-    var buffer: [400]u8 = undefined;
-    const fmt_msg = std.fmt.bufPrint(buffer[0..], message, args) catch |err| return;
-    consoleLog(fmt_msg.ptr, @intCast(u32, fmt_msg.len));
-}
-
-pub export fn initialize(star_data: [*]Star, data_len: u32, settings: *star_math.CanvasSettings) void {
-    const num_stars = star_math.initStarData(allocator, star_data[0..data_len]) catch |err| blk: {
-        switch (err) {
-            error.OutOfMemory => log("[ERROR] Ran out of memory during initialization (needed {} kB for {} stars)", .{(data_len * @sizeOf(Star)) / 1000, data_len})
-        }
-        break :blk 0;
-    };
-    star_math.initCanvasData(allocator, settings.*) catch |err| switch (err) {
+    canvas = Canvas.init(allocator, settings.*) catch |err| switch (err) {
         error.OutOfMemory => {
-            const num_pixels = star_math.global_canvas.width * star_math.global_canvas.height;
-            log("[ERROR] Ran out of memory during canvas intialization (needed {} kB for {} pixels)", .{(num_pixels * @sizeOf(Pixel)) / 1000, num_pixels});
+            const num_pixels = canvas.settings.width * canvas.settings.height;
+            log(.Error, "Ran out of memory during canvas intialization (needed {} kB for {} pixels)", .{(num_pixels * @sizeOf(Pixel)) / 1000, num_pixels});
             unreachable;
         }
     };
+
 }
 
-pub export fn updateCanvasSettings(settings: *star_math.CanvasSettings) void {
-    star_math.global_canvas = settings.*;
+pub export fn updateCanvasSettings(settings: *Canvas.Settings) void {
+    canvas.settings = settings.*;
     allocator.destroy(settings);
 }
 
 pub export fn getImageData(size_in_bytes: *u32) [*]Pixel {
-    size_in_bytes.* = @intCast(u32, star_math.global_pixel_data.len * @sizeOf(star_math.Pixel));
-    return star_math.global_pixel_data.ptr;
+    size_in_bytes.* = @intCast(u32, canvas.data.len * @sizeOf(Pixel));
+    return canvas.data.ptr;
 }
 
 pub export fn resetImageData() void {
-    for (star_math.global_pixel_data) |*p, i| {
+    for (canvas.data) |*p, i| {
         p.* = Pixel{};
     }   
 }
@@ -58,7 +65,34 @@ pub export fn projectStarsWasm(observer_latitude: f32, observer_longitude: f32, 
         .longitude = observer_longitude
     };
 
-    star_math.projectStar(current_coord, observer_timestamp, true);
+    for (stars) |star| {
+        star_math.projectStar(&canvas, star, current_coord, observer_timestamp, true);
+    }
+}
+
+pub export fn projectConstellationGrids(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
+    const current_coord = Coord{
+        .latitude = observer_latitude,
+        .longitude = observer_longitude
+    };
+
+    for (constellation_grids) |constellation| {
+        star_math.projectConstellationGrid(&canvas, constellation, Pixel.rgba(255, 245, 194, 105), 1, current_coord, observer_timestamp);
+    }
+}
+
+pub export fn getConstellationAtPoint(point: *Point, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) isize {
+    const observer_coord = Coord{
+        .latitude = observer_latitude,
+        .longitude = observer_longitude
+    };
+    defer allocator.destroy(point);
+    // const index = star_math.getConstellationAtPoint(allocator, &canvas, point.*, constellation_grids, observer_coord, observer_timestamp);
+    const index = star_math.getConstellationAtPoint(&canvas, point.*, constellation_grids, observer_coord, observer_timestamp);
+    if (index) |i| {
+        star_math.projectConstellationGrid(&canvas, constellation_grids[i], Pixel.rgb(255, 255, 255), 2, observer_coord, observer_timestamp);
+        return @intCast(isize, i);
+    } else return -1;
 }
 
 pub export fn dragAndMoveWasm(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_end_y: f32) *Coord {

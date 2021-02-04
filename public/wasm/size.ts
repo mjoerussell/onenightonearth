@@ -1,4 +1,4 @@
-import { CanvasSettings } from '../render';
+import { CanvasSettings } from '../renderer';
 
 export enum WasmPrimative {
     u8,
@@ -23,43 +23,71 @@ export const sizedCoord: Sized<Coord> = {
     longitude: WasmPrimative.f32,
 };
 
+export enum SpectralType {
+    O = 0,
+    B = 1,
+    A = 2,
+    F = 3,
+    G = 4,
+    K = 5,
+    M = 6,
+}
+
 export type Star = {
     name: string;
     right_ascension: number;
     declination: number;
     brightness: number;
+    spec_type: SpectralType;
 };
 
 export type WasmStar = {
     right_ascension: number;
     declination: number;
     brightness: number;
+    spec_type: SpectralType;
 };
 
 export const sizedWasmStar: Sized<WasmStar> = {
     right_ascension: WasmPrimative.f32,
     declination: WasmPrimative.f32,
     brightness: WasmPrimative.f32,
+    spec_type: WasmPrimative.u8,
 };
 
-export type StarCoord = {
-    rightAscension: number;
+export type Constellation = {
+    name: string;
+    boundaries: SkyCoord[];
+};
+
+export type WasmConstellation = {
+    boundaries_ptr: number;
+    boundaries_len: number;
+};
+
+export const sizedWasmConstellation: Sized<WasmConstellation> = {
+    boundaries_ptr: WasmPrimative.u32,
+    boundaries_len: WasmPrimative.u32,
+};
+
+export type SkyCoord = {
+    right_ascension: number;
     declination: number;
 };
 
-const sizedStarCoord: Sized<StarCoord> = {
-    rightAscension: WasmPrimative.f32,
+export const sizedSkyCoord: Sized<SkyCoord> = {
+    right_ascension: WasmPrimative.f32,
     declination: WasmPrimative.f32,
 };
 
-export type ConstellationBranch = {
-    a: StarCoord;
-    b: StarCoord;
+export type CanvasPoint = {
+    x: number;
+    y: number;
 };
 
-export const sizedConstellationBranch: Sized<ConstellationBranch> = {
-    a: sizedStarCoord,
-    b: sizedStarCoord,
+export const sizedCanvasPoint: Sized<CanvasPoint> = {
+    x: WasmPrimative.f32,
+    y: WasmPrimative.f32,
 };
 
 export const sizedCanvasSettings: Sized<CanvasSettings> = {
