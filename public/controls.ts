@@ -213,11 +213,13 @@ export class Controls {
 
     onMapHover(handler: (_: CanvasPoint) => void): void {
         this.renderer.addEventListener('mousemove', event => {
-            const mouse_point: CanvasPoint = {
-                x: event.offsetX,
-                y: event.offsetY,
-            };
-            handler(mouse_point);
+            if (!this.drag_state.is_dragging) {
+                const mouse_point: CanvasPoint = {
+                    x: event.offsetX,
+                    y: event.offsetY,
+                };
+                handler(mouse_point);
+            }
         });
     }
 

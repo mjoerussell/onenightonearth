@@ -85,16 +85,15 @@ pub fn projectStar(canvas: *Canvas, star: Star, observer_location: Coord, observ
     }
 }
 
-pub fn projectConstellationGrid(canvas: *Canvas, constellation: ConstellationGrid, observer_location: Coord, observer_timestamp: i64) void {
+pub fn projectConstellationGrid(canvas: *Canvas, constellation: ConstellationGrid, color: Pixel, line_width: u32, observer_location: Coord, observer_timestamp: i64) void {
     var branch_index: usize = 0;
-    const line_color = Pixel.rgba(255, 245, 194, 105);
     while (branch_index < constellation.boundaries.len - 1) : (branch_index += 1) {
         const point_a = projectToCanvas(canvas, constellation.boundaries[branch_index], observer_location, observer_timestamp, false);
         const point_b = projectToCanvas(canvas, constellation.boundaries[branch_index + 1], observer_location, observer_timestamp, false);
         
         if (point_a == null or point_b == null) continue;
 
-        canvas.drawLine(Line{ .a = point_a.?, .b = point_b.?}, line_color);
+        canvas.drawLine(Line{ .a = point_a.?, .b = point_b.?}, color, line_width);
     }
 
     // Connect final point to first point
@@ -103,7 +102,7 @@ pub fn projectConstellationGrid(canvas: *Canvas, constellation: ConstellationGri
 
     if (point_a == null or point_b == null) return;
 
-    canvas.drawLine(.{ .a = point_a.?, .b = point_b.?}, line_color);
+    canvas.drawLine(.{ .a = point_a.?, .b = point_b.?}, color, line_width);
 }
 
 pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?Point {

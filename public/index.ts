@@ -18,7 +18,6 @@ const renderStars = (controls: Controls, date?: Date) => {
         console.log('Updating canvas settings');
         wasm_interface.updateSettings(controls.renderer.getCanvasSettings());
     }
-    wasm_interface.resetImageData();
 
     wasm_interface.projectStars(controls.latitude, controls.longitude, BigInt(timestamp));
     if (controls.show_constellations) {
@@ -26,6 +25,7 @@ const renderStars = (controls: Controls, date?: Date) => {
     }
     const data = wasm_interface.getImageData();
     controls.renderer.drawData(data);
+    wasm_interface.resetImageData();
 };
 
 const drawUIElements = (controls: Controls) => {
@@ -217,8 +217,10 @@ document.addEventListener('DOMContentLoaded', () => {
             );
             const data = wasm_interface.getImageData();
             controls.renderer.drawData(data);
+            renderStars(controls);
+            // wasm_interface.resetImageData();
             if (index > 0) {
-                console.log(`Mouse inside constellation ${constellation_names[index]}`);
+                console.log(`Mouse inside constellation ${index}: ${constellation_names[index]}`);
                 controls.constellation_name = constellation_names[index];
             }
         }

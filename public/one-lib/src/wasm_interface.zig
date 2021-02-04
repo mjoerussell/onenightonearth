@@ -77,7 +77,7 @@ pub export fn projectConstellationGrids(observer_latitude: f32, observer_longitu
     };
 
     for (constellation_grids) |constellation| {
-        star_math.projectConstellationGrid(&canvas, constellation, current_coord, observer_timestamp);
+        star_math.projectConstellationGrid(&canvas, constellation, Pixel.rgba(255, 245, 194, 105), 1, current_coord, observer_timestamp);
     }
 }
 
@@ -90,6 +90,7 @@ pub export fn getConstellationAtPoint(point: *Point, observer_latitude: f32, obs
     // const index = star_math.getConstellationAtPoint(allocator, &canvas, point.*, constellation_grids, observer_coord, observer_timestamp);
     const index = star_math.getConstellationAtPoint(&canvas, point.*, constellation_grids, observer_coord, observer_timestamp);
     if (index) |i| {
+        star_math.projectConstellationGrid(&canvas, constellation_grids[i], Pixel.rgb(255, 255, 255), 2, observer_coord, observer_timestamp);
         return @intCast(isize, i);
     } else return -1;
 }

@@ -22,25 +22,6 @@ pub const Pixel = packed struct {
 
 };
 
-
-
-const Orientation = enum {
-    Clockwise,
-    Counterclockwise,
-    Colinear,
-
-    fn fromPoints(p: Point, q: Point, r: Point) Orientation {
-        const value = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
-        if (value == 0) {
-            return .Colinear;
-        } else if (value > 0) {
-            return .Clockwise;
-        } else {
-            return .Counterclockwise;
-        }
-    }
-};
-
 pub const Canvas = struct {
     pub const Settings = packed struct {
         width: u32,
@@ -113,7 +94,6 @@ pub const Canvas = struct {
         };
         var num_intersections: u32 = 0;
         var index: usize = 0;
-        // self.drawLine(point_ray, Pixel.rgb(255, 0, 255));
         while (index < polygon.len - 1) : (index += 1) {
             const bound = Line{
                 .a = polygon[index],
@@ -128,19 +108,7 @@ pub const Canvas = struct {
                     num_intersections += 1;
                 }
             }
-            // const ori_1 = Orientation.fromPoints(point, q1, ray_end);
-            // const ori_2 = Orientation.fromPoints(point, q1, q2);
-            // const ori_3 = Orientation.fromPoints(ray_end, q2, point);
-            // const ori_4 = Orientation.fromPoints(ray_end, q2, q1);
-
-            // log(.Debug, "{}<>{} | {}<>{}", .{@tagName(ori_1), @tagName(ori_2), @tagName(ori_3), @tagName(ori_4)});
-            // Not considering all-colinear points right now, I don't think
-            // it needs to handle that edge case
-            // if (ori_1 != ori_2 and ori_3 != ori_4) {
-            //     num_intersections += 1;
-            // }
         }
-        log(.Debug, "Num intersections: {d:.0}", .{num_intersections});
         return num_intersections % 2 == 1;
     }
 
@@ -155,9 +123,10 @@ pub const Canvas = struct {
         }
     }
 
-    pub fn drawLine(self: *Canvas, line: Line, color: Pixel) void {
-        // const line_color = Pixel;
+    pub fn drawLine(self: *Canvas, line: Line, color: Pixel, thickness: u32) void {
         const num_points = @floatToInt(u32, 75 * self.settings.zoom_factor);
+
+        if (thickness == 0) return;
 
         // Draw the line to the edge of the circle no matter what.
         // If `a` is outside the circle to begin with then the line won't be drawn,
@@ -166,17 +135,27 @@ pub const Canvas = struct {
         const start = if (is_a_inside_circle) line.a else line.b;
         const end = if (is_a_inside_circle) line.b else line.a;
 
+        const expand_x = line.getSlope() > 1.5;
+
         const total_dist = start.getDist(end);
         var point_index: u32 = 0;
         while (point_index < num_points) : (point_index += 1) {
             const point_dist = (total_dist / @intToFloat(f32, num_points)) * @intToFloat(f32, point_index);
-            const next_point = Point{
+            var next_point = Point{
                 .x = start.x + (point_dist / total_dist) * (end.x - start.x),
                 .y = start.y + (point_dist / total_dist) * (end.y - start.y)
             };
-            if (self.isInsideCircle(next_point)) {
-                self.setPixelAt(next_point, color);
-            } else break;
+            var width_index: u32 = 0;
+            while (width_index < thickness) : (width_index += 1) {
+                if (expand_x) {
+                    next_point.x += 1; 
+                } else {
+                    next_point.y += 1;
+                }
+                if (self.isInsideCircle(next_point)) {
+                    self.setPixelAt(next_point, color);
+                } else break;
+            }
         }
     }
 
