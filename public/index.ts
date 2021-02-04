@@ -15,7 +15,6 @@ const renderStars = (controls: Controls, date?: Date) => {
     }
 
     if (controls.renderer.settings_did_change) {
-        console.log('Updating canvas settings');
         wasm_interface.updateSettings(controls.renderer.getCanvasSettings());
     }
 

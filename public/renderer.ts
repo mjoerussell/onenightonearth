@@ -1,8 +1,3 @@
-// interface CanvasOptions {
-//     width?: number;
-//     height?: number;
-// }
-
 export type CanvasSettings = {
     width: number;
     height: number;
@@ -43,12 +38,6 @@ export class Renderer {
             this.height = this.main_canvas.height;
             console.log('resize');
         });
-
-        // this.offscreen_canvas = document.createElement('canvas');
-        // this.offscreen_ctx = this.offscreen_canvas.getContext('2d')!;
-
-        // this.offscreen_canvas.width = this.width;
-        // this.offscreen_canvas.height = this.height;
     }
 
     drawData(data: Uint8ClampedArray): void {
@@ -116,7 +105,6 @@ export class Renderer {
     }
 
     set zoom_factor(f: number) {
-        console.log('New zoom_factor = ', f);
         this.settings.zoom_factor = f;
         this._settings_did_change = true;
     }

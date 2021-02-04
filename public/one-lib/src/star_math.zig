@@ -105,6 +105,45 @@ pub fn projectConstellationGrid(canvas: *Canvas, constellation: ConstellationGri
     canvas.drawLine(.{ .a = point_a.?, .b = point_b.?}, color, line_width);
 }
 
+pub fn drawSkyGrid(canvas: *Canvas, observer_location: Coord, observer_timestamp: i64) void {
+    const grid_color = Pixel.rgba(91, 101, 117, 180);
+    const grid_zero_color = Pixel.rgba(176, 98, 65, 225);
+    var base_right_ascension: f32 = 0;
+
+    while (base_right_ascension < 360) : (base_right_ascension += 15) {
+        var declination: f32 = -90;
+        while (declination <= 90) : (declination += 0.1) {
+            const point = projectToCanvas(canvas, .{ .right_ascension = base_right_ascension, .declination = declination }, observer_location, observer_timestamp, true);
+            if (point) |p| {
+                if (canvas.isInsideCircle(p)) {
+                    if (base_right_ascension == 0) {
+                        canvas.setPixelAt(p, grid_zero_color);
+                    } else {
+                        canvas.setPixelAt(p, grid_color);
+                    }
+                }
+            }
+        }
+    }
+
+    var base_declination: f32 = -90;
+    while (base_declination <= 90) : (base_declination += 15) {
+        var right_ascension: f32 = 0;
+        while (right_ascension <= 360) : (right_ascension += 0.1) {
+            const point = projectToCanvas(canvas, .{ .right_ascension = right_ascension, .declination = base_declination }, observer_location, observer_timestamp, true);
+            if (point) |p| {
+                if (canvas.isInsideCircle(p)) {
+                    if (base_declination == 0) {
+                        canvas.setPixelAt(p, grid_zero_color);
+                    } else {
+                        canvas.setPixelAt(p, grid_color);
+                    }
+                }
+            }
+        }
+    }
+}
+
 pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?Point {
     const two_pi = comptime math.pi * 2.0;
     const half_pi = comptime math.pi / 2.0;
@@ -313,6 +352,7 @@ pub fn getCoordForSkyCoord(sky_coord: SkyCoord, observer_timestamp: i64) Coord {
 }
 
 pub fn getSkyCoordForCanvasPoint(canvas: *Canvas, point: Point, observer_location: Coord, observer_timestamp: i64) ?SkyCoord {
+    if (!canvas.isInsideCircle(point)) return null;
     const raw_point = canvas.untranslatePoint(point);
     // Distance from raw_point to the center of the sky circle
     const s = math.sqrt(math.pow(f32, raw_point.x, 2.0) + math.pow(f32, raw_point.y, 2.0));
@@ -327,10 +367,13 @@ pub fn getSkyCoordForCanvasPoint(canvas: *Canvas, point: Point, observer_locatio
         return null;
     };
 
-    const hour_angle_rad = math_utils.boundedACos((math.sin(altitude) - (math.sin(declination) * sin_lat)) / (math.cos(declination) * cos_lat)) catch |_| {
+    var hour_angle_rad = math_utils.boundedACos((math.sin(altitude) - (math.sin(declination) * sin_lat)) / (math.cos(declination) * cos_lat)) catch |_| {
         log(.Error, "Error computing hour angle. Declination was {d:.3}", .{declination});
         return null;
     };
+
+    hour_angle_rad = if (raw_point.x < 0) -hour_angle_rad else hour_angle_rad;
+
     const hour_angle = math_utils.radToDeg(hour_angle_rad);
     const lst = getLocalSiderealTime(@intToFloat(f64, observer_timestamp), @floatCast(f64, observer_location.longitude));
     const right_ascension = math_utils.floatMod(lst - hour_angle, 360);
