@@ -1,5 +1,5 @@
 import { Renderer } from './renderer';
-import { Coord } from './wasm/size';
+import { CanvasPoint, Coord } from './wasm/size';
 
 interface DragState {
     is_dragging: boolean;
@@ -9,18 +9,23 @@ interface DragState {
 
 export class Controls {
     private date_input: HTMLInputElement | null;
-    private lat_input: HTMLInputElement | null;
-    private long_input: HTMLInputElement | null;
+    private location_input: HTMLInputElement | null;
+
     private time_travel_button: HTMLButtonElement | null;
+    private today_button: HTMLButtonElement | null;
+
     private update_location_button: HTMLButtonElement | null;
     private current_position_button: HTMLButtonElement | null;
+
+    private show_constellations_input: HTMLInputElement | null;
+    private constellation_name_display: HTMLSpanElement | null;
 
     public renderer: Renderer;
 
     private current_latitude = 0;
     private current_longitude = 0;
-    private user_changed_latitude = false;
-    private user_changed_longitude = false;
+
+    private user_changed_location = false;
 
     private timelapse_is_on = false;
 
@@ -35,22 +40,25 @@ export class Controls {
 
     constructor() {
         this.date_input = document.getElementById('dateInput') as HTMLInputElement;
-        this.lat_input = document.getElementById('latInput') as HTMLInputElement;
-        this.long_input = document.getElementById('longInput') as HTMLInputElement;
+        this.location_input = document.getElementById('locationInput') as HTMLInputElement;
+
         this.time_travel_button = document.getElementById('timelapse') as HTMLButtonElement;
+        this.today_button = document.getElementById('today') as HTMLButtonElement;
+
         this.update_location_button = document.getElementById('locationUpdate') as HTMLButtonElement;
         this.current_position_button = document.getElementById('currentPosition') as HTMLButtonElement;
+
+        this.show_constellations_input = document.getElementById('showConstellations') as HTMLInputElement;
+        this.constellation_name_display = document.getElementById('constellationName') as HTMLSpanElement;
+
         this.renderer = new Renderer('star-canvas');
 
         const mql = window.matchMedia('only screen and (max-width: 760px)');
         this.is_mobile = mql.matches;
         // Listen for future changes
         mql.addEventListener('change', this.handleOrientationChange.bind(this));
-        this.lat_input?.addEventListener('change', () => {
-            this.user_changed_latitude = true;
-        });
-        this.long_input?.addEventListener('change', () => {
-            this.user_changed_longitude = true;
+        this.location_input?.addEventListener('change', () => {
+            this.user_changed_location = true;
         });
     }
 
@@ -64,26 +72,55 @@ export class Controls {
         });
     }
 
+    onSetToday(handler: (current: Date, target: Date) => Date): void {
+        this.today_button?.addEventListener('click', () => {
+            let current = this.date;
+            let target = new Date();
+
+            const moving_backwards = current.valueOf() > target.valueOf();
+
+            const run = () => {
+                current = handler(current, target);
+                this.date = current;
+                if (
+                    (moving_backwards && current.valueOf() > target.valueOf()) ||
+                    (!moving_backwards && current.valueOf() < target.valueOf())
+                ) {
+                    window.requestAnimationFrame(run);
+                }
+            };
+
+            window.requestAnimationFrame(run);
+        });
+    }
+
     onLocationUpdate(handler: (_: Coord) => void): void {
         this.update_location_button?.addEventListener('click', () => {
-            if (this.user_changed_latitude || this.user_changed_longitude) {
+            if (this.user_changed_location) {
                 let new_latitude: number;
                 let new_longitude: number;
+                const input_value = this.location_input?.value ?? '0, 0';
+                let coords = input_value.split(',');
+                if (coords.length === 1) {
+                    coords = input_value.split(' ');
+                    if (coords.length === 1) {
+                        coords = [coords[0], '0'];
+                    }
+                }
                 try {
-                    new_latitude = parseFloat(this.lat_input?.value ?? '0');
+                    new_latitude = parseFloat(coords[0]);
                 } catch (err) {
                     new_latitude = 0;
                 }
                 try {
-                    new_longitude = parseFloat(this.long_input?.value ?? '0');
+                    new_longitude = parseFloat(coords[1]);
                 } catch (err) {
                     new_longitude = 0;
                 }
 
                 handler({ latitude: new_latitude, longitude: new_longitude });
 
-                this.user_changed_latitude = false;
-                this.user_changed_longitude = false;
+                this.user_changed_location = false;
             }
         });
     }
@@ -100,7 +137,7 @@ export class Controls {
 
     onTimelapse(handler: (next_date: Date) => Date): void {
         this.time_travel_button?.addEventListener('click', () => {
-            this.time_travel_button!.innerText = this.timelapse_is_on ? 'Time Travel' : 'Stop';
+            this.time_travel_button!.innerText = this.timelapse_is_on ? 'Timelapse' : 'Stop';
             if (this.timelapse_is_on) {
                 this.timelapse_is_on = false;
                 return;
@@ -174,6 +211,22 @@ export class Controls {
         });
     }
 
+    onMapHover(handler: (_: CanvasPoint) => void): void {
+        this.renderer.addEventListener('mousemove', event => {
+            if (!this.drag_state.is_dragging) {
+                const mouse_point: CanvasPoint = {
+                    x: event.offsetX,
+                    y: event.offsetY,
+                };
+                handler(mouse_point);
+            }
+        });
+    }
+
+    onChangeConstellationView(handler: () => void): void {
+        this.show_constellations_input?.addEventListener('change', handler);
+    }
+
     get date(): Date {
         const current_date = this.date_input?.valueAsDate;
         return current_date ?? new Date();
@@ -191,8 +244,9 @@ export class Controls {
 
     set latitude(value: number) {
         this.current_latitude = value;
-        if (this.lat_input) {
-            this.lat_input.value = value.toString();
+        if (this.location_input) {
+            const [_, longitude] = this.location_input.value.split(',');
+            this.location_input.value = `${value.toPrecision(6)}, ${longitude}`;
         }
     }
 
@@ -202,8 +256,29 @@ export class Controls {
 
     set longitude(value: number) {
         this.current_longitude = value;
-        if (this.long_input) {
-            this.long_input.value = value.toString();
+        if (this.location_input) {
+            const [latitude, _] = this.location_input.value.split(',');
+            this.location_input.value = `${latitude}, ${value.toPrecision(6)}`;
+        }
+    }
+
+    get show_constellations(): boolean {
+        return this.show_constellations_input?.checked ?? false;
+    }
+
+    set show_constellations(should_show: boolean) {
+        if (this.show_constellations_input) {
+            this.show_constellations_input.checked = should_show;
+        }
+    }
+
+    get constellation_name(): string {
+        return this.constellation_name_display?.innerText ?? '';
+    }
+
+    set constellation_name(value: string) {
+        if (this.constellation_name_display) {
+            this.constellation_name_display.innerText = value;
         }
     }
 

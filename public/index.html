@@ -11,50 +11,36 @@
     <body>
         <div class="page-container">
             <h1>One night, on Earth...</h1>
-            <div class="info-box">
-                <h2>Controls</h2>
-                <ul>
-                    <li>Click & Drag on the map to move. Scroll while hovering over the map to zoom in/out.</li>
-                    <li>Click "Use My Location" to move the map to your current location.</li>
-                    <li>Enter a latitude & longitude, then click "Update Location" to move to that location.</li>
-                    <li>Click "Time Travel" to start a timelapse view. Click again to stop.</li>
-                </ul>
-            </div>
-            <hr />
             <div id="settings">
                 <div id="main-settings">
-                    <div class="input-fields">
-                        <div class="input-row">
-                            <label>
-                                Date
-                                <input id="dateInput" type="date" />
-                            </label>
-                        </div>
-                        <div class="input-row">
-                            <label>
-                                Latitude
-                                <input id="latInput" type="text" value="0" min="-90.0" max="90.0" />
-                            </label>
-                            <label>
-                                Longitude
-                                <input id="longInput" type="text" value="0" min="-180.0" max="180.0" />
-                            </label>
-                        </div>
+                    <div class="input-row">
+                        <input id="dateInput" type="date" required />
+                        <button id="timelapse">Timelapse</button>
+                        <!-- <button id="today">Go to Today</button> -->
                     </div>
-                    <div id="actions">
-                        <button id="timelapse">Time Travel</button>
-                        <button id="locationUpdate">Update Location</button>
+                    <div class="input-row">
+                        <div class="inline-input">
+                            <input id="locationInput" type="text" placeholder="Latitude, Longitude" />
+                            <button id="locationUpdate">Go</button>
+                        </div>
                         <button id="currentPosition">Use My Location</button>
                     </div>
+                    <div class="input-row">
+                        <label>
+                            Show Constellations
+                            <input id="showConstellations" type="checkbox" />
+                        </label>
+                        <span id="constellationName"></span>
+                    </div>
                 </div>
-            </div>
-            
-            <div class="canvas-container">
-                <div id="loading-icon-container">
-                    <div class="loading-icon"></div>
+                
+                <div class="canvas-container">
+                    <div id="loading-icon-container">
+                        <div class="loading-icon"></div>
+                    </div>
+                    <canvas id="backdrop-canvas" width="850" height="850"></canvas>
+                    <canvas id="star-canvas" width="850" height="850"></canvas>
                 </div>
-                <canvas id="backdrop-canvas" width="800" height="800"></canvas>
-                <canvas id="star-canvas" width="800" height="800"></canvas>
             </div>
             
         </div>
