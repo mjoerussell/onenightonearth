@@ -13,26 +13,21 @@ const Point = math_utils.Point;
 
 const star_math = @import("./star_math.zig");
 const Star = star_math.Star;
-const ConstellationGrid = star_math.ConstellationGrid;
+const Constellation = star_math.Constellation;
 const SkyCoord = star_math.SkyCoord;
 const Coord = star_math.Coord;
 
 const allocator = std.heap.page_allocator;
 var canvas: Canvas = undefined;
 var stars: []Star = undefined;
-var constellation_grids: []ConstellationGrid = undefined;
 
-pub export fn initialize(star_data: [*]Star, star_len: u32, constellation_data: [*][*]SkyCoord, coord_lens: [*]u32, num_constellations: u32, settings: *Canvas.Settings) void {
+var constellations: []Constellation = undefined;
+
+pub export fn initializeStars(star_data: [*]Star, star_len: u32) void {
     stars = star_data[0..star_len];
+}
 
-    constellation_grids = allocator.alloc(ConstellationGrid, num_constellations) catch unreachable;
-    defer allocator.free(coord_lens[0..num_constellations]);
-    for (constellation_grids) |*c, i| {
-        c.* = ConstellationGrid{
-            .boundaries = constellation_data[i][0..coord_lens[i]]
-        };
-    }
-
+pub export fn initializeCanvas(settings: *Canvas.Settings) void {
     canvas = Canvas.init(allocator, settings.*) catch |err| switch (err) {
         error.OutOfMemory => {
             const num_pixels = canvas.settings.width * canvas.settings.height;
@@ -40,7 +35,19 @@ pub export fn initialize(star_data: [*]Star, star_len: u32, constellation_data: 
             unreachable;
         }
     };
+}
 
+pub export fn initializeConstellations(constellation_grid_data: [*][*]SkyCoord, constellation_asterism_data: [*][*]SkyCoord, grid_coord_lens: [*]u32, asterism_coord_lens: [*]u32, num_constellations: u32) void {
+    constellations = allocator.alloc(Constellation, num_constellations) catch unreachable;
+
+    defer allocator.free(grid_coord_lens[0..num_constellations]);
+    defer allocator.free(asterism_coord_lens[0..num_constellations]);
+    for (constellations) |*c, i| {
+        c.* = Constellation{
+            .asterism = constellation_asterism_data[i][0..asterism_coord_lens[i]],
+            .boundaries = constellation_grid_data[i][0..grid_coord_lens[i]]
+        };
+    }
 }
 
 pub export fn updateCanvasSettings(settings: *Canvas.Settings) void {
@@ -78,8 +85,9 @@ pub export fn projectConstellationGrids(observer_latitude: f32, observer_longitu
         .longitude = observer_longitude
     };
 
-    for (constellation_grids) |constellation| {
+    for (constellations) |constellation| {
         star_math.projectConstellationGrid(&canvas, constellation, Pixel.rgba(255, 245, 194, 105), 1, current_coord, observer_timestamp);
+        star_math.projectConstellationAsterism(&canvas, constellation, Pixel.rgba(255, 245, 194, 105), 1, current_coord, observer_timestamp);
     }
 }
 
@@ -89,9 +97,9 @@ pub export fn getConstellationAtPoint(point: *Point, observer_latitude: f32, obs
         .longitude = observer_longitude
     };
     defer allocator.destroy(point);
-    const index = star_math.getConstellationAtPoint(&canvas, point.*, constellation_grids, observer_coord, observer_timestamp);
+    const index = star_math.getConstellationAtPoint(&canvas, point.*, constellations, observer_coord, observer_timestamp);
     if (index) |i| {
-        star_math.projectConstellationGrid(&canvas, constellation_grids[i], Pixel.rgb(255, 255, 255), 2, observer_coord, observer_timestamp);
+        star_math.projectConstellationGrid(&canvas, constellations[i], Pixel.rgb(255, 255, 255), 2, observer_coord, observer_timestamp);
         return @intCast(isize, i);
     } else return -1;
 }

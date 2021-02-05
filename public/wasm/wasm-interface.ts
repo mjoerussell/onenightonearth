@@ -35,23 +35,37 @@ export class WasmInterface {
             };
         });
         const boundaries: pointer[] = [];
+        const asterisms: pointer[] = [];
         for (const c of constellations) {
-            const coords_ptr = this.allocArray(c.boundaries, sizedSkyCoord);
-            boundaries.push(coords_ptr);
+            const bound_coords_ptr = this.allocArray(c.boundaries, sizedSkyCoord);
+            const aster_coords_ptr = this.allocArray(c.asterism, sizedSkyCoord);
+            boundaries.push(bound_coords_ptr);
+            asterisms.push(aster_coords_ptr);
         }
-        const constellation_lengths = constellations.map(c => c.boundaries.length);
-        const constellation_ptr = this.allocPrimativeArray(boundaries, WasmPrimative.u32);
-        const coord_lens_ptr = this.allocPrimativeArray(constellation_lengths, WasmPrimative.u32);
+        const boundary_lengths = constellations.map(c => c.boundaries.length);
+        const asterism_lengths = constellations.map(c => c.asterism.length);
+        const boundaries_ptr = this.allocPrimativeArray(boundaries, WasmPrimative.u32);
+        const asterisms_ptr = this.allocPrimativeArray(asterisms, WasmPrimative.u32);
+        const bound_coord_lens_ptr = this.allocPrimativeArray(boundary_lengths, WasmPrimative.u32);
+        const aster_coord_lens_ptr = this.allocPrimativeArray(asterism_lengths, WasmPrimative.u32);
         const star_ptr = this.allocArray(wasm_stars, sizedWasmStar);
         const settings_ptr = this.allocObject(canvas_settings, sizedCanvasSettings);
 
-        (this.instance.exports.initialize as any)(
+        (this.instance.exports.initializeStars as any)(
             star_ptr,
-            wasm_stars.length,
-            constellation_ptr,
-            coord_lens_ptr,
-            constellations.length,
-            settings_ptr
+            wasm_stars.length
+            // constellation_ptr,
+            // coord_lens_ptr,
+            // constellations.length,
+            // settings_ptr
+        );
+        (this.instance.exports.initializeCanvas as any)(settings_ptr);
+        (this.instance.exports.initializeConstellations as any)(
+            boundaries_ptr,
+            asterisms_ptr,
+            bound_coord_lens_ptr,
+            aster_coord_lens_ptr,
+            constellations.length
         );
     }
 

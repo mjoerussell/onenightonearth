@@ -57,6 +57,7 @@ export const sizedWasmStar: Sized<WasmStar> = {
 
 export type Constellation = {
     name: string;
+    asterism: SkyCoord[];
     boundaries: SkyCoord[];
 };
 

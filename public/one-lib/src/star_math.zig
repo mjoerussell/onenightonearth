@@ -28,7 +28,8 @@ pub const Star = packed struct {
     spec_type: SpectralType,
 };
 
-pub const ConstellationGrid = struct {
+pub const Constellation = struct {
+    asterism: []SkyCoord,
     boundaries: []SkyCoord,
 };
 
@@ -85,7 +86,7 @@ pub fn projectStar(canvas: *Canvas, star: Star, observer_location: Coord, observ
     }
 }
 
-pub fn projectConstellationGrid(canvas: *Canvas, constellation: ConstellationGrid, color: Pixel, line_width: u32, observer_location: Coord, observer_timestamp: i64) void {
+pub fn projectConstellationGrid(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, observer_location: Coord, observer_timestamp: i64) void {
     var branch_index: usize = 0;
     while (branch_index < constellation.boundaries.len - 1) : (branch_index += 1) {
         const point_a = projectToCanvas(canvas, constellation.boundaries[branch_index], observer_location, observer_timestamp, false);
@@ -103,6 +104,26 @@ pub fn projectConstellationGrid(canvas: *Canvas, constellation: ConstellationGri
     if (point_a == null or point_b == null) return;
 
     canvas.drawLine(.{ .a = point_a.?, .b = point_b.?}, color, line_width);
+}
+
+pub fn projectConstellationAsterism(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, observer_location: Coord, observer_timestamp: i64) void {
+    var branch_index: usize = 0;
+    while (branch_index < constellation.asterism.len - 1) : (branch_index += 2) {
+        const point_a = projectToCanvas(canvas, constellation.asterism[branch_index], observer_location, observer_timestamp, false);
+        const point_b = projectToCanvas(canvas, constellation.asterism[branch_index + 1], observer_location, observer_timestamp, false);
+        
+        if (point_a == null or point_b == null) continue;
+
+        canvas.drawLine(Line{ .a = point_a.?, .b = point_b.?}, color, line_width);
+    }
+
+    // Connect final point to first point
+    // const point_a = projectToCanvas(canvas, constellation.asterism[constellation.asterism.len - 1], observer_location, observer_timestamp, false);
+    // const point_b = projectToCanvas(canvas, constellation.asterism[0], observer_location, observer_timestamp, false);
+
+    // if (point_a == null or point_b == null) return;
+
+    // canvas.drawLine(.{ .a = point_a.?, .b = point_b.?}, color, line_width);
 }
 
 pub fn drawSkyGrid(canvas: *Canvas, observer_location: Coord, observer_timestamp: i64) void {
@@ -187,7 +208,7 @@ pub fn getProjectedCoord(altitude: f32, azimuth: f32) Point {
     };
 }
 
-pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []ConstellationGrid, observer_location: Coord, observer_timestamp: i64) ?usize {
+pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []Constellation, observer_location: Coord, observer_timestamp: i64) ?usize {
     if (!canvas.isInsideCircle(point)) return null;
 
     const point_ray_right = Line{ 
