@@ -135,6 +135,28 @@ export class WasmInterface {
         }
     }
 
+    getCoordForCanvasPoint(
+        point: CanvasPoint,
+        observer_latitude: number,
+        observer_longitude: number,
+        observer_timestamp: BigInt
+    ): Coord | null {
+        const point_ptr = this.allocObject(point, sizedCanvasPoint);
+        const coord_ptr = (this.instance.exports.getCoordForCanvasPoint as any)(
+            point_ptr,
+            observer_latitude,
+            observer_longitude,
+            observer_timestamp
+        );
+        if (coord_ptr === 0) {
+            return null;
+        } else {
+            const coord = this.readObject(coord_ptr, sizedCoord);
+            this.freeBytes(coord_ptr, sizeOf(sizedCoord));
+            return coord;
+        }
+    }
+
     updateSettings(settings: CanvasSettings): void {
         const settings_ptr = this.allocObject(settings, sizedCanvasSettings);
         (this.instance.exports.updateCanvasSettings as any)(settings_ptr);

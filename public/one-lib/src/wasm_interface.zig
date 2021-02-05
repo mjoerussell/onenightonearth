@@ -136,6 +136,25 @@ pub export fn getSkyCoordForCanvasPoint(point: *Point, observer_latitude: f32, o
     }
 }
 
+pub export fn getCoordForCanvasPoint(point: *Point, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) ?*Coord {
+    defer allocator.destroy(point);
+    const observer_location = Coord{
+        .latitude = observer_latitude,
+        .longitude = observer_longitude
+    };
+    const sky_coord = star_math.getSkyCoordForCanvasPoint(&canvas, point.*, observer_location, observer_timestamp);
+    if (sky_coord) |sk| {
+        log(.Debug, "Got sky coord ({d:.2}, {d:.2})", .{sk.right_ascension, sk.declination});
+        const coord = star_math.getCoordForSkyCoord(sk, observer_timestamp);
+        log(.Debug, "Got coord ({d:.2}, {d:.2})", .{coord.latitude, coord.longitude});
+        const coord_ptr = allocator.create(Coord) catch unreachable;
+        coord_ptr.* = coord;
+        return coord_ptr;
+    } else {
+        return null;
+    }
+}
+
 pub export fn _wasm_alloc(byte_len: u32) ?[*]u8 {
     const buffer = allocator.alloc(u8, byte_len) catch |err| return null;
     return buffer.ptr;

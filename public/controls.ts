@@ -228,6 +228,15 @@ export class Controls {
         });
     }
 
+    onMapDoubleClick(handler: (_: CanvasPoint) => void): void {
+        this.renderer.addEventListener('dblclick', event => {
+            handler({
+                x: event.offsetX,
+                y: event.offsetY,
+            });
+        });
+    }
+
     onChangeConstellationView(handler: () => void): void {
         this.show_constellations_input?.addEventListener('change', handler);
     }

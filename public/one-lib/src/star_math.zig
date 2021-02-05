@@ -337,7 +337,7 @@ pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_e
 pub fn getCoordForSkyCoord(sky_coord: SkyCoord, observer_timestamp: i64) Coord {
     const j2000_offset_millis: f64 = 949_428_000_000.0;
     const days_since_j2000 = (@intToFloat(f64, observer_timestamp) - j2000_offset_millis) / 86400000.0;
-    var longitude = -sky_coord.right_ascension - (100.46 + (0.985647 * days_since_j2000) + (15 * @intToFloat(f64, observer_timestamp)));
+    var longitude = sky_coord.right_ascension - (100.46 + (0.985647 * days_since_j2000) + (15 * @intToFloat(f64, observer_timestamp)));
     longitude = math_utils.floatMod(longitude, 360);
     if (longitude < -180) {
         longitude += 360;

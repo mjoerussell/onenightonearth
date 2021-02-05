@@ -232,6 +232,18 @@ document.addEventListener('DOMContentLoaded', () => {
         controls.cursor_sky_location = sky_coord;
     });
 
+    controls.onMapDoubleClick(point => {
+        const new_coord = wasm_interface.getCoordForCanvasPoint(
+            point,
+            controls.latitude,
+            controls.longitude,
+            BigInt(controls.date.valueOf())
+        );
+        if (new_coord != null) {
+            updateLocation(new_coord);
+        }
+    });
+
     controls.onGoToAndromeda(sky_coord => {
         const new_coord = wasm_interface.getCoordForSkyCoord(sky_coord, BigInt(controls.date.valueOf()));
         updateLocation(new_coord);
