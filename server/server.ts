@@ -130,29 +130,30 @@ const readConstellationFiles = async (): Promise<Constellation[]> => {
                     declination: parseFloat(dec_data),
                 };
             });
-        const asterism: SkyCoord[] = data['asterism']
-            .split('\n')
-            .map(s => s.trim())
-            .filter(s => s != null && s !== '')
-            .flatMap(aster_line => {
-                const star_names = aster_line.split(',').map(a => a.trim());
-                const [star_a, star_b] = star_names.map(name => stars.find(star => star.name === name));
-                if (star_a != null && star_b != null) {
-                    return [
-                        {
-                            right_ascension: star_a.right_ascension,
-                            declination: star_a.declination,
-                        },
-                        {
-                            right_ascension: star_b.right_ascension,
-                            declination: star_b.declination,
-                        },
-                    ];
-                } else {
-                    return null;
-                }
-            })
-            .filter(coord => coord != null) as SkyCoord[];
+        const asterism: SkyCoord[] =
+            (data['asterism']
+                ?.split('\n')
+                .map(s => s.trim())
+                .filter(s => s != null && s !== '')
+                .flatMap(aster_line => {
+                    const star_names = aster_line.split(',').map(a => a.trim());
+                    const [star_a, star_b] = star_names.map(name => stars.find(star => star.name === name));
+                    if (star_a != null && star_b != null) {
+                        return [
+                            {
+                                right_ascension: star_a.right_ascension,
+                                declination: star_a.declination,
+                            },
+                            {
+                                right_ascension: star_b.right_ascension,
+                                declination: star_b.declination,
+                            },
+                        ];
+                    } else {
+                        return null;
+                    }
+                })
+                .filter(coord => coord != null) as SkyCoord[]) ?? [];
         const boundaries: SkyCoord[] = data['boundaries']
             .split('\n')
             .map(s => s.trim())
