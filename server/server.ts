@@ -132,30 +132,29 @@ const readConstellationFiles = async (): Promise<Constellation[]> => {
                     declination: parseFloat(dec_data),
                 };
             });
-        const asterism: SkyCoord[] =
-            (data['asterism']
-                ?.split('\n')
-                .map(s => s.trim())
-                .filter(s => s != null && s !== '')
-                .flatMap(aster_line => {
-                    const star_names = aster_line.split(',').map(a => a.trim());
-                    const [star_a, star_b] = star_names.map(name => stars.find(star => star.name === name));
-                    if (star_a != null && star_b != null) {
-                        return [
-                            {
-                                right_ascension: star_a.right_ascension,
-                                declination: star_a.declination,
-                            },
-                            {
-                                right_ascension: star_b.right_ascension,
-                                declination: star_b.declination,
-                            },
-                        ];
-                    } else {
-                        return null;
-                    }
-                })
-                .filter(coord => coord != null) as SkyCoord[]) ?? [];
+        const asterism: SkyCoord[] = data['asterism']
+            ?.split('\n')
+            .map(s => s.trim())
+            .filter(s => s != null && s !== '')
+            .flatMap(aster_line => {
+                const star_names = aster_line.split(',').map(a => a.trim());
+                const [star_a, star_b] = star_names.map(name => stars.find(star => star.name === name));
+                if (star_a != null && star_b != null) {
+                    return [
+                        {
+                            right_ascension: star_a.right_ascension,
+                            declination: star_a.declination,
+                        },
+                        {
+                            right_ascension: star_b.right_ascension,
+                            declination: star_b.declination,
+                        },
+                    ];
+                } else {
+                    return null;
+                }
+            })
+            .filter(coord => coord != null) as SkyCoord[];
         const boundaries: SkyCoord[] = data['boundaries']
             .split('\n')
             .map(s => s.trim())
@@ -261,44 +260,6 @@ const parseRightAscension = (ra: string): number => {
     return hours_deg + minutes_deg + seconds_deg;
 };
 
-// const parseConstallations = (lines: string[]): Constellation[] => {
-//     const constellations: Constellation[] = [];
-//     let current_constellation: Constellation | null = null;
-//     for (const line of lines) {
-//         if (line.startsWith('#')) {
-//             continue;
-//         }
-//         const parts: string[] = line.split('|');
-//         if (current_constellation == null) {
-//             current_constellation = {
-//                 name: parts[0],
-
-//                 boundaries: [],
-//                 asterism: [],
-//             };
-//         } else if (parts[0] !== current_constellation?.name) {
-//             constellations.push(current_constellation);
-//             current_constellation = {
-//                 name: parts[0],
-//                 boundaries: [],
-//                 asterism: [],
-//             };
-//         }
-
-//         const coord: SkyCoord = {
-//             right_ascension: parseRightAscension(parts[1]),
-//             declination: parseFloat(parts[2]),
-//         };
-
-//         current_constellation.boundaries.push(coord);
-//     }
-
-//     constellations.push(current_constellation!);
-//     return constellations;
-// };
-
-const readConstellationFile = readFile(path.join(__dirname, 'constellations.txt'));
-
 const main = async () => {
     const stars: Star[] = await readFile(path.join(__dirname, 'sao_catalog'))
         .then(catalog =>
@@ -310,11 +271,6 @@ const main = async () => {
         .then(lines => lines.map(parseCatalogLine).filter(star => star != null) as Star[]);
 
     const constellations: Constellation[] = await readConstellationFiles();
-
-    const constellation_info: string[] = await readConstellationFile
-        .then(catalog => catalog.toString().split('\n'))
-        .then(lines => lines.filter(line => line.startsWith('#')))
-        .then(lines => lines.map(line => line.substring(2)));
 
     app.get('/', (req, res) => {
         res.sendFile(path.join(__dirname, 'index.html'));
@@ -330,9 +286,6 @@ const main = async () => {
         res.send(constellations);
     });
 
-    // app.get('/constellation/info', async (req, res) => {
-    //     res.send(constellation_info);
-    // });
     http.createServer(app).listen(PORT, () => console.log(`Listening on port ${PORT}`));
 };
 

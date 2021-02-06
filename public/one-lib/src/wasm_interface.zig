@@ -70,6 +70,7 @@ pub export fn initializeConstellations(constellation_grid_data: [*][*]SkyCoord, 
             .boundaries = constellation_grid_data[i][0..grid_coord_lens[i]]
         };
     }
+
 }
 
 pub export fn updateCanvasSettings(settings: *ExternCanvasSettings) void {

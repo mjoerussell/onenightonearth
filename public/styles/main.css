@@ -1,3 +1,9 @@
+:root {
+    --background-color: #f5f5ec;
+    --text-color: #01020f;
+    --button-color: #081f41;
+}
+
 body {
     background: linear-gradient(#01020f, #031131);
     font-family: 'Poppins', serif;
@@ -66,10 +72,10 @@ h1 {
     font-weight: 550;
     font-family: 'Poppins', serif;
     letter-spacing: 0.05em;
-    border: 1px solid #081f41;
+    border: 1px solid var(--button-color);
     border-radius: 3px;
     color: #ffffff;
-    background-color: #081f41;
+    background-color: var(--button-color);
 }
 
 .input-row > button:hover {
@@ -119,6 +125,13 @@ input[type='date']::-webkit-clear-button {
     display: none;
 }
 
+select {
+    width: 100%;
+    font-size: 1.1em;
+    color: #4d4d4d;
+    padding: 3px;
+}
+
 .inline-input input:focus-visible {
     outline: none;
     border: none;
@@ -129,16 +142,44 @@ input[type='date']::-webkit-clear-button {
     border: none;
 }
 
-div#constellationDetails {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-evenly;
-}
-
 .inline-input button:hover {
     font-style: italic;
     color: #222222;
     cursor: pointer;
+}
+
+div.toggle {
+    width: 40px;
+    height: 1.4em;
+    background-color: var(--button-color);
+    position: relative;
+    border-radius: 500px;
+    cursor: pointer;
+    float: right;
+}
+
+div.toggle input[type='checkbox'] {
+    opacity: 0;
+}
+
+div.toggle span {
+    display: block;
+    width: 0.95em;
+    height: 0.95em;
+    border-radius: 50%;
+
+    transition: all 0.9s ease-out;
+    position: absolute;
+    top: 50%;
+    left: 5%;
+    right: auto;
+    transform: translateY(-50%);
+    background-color: #f5f5ec;
+}
+
+div.toggle input[type='checkbox']:checked + span {
+    left: auto;
+    right: 5%;
 }
 
 .canvas-container {

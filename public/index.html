@@ -25,21 +25,24 @@
                         <button id="currentPosition">Use My Location</button>
                     </div>
                     <div class="input-row">
-                        <label>
-                            Show Constellations
-                            <input id="showConstellations" type="checkbox" />
-                        </label>
-                        <div id="constellationDetails">
-                            <label>
-                                Show Constellation Boundaries
-                                <input id="showGrid" type="checkbox" />
-                            </label>
-                            <label>
-                                Draw Constellations
+                        <label class="toggle">
+                            Constellations
+                            <div class="toggle">
                                 <input id="showAsterism" type="checkbox" />
-                            </label>
-                            <span id="constellationName"></span>
-                        </div>
+                                <span></span>
+                            </div>
+                        </label>
+                        <label class="toggle">
+                            Constellation Boundaries
+                            <div class="toggle">
+                                <input id="showGrid" type="checkbox" />
+                                <span></span>
+                            </div>
+                        </label>
+                        <span id="constellationName"></span>
+                        <select id="selectConstellation">
+                            <option value="-1">Select a Constellation to View</option>
+                        </select>
                     </div>
                 </div>
                 

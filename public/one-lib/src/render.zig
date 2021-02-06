@@ -1,5 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const math = std.math;
 
 const log = @import("./log.zig").log;
 const math_utils = @import("./math_utils.zig");
@@ -141,12 +142,6 @@ pub const Canvas = struct {
 
     pub fn drawLine(self: *Canvas, line: Line, color: Pixel, thickness: u32) void {
         const num_points = @floatToInt(u32, 75 * self.settings.zoom_factor);
-
-        if (thickness == 0) return;
-
-        // Draw the line to the edge of the circle no matter what.
-        // If `a` is outside the circle to begin with then the line won't be drawn,
-        // so if that's the case then start from b and draw to a
         const is_a_inside_circle = self.isInsideCircle(line.a);
         const start = if (is_a_inside_circle) line.a else line.b;
         const end = if (is_a_inside_circle) line.b else line.a;

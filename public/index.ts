@@ -69,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     .then(const_result => const_result.json())
                     .then((consts: Constellation[]) => {
                         constellations = consts;
+                        controls.setConstellations(constellations);
                         wasm_interface = new WasmInterface(wasm_result.instance);
                         wasm_interface.initialize(stars, constellations, controls.renderer.getCanvasSettings());
 
@@ -106,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return next_date;
     });
 
-    const updateLocation = (new_coord: Coord): void => {
+    const updateLocation = (new_coord: Coord, end_zoom_factor: number): void => {
         // If the longitude is exactly opposite of the original, then there will be issues calculating the
         // great circle, and the journey will look really weird.
         // Introduce a slight offset to minimize this without significantly affecting end location
@@ -117,11 +118,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const start: Coord = { latitude: controls.latitude, longitude: controls.longitude };
 
         const waypoints = wasm_interface.findWaypoints(start, new_coord);
-        console.log(waypoints);
         if (waypoints == null || waypoints.length === 0) {
             console.log('No waypoints recieved');
             renderStars(controls);
             return;
+        }
+
+        let zoom_step = 0;
+        if (controls.renderer.zoom_factor !== end_zoom_factor) {
+            const zoom_diff = end_zoom_factor - controls.renderer.zoom_factor;
+            zoom_step = zoom_diff / waypoints.length;
         }
 
         let waypoint_index = 0;
@@ -129,6 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const waypoint = waypoints[waypoint_index];
             controls.latitude = waypoint.latitude;
             controls.longitude = waypoint.longitude;
+            controls.renderer.zoom_factor += zoom_step;
             renderStars(controls);
             waypoint_index += 1;
             if (waypoint_index < waypoints.length) {
@@ -138,11 +145,11 @@ document.addEventListener('DOMContentLoaded', () => {
         window.requestAnimationFrame(runWaypointTravel);
     };
 
-    controls.onLocationUpdate(updateLocation);
-    controls.onUseCurrentPosition(updateLocation);
+    controls.onLocationUpdate(new_coord => updateLocation(new_coord, controls.renderer.zoom_factor));
+    controls.onUseCurrentPosition(new_coord => updateLocation(new_coord, 1));
 
     controls.onTimelapse(current_date => {
-        const days_per_frame = 0.25;
+        const days_per_frame = 0.15;
         const days_per_frame_millis = days_per_frame * 86400000;
         let next_date = new Date(current_date);
         next_date.setTime(next_date.getTime() + days_per_frame_millis);
@@ -200,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     controls.onMapHover(point => {
-        if (controls.show_constellations) {
+        if (controls.renderer.draw_asterisms || controls.renderer.draw_constellation_grid) {
             const index = wasm_interface.getConstellationAtPoint(
                 point,
                 controls.latitude,
@@ -211,7 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
             controls.renderer.drawData(data);
             renderStars(controls);
             if (index >= 0) {
-                controls.constellation_name = `${constellations[index].name}: ${constellations[index].epithet}`;
+                controls.constellation_name = `${constellations[index].name} - ${constellations[index].epithet}`;
             }
         }
     });
@@ -224,7 +231,14 @@ document.addEventListener('DOMContentLoaded', () => {
             BigInt(controls.date.valueOf())
         );
         if (new_coord != null) {
-            updateLocation(new_coord);
+            updateLocation(new_coord, 2.5);
+        }
+    });
+
+    controls.onSelectConstellation(const_index => {
+        const new_coord = wasm_interface.getCoordForSkyCoord(constellations[const_index].boundaries[0], BigInt(controls.date.valueOf()));
+        if (new_coord) {
+            updateLocation(new_coord, 2.5);
         }
     });
 });
