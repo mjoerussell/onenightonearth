@@ -8,6 +8,18 @@ One Night on Earth is written in Typescript and Zig.
 
 > Note: Currently appears to run best in Firefox, some issues have been seen in Chrome which are currently being worked on.
 
+## Controls
+
+The controls currently available on the site are:
+
+1. Change Date - Update the date that the sky is simulated for
+2. Change Location - Enter a new latitude and/or longitude, then click 'Update Location' to move the simulation to the desired coordinates.
+3. 'Use My Location' - Navigate to your current location.
+4. 'Time Travel' - Click this button to start automatically advancing the date. Click again to stop.
+5. Drag and Move - Click and drag on the map to move the sky. Your updated coordinates will be populated in the 'Latitude' and 'Longitude' fields.
+6. Double Click - Double Click on the map to navigate to that point.
+7. Zoom - Scroll with your mouse while hovering over the map to zoom in/out.
+
 ## Running Locally
 
 ### Docker
@@ -45,13 +57,3 @@ If you don't have Docker, or would rather run the app directly, there's a few st
    every time you want to make changes to the WASM code.
 
 Now you're ready! Like before, visit `localhost:8080` to view the site.
-
-## Controls
-
-The controls currently available on the site are:
-
-1. Change Date - Update the date that the sky is simulated for
-2. Change Location - Enter a new latitude and/or longitude, then click 'Update Location' to move the simulation to the desired coordinates.
-3. 'Time Travel' - Click this button to start automatically advancing the date. Click again to stop.
-4. Drag and Move - Click and drag on the map to move the sky. Your updated coordinates will be populated in the 'Latitude' and 'Longitude' fields.
-5. Zoom - Scroll with your mouse while hovering over the map to zoom in/out.
