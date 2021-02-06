@@ -7,6 +7,12 @@ interface DragState {
     y: number;
 }
 
+interface ConstellationSettings {
+    show_constellations: boolean;
+    show_grid: boolean;
+    show_asterism: boolean;
+}
+
 export class Controls {
     private date_input: HTMLInputElement | null;
     private location_input: HTMLInputElement | null;
@@ -17,9 +23,12 @@ export class Controls {
     private update_location_button: HTMLButtonElement | null;
     private current_position_button: HTMLButtonElement | null;
 
+    private constellation_details: HTMLDivElement | null;
     private show_constellations_input: HTMLInputElement | null;
+    private show_constellation_grid_input: HTMLInputElement | null;
+    private show_asterism_input: HTMLInputElement | null;
     private constellation_name_display: HTMLSpanElement | null;
-    private sky_location_display: HTMLSpanElement | null;
+    // private sky_location_display: HTMLSpanElement | null;
 
     private andromeda_button: HTMLButtonElement | null;
 
@@ -51,9 +60,16 @@ export class Controls {
         this.update_location_button = document.getElementById('locationUpdate') as HTMLButtonElement;
         this.current_position_button = document.getElementById('currentPosition') as HTMLButtonElement;
 
+        this.constellation_details = document.getElementById('constellationDetails') as HTMLDivElement;
+        if (this.constellation_details) {
+            this.constellation_details.style.display = 'none';
+        }
+
         this.show_constellations_input = document.getElementById('showConstellations') as HTMLInputElement;
+        this.show_asterism_input = document.getElementById('showAsterism') as HTMLInputElement;
+        this.show_constellation_grid_input = document.getElementById('showGrid') as HTMLInputElement;
         this.constellation_name_display = document.getElementById('constellationName') as HTMLSpanElement;
-        this.sky_location_display = document.getElementById('skyLocation') as HTMLSpanElement;
+        // this.sky_location_display = document.getElementById('skyLocation') as HTMLSpanElement;
         this.andromeda_button = document.getElementById('debugGoAnd') as HTMLButtonElement;
 
         this.renderer = new Renderer('star-canvas');
@@ -238,16 +254,33 @@ export class Controls {
     }
 
     onChangeConstellationView(handler: () => void): void {
-        this.show_constellations_input?.addEventListener('change', handler);
-    }
+        const handleAllInputs = () => {
+            // const settings: ConstellationSettings = {
+            //     show_constellations: this.show_constellations_input?.checked ?? false,
+            //     show_asterism: this.show_asterism_input?.checked ?? false,
+            //     show_grid: this.show_constellation_grid_input?.checked ?? false,
+            // };
+            let show_constellations = false;
+            if (this.show_constellations_input) {
+                show_constellations = this.show_constellations_input.checked;
+                if (this.constellation_details) {
+                    this.constellation_details.style.display = show_constellations ? 'block' : 'none';
+                }
+            }
 
-    onGoToAndromeda(handler: (_: SkyCoord) => void): void {
-        this.andromeda_button?.addEventListener('click', () => {
-            handler({
-                right_ascension: 15,
-                declination: 40,
-            });
-        });
+            if (this.show_asterism_input) {
+                this.renderer.draw_asterisms = show_constellations && this.show_asterism_input.checked;
+            }
+
+            if (this.show_constellation_grid_input) {
+                this.renderer.draw_constellation_grid = show_constellations && this.show_constellation_grid_input.checked;
+            }
+
+            handler();
+        };
+        this.show_constellations_input?.addEventListener('change', () => handleAllInputs());
+        this.show_asterism_input?.addEventListener('change', () => handleAllInputs());
+        this.show_constellation_grid_input?.addEventListener('change', () => handleAllInputs());
     }
 
     get date(): Date {
@@ -302,35 +335,6 @@ export class Controls {
     set constellation_name(value: string) {
         if (this.constellation_name_display) {
             this.constellation_name_display.innerText = value;
-        }
-    }
-
-    get cursor_sky_location(): SkyCoord | null {
-        if (this.sky_location_display) {
-            const value = this.sky_location_display.innerText;
-            const [ra_text, dec_text] = value.split(',');
-            try {
-                const ra = parseFloat(ra_text);
-                const dec = parseFloat(dec_text);
-                return {
-                    right_ascension: ra,
-                    declination: dec,
-                };
-            } catch (err) {
-                return null;
-            }
-        } else {
-            return null;
-        }
-    }
-
-    set cursor_sky_location(value: SkyCoord | null) {
-        if (this.sky_location_display) {
-            if (value == null) {
-                this.sky_location_display.innerText = '';
-            } else {
-                this.sky_location_display.innerText = `${value.right_ascension.toPrecision(6)}, ${value.declination.toPrecision(5)}`;
-            }
         }
     }
 

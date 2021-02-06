@@ -365,6 +365,9 @@ export class WasmInterface {
             val = value;
         }
         switch (type) {
+            case WasmPrimative.bool: {
+                mem.setUint8(offset, val);
+            }
             case WasmPrimative.u8: {
                 mem.setUint8(offset, val);
                 break;
@@ -408,8 +411,11 @@ export class WasmInterface {
         }
     }
 
-    private getPrimative(mem: DataView, type: WasmPrimative, offset = 0): number | BigInt {
+    private getPrimative(mem: DataView, type: WasmPrimative, offset = 0): number | boolean | BigInt {
         switch (type) {
+            case WasmPrimative.bool: {
+                return mem.getUint8(offset) == 1;
+            }
             case WasmPrimative.u8: {
                 return mem.getUint8(offset);
             }

@@ -1,6 +1,7 @@
 import { CanvasSettings } from '../renderer';
 
 export enum WasmPrimative {
+    bool,
     u8,
     u16,
     u32,
@@ -57,6 +58,7 @@ export const sizedWasmStar: Sized<WasmStar> = {
 
 export type Constellation = {
     name: string;
+    epithet: string;
     asterism: SkyCoord[];
     boundaries: SkyCoord[];
 };
@@ -96,7 +98,9 @@ export const sizedCanvasSettings: Sized<CanvasSettings> = {
     height: WasmPrimative.u32,
     background_radius: WasmPrimative.f32,
     zoom_factor: WasmPrimative.f32,
-    draw_north_up: WasmPrimative.u8,
+    draw_north_up: WasmPrimative.bool,
+    draw_constellation_grid: WasmPrimative.bool,
+    draw_asterisms: WasmPrimative.bool,
 };
 
 /**
@@ -173,6 +177,7 @@ export type pointer = number;
  */
 export const sizeOfPrimative = (data: WasmPrimative): number => {
     switch (data) {
+        case WasmPrimative.bool:
         case WasmPrimative.u8:
         case WasmPrimative.i8:
             return 1;

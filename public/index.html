@@ -16,7 +16,6 @@
                     <div class="input-row">
                         <input id="dateInput" type="date" required />
                         <button id="timelapse">Timelapse</button>
-                        <!-- <button id="today">Go to Today</button> -->
                     </div>
                     <div class="input-row">
                         <div class="inline-input">
@@ -30,9 +29,17 @@
                             Show Constellations
                             <input id="showConstellations" type="checkbox" />
                         </label>
-                        <span id="constellationName"></span>
-                        <span id="skyLocation"></span>
-                        <button id="debugGoAnd">Go to Andromeda</button>
+                        <div id="constellationDetails">
+                            <label>
+                                Show Constellation Boundaries
+                                <input id="showGrid" type="checkbox" />
+                            </label>
+                            <label>
+                                Draw Constellations
+                                <input id="showAsterism" type="checkbox" />
+                            </label>
+                            <span id="constellationName"></span>
+                        </div>
                     </div>
                 </div>
                 

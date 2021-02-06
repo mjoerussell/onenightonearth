@@ -4,6 +4,8 @@ export type CanvasSettings = {
     background_radius: number;
     zoom_factor: number;
     draw_north_up: boolean;
+    draw_constellation_grid: boolean;
+    draw_asterisms: boolean;
 };
 
 export class Renderer {
@@ -28,6 +30,8 @@ export class Renderer {
             background_radius: 0.45 * Math.min(this.main_canvas.width, this.main_canvas.height),
             zoom_factor: 1.0,
             draw_north_up: true,
+            draw_constellation_grid: false,
+            draw_asterisms: false,
         };
 
         console.log('Canvas width: ', this.settings.width);
@@ -131,5 +135,23 @@ export class Renderer {
 
     get context() {
         return this.main_ctx;
+    }
+
+    set draw_constellation_grid(value: boolean) {
+        this._settings_did_change = true;
+        this.settings.draw_constellation_grid = value;
+    }
+
+    get draw_constellation_grid(): boolean {
+        return this.settings.draw_constellation_grid;
+    }
+
+    set draw_asterisms(value: boolean) {
+        this._settings_did_change = true;
+        this.settings.draw_asterisms = value;
+    }
+
+    get draw_asterisms(): boolean {
+        return this.settings.draw_asterisms;
     }
 }

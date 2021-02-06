@@ -129,6 +129,12 @@ input[type='date']::-webkit-clear-button {
     border: none;
 }
 
+div#constellationDetails {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+}
+
 .inline-input button:hover {
     font-style: italic;
     color: #222222;

@@ -23,12 +23,14 @@ pub const Pixel = packed struct {
 };
 
 pub const Canvas = struct {
-    pub const Settings = packed struct {
+    pub const Settings = struct {
         width: u32,
         height: u32,
         background_radius: f32,
         zoom_factor: f32,
         draw_north_up: bool,
+        draw_constellation_grid: bool,
+        draw_asterisms: bool
     };
 
     data: []Pixel,
@@ -181,7 +183,9 @@ test "translate point" {
         .height = 700,
         .draw_north_up = true,
         .background_radius = 0.45 * 700.0,
-        .zoom_factor = 1.0
+        .zoom_factor = 1.0,
+        .draw_asterisms = false,
+        .draw_constellation_grid = false,
     };
 
     var canvas = try Canvas.init(std.testing.allocator, canvas_settings);

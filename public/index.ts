@@ -2,7 +2,7 @@ import { Controls } from './controls';
 import { Constellation, Coord, Star } from './wasm/size';
 import { WasmInterface } from './wasm/wasm-interface';
 
-let constellation_names: string[] = [];
+let constellations: Constellation[] = [];
 let wasm_interface: WasmInterface;
 
 const renderStars = (controls: Controls, date?: Date) => {
@@ -19,9 +19,7 @@ const renderStars = (controls: Controls, date?: Date) => {
     }
 
     wasm_interface.projectStars(controls.latitude, controls.longitude, BigInt(timestamp));
-    if (controls.show_constellations) {
-        wasm_interface.projectConstellationGrids(controls.latitude, controls.longitude, BigInt(timestamp));
-    }
+    wasm_interface.projectConstellationGrids(controls.latitude, controls.longitude, BigInt(timestamp));
     const data = wasm_interface.getImageData();
     controls.renderer.drawData(data);
     wasm_interface.resetImageData();
@@ -69,7 +67,8 @@ document.addEventListener('DOMContentLoaded', () => {
             .then((stars: Star[]) =>
                 fetch('/constellation/bounds')
                     .then(const_result => const_result.json())
-                    .then((constellations: Constellation[]) => {
+                    .then((consts: Constellation[]) => {
+                        constellations = consts;
                         wasm_interface = new WasmInterface(wasm_result.instance);
                         wasm_interface.initialize(stars, constellations, controls.renderer.getCanvasSettings());
 
@@ -81,12 +80,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('In WebAssembly Promise: ', error);
             })
     );
-
-    fetch('/constellation/info')
-        .then(result => result.json())
-        .then((names: string[]) => {
-            constellation_names = names;
-        });
 
     controls.onDateChange(date => {
         renderStars(controls);
@@ -217,19 +210,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = wasm_interface.getImageData();
             controls.renderer.drawData(data);
             renderStars(controls);
-            // wasm_interface.resetImageData();
             if (index >= 0) {
-                console.log(`Mouse inside constellation ${index}: ${constellation_names[index]}`);
-                controls.constellation_name = constellation_names[index];
+                controls.constellation_name = `${constellations[index].name}: ${constellations[index].epithet}`;
             }
         }
-        const sky_coord = wasm_interface.getSkyCoordForCanvasPoint(
-            point,
-            controls.latitude,
-            controls.longitude,
-            BigInt(controls.date.valueOf())
-        );
-        controls.cursor_sky_location = sky_coord;
     });
 
     controls.onMapDoubleClick(point => {
@@ -242,10 +226,5 @@ document.addEventListener('DOMContentLoaded', () => {
         if (new_coord != null) {
             updateLocation(new_coord);
         }
-    });
-
-    controls.onGoToAndromeda(sky_coord => {
-        const new_coord = wasm_interface.getCoordForSkyCoord(sky_coord, BigInt(controls.date.valueOf()));
-        updateLocation(new_coord);
     });
 });

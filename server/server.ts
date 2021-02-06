@@ -31,6 +31,7 @@ interface SkyCoord {
 
 interface Constellation {
     name: string;
+    epithet: string;
     asterism: SkyCoord[];
     boundaries: SkyCoord[];
 }
@@ -118,6 +119,7 @@ const readConstellationFiles = async (): Promise<Constellation[]> => {
         const file = await readFile(filename);
         const data = parseSkyFile(file.toString());
         const const_name = data['name'];
+        console.log(const_name);
         const stars = data['stars']
             .split('\n')
             .map(s => s.trim())
@@ -168,6 +170,7 @@ const readConstellationFiles = async (): Promise<Constellation[]> => {
 
         result.push({
             name: const_name,
+            epithet: data['epithet'],
             asterism,
             boundaries,
         });
@@ -258,40 +261,41 @@ const parseRightAscension = (ra: string): number => {
     return hours_deg + minutes_deg + seconds_deg;
 };
 
-const parseConstallations = (lines: string[]): Constellation[] => {
-    const constellations: Constellation[] = [];
-    let current_constellation: Constellation | null = null;
-    for (const line of lines) {
-        if (line.startsWith('#')) {
-            continue;
-        }
-        const parts: string[] = line.split('|');
-        if (current_constellation == null) {
-            current_constellation = {
-                name: parts[0],
-                boundaries: [],
-                asterism: [],
-            };
-        } else if (parts[0] !== current_constellation?.name) {
-            constellations.push(current_constellation);
-            current_constellation = {
-                name: parts[0],
-                boundaries: [],
-                asterism: [],
-            };
-        }
+// const parseConstallations = (lines: string[]): Constellation[] => {
+//     const constellations: Constellation[] = [];
+//     let current_constellation: Constellation | null = null;
+//     for (const line of lines) {
+//         if (line.startsWith('#')) {
+//             continue;
+//         }
+//         const parts: string[] = line.split('|');
+//         if (current_constellation == null) {
+//             current_constellation = {
+//                 name: parts[0],
 
-        const coord: SkyCoord = {
-            right_ascension: parseRightAscension(parts[1]),
-            declination: parseFloat(parts[2]),
-        };
+//                 boundaries: [],
+//                 asterism: [],
+//             };
+//         } else if (parts[0] !== current_constellation?.name) {
+//             constellations.push(current_constellation);
+//             current_constellation = {
+//                 name: parts[0],
+//                 boundaries: [],
+//                 asterism: [],
+//             };
+//         }
 
-        current_constellation.boundaries.push(coord);
-    }
+//         const coord: SkyCoord = {
+//             right_ascension: parseRightAscension(parts[1]),
+//             declination: parseFloat(parts[2]),
+//         };
 
-    constellations.push(current_constellation!);
-    return constellations;
-};
+//         current_constellation.boundaries.push(coord);
+//     }
+
+//     constellations.push(current_constellation!);
+//     return constellations;
+// };
 
 const readConstellationFile = readFile(path.join(__dirname, 'constellations.txt'));
 
@@ -326,9 +330,9 @@ const main = async () => {
         res.send(constellations);
     });
 
-    app.get('/constellation/info', async (req, res) => {
-        res.send(constellation_info);
-    });
+    // app.get('/constellation/info', async (req, res) => {
+    //     res.send(constellation_info);
+    // });
     http.createServer(app).listen(PORT, () => console.log(`Listening on port ${PORT}`));
 };
 
