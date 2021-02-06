@@ -59,7 +59,7 @@ RUN mkdir server
 
 # Copy over necessary files from build images
 COPY ./server/sao_catalog ./server
-COPY ./server/constellations.txt ./server
+COPY ./server/constellations ./server/constellations
 COPY ./public/assets/favicon.ico ./public/assets/favicon.ico
 COPY --from=build /usr/src/public/styles ./public/styles
 COPY --from=build /usr/src/public/index.html ./public/index.html
