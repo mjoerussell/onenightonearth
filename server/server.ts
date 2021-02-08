@@ -282,7 +282,7 @@ const main = async () => {
         res.send(stars.filter(star => star.brightness >= min_brightness));
     });
 
-    app.get('/constellation/bounds', (req, res) => {
+    app.get('/constellations', (req, res) => {
         res.send(constellations);
     });
 

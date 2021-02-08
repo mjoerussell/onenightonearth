@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
         fetch('/stars')
             .then(star_result => star_result.json())
             .then((stars: Star[]) =>
-                fetch('/constellation/bounds')
+                fetch('/constellations')
                     .then(const_result => const_result.json())
                     .then((consts: Constellation[]) => {
                         constellations = consts;
