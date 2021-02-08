@@ -160,17 +160,20 @@ div.toggle span {
     height: 0.95em;
     border-radius: 50%;
 
-    transition: all 0.9s ease-out;
     position: absolute;
     top: 50%;
     left: 5%;
-    right: auto;
+    right: calc(100% - 0.95em);
     transform: translateY(-50%);
-    background-color: #f5f5ec;
+    background-color: var(--background-color);
+
+    transition-property: left, right;
+    transition-duration: 0.2s;
+    transition-timing-function: ease-out;
 }
 
 div.toggle input[type='checkbox']:checked + span {
-    left: auto;
+    left: calc(98% - 0.95em);
     right: 5%;
 }
 
