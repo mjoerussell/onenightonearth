@@ -1,11 +1,17 @@
 import { Renderer } from './renderer';
-import { CanvasPoint, Constellation, Coord, SkyCoord } from './wasm/size';
+import { CanvasPoint, Constellation, Coord } from './wasm/size';
 
 interface DragState {
     is_dragging: boolean;
     x: number;
     y: number;
 }
+
+interface PinchState {
+    previous_distance: number;
+    is_zooming: boolean;
+}
+
 export class Controls {
     private date_input: HTMLInputElement | null;
     private location_input: HTMLInputElement | null;
@@ -37,8 +43,10 @@ export class Controls {
         y: 0,
     };
 
-    /** Determine if the current device is a mobile device in portrait mode */
-    private is_mobile = false;
+    private pinch_state: PinchState = {
+        is_zooming: false,
+        previous_distance: 0,
+    };
 
     constructor() {
         this.date_input = document.getElementById('dateInput') as HTMLInputElement;
@@ -67,10 +75,6 @@ export class Controls {
                 this.renderer.draw_asterisms || this.renderer.draw_constellation_grid ? 'block' : 'none';
         }
 
-        const mql = window.matchMedia('only screen and (max-width: 760px)');
-        this.is_mobile = mql.matches;
-        // Listen for future changes
-        mql.addEventListener('change', this.handleOrientationChange.bind(this));
         this.location_input?.addEventListener('change', () => {
             this.user_changed_location = true;
         });
@@ -173,31 +177,56 @@ export class Controls {
     }
 
     onMapDrag(handler: (current_state: DragState, new_state: DragState) => void): void {
-        this.renderer.addEventListener('mousedown', event => {
+        const handleDragStart = (x: number, y: number) => {
             const center_x = this.renderer.width / 2;
             const center_y = this.renderer.height / 2;
-            this.drag_state.x = (event.offsetX - center_x) / this.renderer.canvas.width;
-            this.drag_state.y = (event.offsetY - center_y) / this.renderer.canvas.height;
+            this.drag_state.x = (x - center_x) / this.renderer.canvas.width;
+            this.drag_state.y = (y - center_y) / this.renderer.canvas.height;
 
             this.renderer.canvas.classList.add('moving');
 
             this.drag_state.is_dragging = true;
-        });
+        };
 
-        this.renderer.addEventListener('mousemove', event => {
+        const handleDragMove = (x: number, y: number, drag_scale: number = 1) => {
             if (this.drag_state.is_dragging) {
                 const center_x = this.renderer.width / 2;
                 const center_y = this.renderer.height / 2;
                 const new_drag_state: DragState = {
                     is_dragging: true,
-                    x: (event.offsetX - center_x) / this.renderer.width,
-                    y: (event.offsetY - center_y) / this.renderer.height,
+                    x: ((x - center_x) / this.renderer.width) * drag_scale,
+                    y: ((y - center_y) / this.renderer.height) * drag_scale,
                 };
 
                 handler(this.drag_state, new_drag_state);
 
                 this.drag_state = new_drag_state;
             }
+        };
+
+        this.renderer.addEventListener('mousedown', event => handleDragStart(event.offsetX, event.offsetY));
+
+        this.renderer.addEventListener('touchstart', event => {
+            if (event.changedTouches.length !== 1 || this.pinch_state.is_zooming) {
+                return;
+            }
+            event.preventDefault();
+            const canvas_rect = this.renderer.canvas.getBoundingClientRect();
+            const touch = event.changedTouches[0];
+            const offset_x = touch.clientX - canvas_rect.x;
+            const offset_y = touch.clientY - canvas_rect.y;
+            handleDragStart(offset_x, offset_y);
+        });
+
+        this.renderer.addEventListener('mousemove', event => handleDragMove(event.offsetX, event.offsetY));
+
+        this.renderer.addEventListener('touchmove', event => {
+            event.preventDefault();
+            const canvas_rect = this.renderer.canvas.getBoundingClientRect();
+            const touch = event.changedTouches[0];
+            const offset_x = touch.clientX - canvas_rect.x;
+            const offset_y = touch.clientY - canvas_rect.y;
+            handleDragMove(offset_x, offset_y, 2);
         });
 
         this.renderer.addEventListener('mouseup', event => {
@@ -209,9 +238,45 @@ export class Controls {
             this.renderer.canvas.classList.remove('moving');
             this.drag_state.is_dragging = false;
         });
+
+        this.renderer.addEventListener('touchend', event => {
+            this.renderer.canvas.classList.remove('moving');
+            this.drag_state.is_dragging = false;
+        });
     }
 
     onMapZoom(handler: (zoom_factor: number) => void): void {
+        this.renderer.addEventListener('touchstart', event => {
+            if (event.changedTouches.length === 2) {
+                event.preventDefault();
+                this.pinch_state.is_zooming = true;
+            }
+        });
+        this.renderer.addEventListener('touchmove', event => {
+            if (this.pinch_state.is_zooming) {
+                event.preventDefault();
+                if (event.changedTouches.length !== 2 || this.drag_state.is_dragging) {
+                    return;
+                }
+                const touch_a = event.changedTouches[0];
+                const touch_b = event.changedTouches[1];
+                const current_touch_distance = Math.sqrt(
+                    Math.pow(touch_b.pageX - touch_a.pageX, 2) + Math.pow(touch_b.pageY - touch_a.pageY, 2)
+                );
+                const delta_amount = current_touch_distance < this.pinch_state.previous_distance ? -0.05 : 0.15;
+                this.pinch_state.previous_distance = current_touch_distance;
+                let zoom_factor = this.renderer.zoom_factor - this.renderer.zoom_factor * delta_amount;
+                if (zoom_factor < 1) {
+                    zoom_factor = 1;
+                }
+                handler(zoom_factor);
+            }
+        });
+
+        this.renderer.addEventListener('touchend', event => {
+            this.pinch_state.is_zooming = false;
+        });
+
         this.renderer.addEventListener('wheel', event => {
             event.preventDefault();
             // Zoom out faster than zooming in, because usually when you zoom out you just want
@@ -239,6 +304,7 @@ export class Controls {
 
     onMapDoubleClick(handler: (_: CanvasPoint) => void): void {
         this.renderer.addEventListener('dblclick', event => {
+            event.preventDefault();
             handler({
                 x: event.offsetX,
                 y: event.offsetY,
@@ -339,12 +405,6 @@ export class Controls {
     set constellation_name(value: string) {
         if (this.constellation_name_display) {
             this.constellation_name_display.innerText = value;
-        }
-    }
-
-    private handleOrientationChange(event: MediaQueryListEvent): void {
-        if (event.isTrusted) {
-            this.is_mobile = event.matches;
         }
     }
 }

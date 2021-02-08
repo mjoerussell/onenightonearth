@@ -141,7 +141,7 @@ select {
 }
 
 div.toggle {
-    width: 40px;
+    width: 2.5em;
     height: 1.4em;
     background-color: var(--button-color);
     position: relative;
@@ -253,6 +253,24 @@ div.toggle input[type='checkbox']:checked + span {
     }
 
     .canvas-container canvas {
+        width: 100%;
+    }
+}
+
+@media (max-width: 1050px) {
+    :root {
+        font-size: 1.3em;
+    }
+
+    html {
+        height: 100%;
+    }
+
+    body {
+        height: 100%;
+    }
+
+    .page-container {
         width: 100%;
     }
 }

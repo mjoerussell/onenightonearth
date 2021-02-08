@@ -197,6 +197,14 @@ pub export fn getCoordForCanvasPoint(point: *Point, observer_latitude: f32, obse
     }
 }
 
+pub export fn getConstellationCentroid(constellation_index: usize) ?*SkyCoord {
+    if (constellation_index > constellations.len) return null;
+
+    const coord_ptr = allocator.create(SkyCoord) catch unreachable;
+    coord_ptr.* = star_math.getConstellationCentroid(constellations[constellation_index]);
+    return coord_ptr;
+}
+
 pub export fn _wasm_alloc(byte_len: u32) ?[*]u8 {
     const buffer = allocator.alloc(u8, byte_len) catch |err| return null;
     return buffer.ptr;

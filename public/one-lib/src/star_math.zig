@@ -116,14 +116,6 @@ pub fn projectConstellationAsterism(canvas: *Canvas, constellation: Constellatio
 
         canvas.drawLine(Line{ .a = point_a.?, .b = point_b.?}, color, line_width);
     }
-
-    // Connect final point to first point
-    // const point_a = projectToCanvas(canvas, constellation.asterism[constellation.asterism.len - 1], observer_location, observer_timestamp, false);
-    // const point_b = projectToCanvas(canvas, constellation.asterism[0], observer_location, observer_timestamp, false);
-
-    // if (point_a == null or point_b == null) return;
-
-    // canvas.drawLine(.{ .a = point_a.?, .b = point_b.?}, color, line_width);
 }
 
 pub fn drawSkyGrid(canvas: *Canvas, observer_location: Coord, observer_timestamp: i64) void {
@@ -402,6 +394,35 @@ pub fn getSkyCoordForCanvasPoint(canvas: *Canvas, point: Point, observer_locatio
     return SkyCoord{
         .right_ascension = @floatCast(f32, right_ascension),
         .declination = math_utils.radToDeg(declination)
+    };
+}
+
+pub fn getConstellationCentroid(constellation: Constellation) SkyCoord {
+    var x: f32 = 0;
+    var y: f32 = 0;
+    var z: f32 = 0;
+
+    for (constellation.boundaries) |b| {
+        // convert to radians
+        const ra_rad = b.right_ascension * (math.pi / 180.0);
+        const dec_rad = b.declination * (math.pi / 180.0);
+
+        x += math.cos(dec_rad) * math.cos(ra_rad);
+        y += math.cos(dec_rad) * math.sin(ra_rad);
+        z += math.sin(dec_rad);
+    }
+
+    x /= @intToFloat(f32, constellation.boundaries.len);
+    y /= @intToFloat(f32, constellation.boundaries.len);
+    z /= @intToFloat(f32, constellation.boundaries.len);
+
+    const central_long = math.atan2(f32, y, x);
+    const central_sqrt = math.sqrt(x * x + y * y);
+    const central_lat = math.atan2(f32, z, central_sqrt);
+
+    return SkyCoord{
+        .right_ascension = central_long * (180.0 / math.pi),
+        .declination = central_lat * (180.0 / math.pi)
     };
 }
 

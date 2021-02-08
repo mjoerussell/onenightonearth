@@ -236,9 +236,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     controls.onSelectConstellation(const_index => {
-        const new_coord = wasm_interface.getCoordForSkyCoord(constellations[const_index].boundaries[0], BigInt(controls.date.valueOf()));
-        if (new_coord) {
-            updateLocation(new_coord, 2.5);
+        const constellation_center = wasm_interface.getCosntellationCentroid(const_index);
+        if (constellation_center) {
+            const new_coord = wasm_interface.getCoordForSkyCoord(constellation_center, BigInt(controls.date.valueOf()));
+            // const new_coord = wasm_interface.getCoordForSkyCoord(constellations[const_index].boundaries[0], BigInt(controls.date.valueOf()));
+            if (new_coord) {
+                updateLocation(new_coord, 2.5);
+            }
         }
     });
 });

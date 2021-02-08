@@ -43,6 +43,7 @@ interface WasmFns {
         observer_longitude: number,
         observer_timestamp: BigInt
     ) => number;
+    getConstellationCentroid: (constellation_index: number) => pointer<SkyCoord>;
     dragAndMove: (drag_start_x: number, drag_start_y: number, drag_end_x: number, drag_end_y: number) => pointer<Coord>;
     findWaypoints: (start: pointer<Coord>, end: pointer<Coord>, num_waypoints: pointer<number>) => pointer<Coord>;
     getCoordForSkyCoord: (sky_coord: pointer<SkyCoord>, observer_timestamp: BigInt) => pointer<Coord>;
@@ -110,6 +111,16 @@ export class WasmInterface {
         const point_ptr = this.allocObject(point, sizedCanvasPoint);
         const constellation_index = this.lib.getConstellationAtPoint(point_ptr, latitude, longitude, timestamp);
         return constellation_index;
+    }
+
+    getCosntellationCentroid(index: number): SkyCoord | null {
+        const coord_ptr = this.lib.getConstellationCentroid(index);
+        if (coord_ptr === 0) {
+            return null;
+        }
+        const coord = this.readObject(coord_ptr, sizedSkyCoord);
+        this.freeBytes(coord_ptr, sizeOf(sizedSkyCoord));
+        return coord;
     }
 
     resetImageData(): void {
