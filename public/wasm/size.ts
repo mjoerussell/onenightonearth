@@ -1,5 +1,9 @@
 import { CanvasSettings } from '../renderer';
 
+/**
+ * Simple primative types that can be passed to WASM functions directly, and whose sizes
+ * can be known trivially.
+ */
 export enum WasmPrimative {
     bool,
     u8,
@@ -14,6 +18,11 @@ export enum WasmPrimative {
     f64,
 }
 
+export type pointer<T> = number;
+
+/**
+ * An Earth coordinate, used to determine the location of an observer.
+ */
 export type Coord = {
     latitude: number;
     longitude: number;
@@ -24,6 +33,9 @@ export const sizedCoord: Sized<Coord> = {
     longitude: WasmPrimative.f32,
 };
 
+/**
+ * The Spectral Type of a star indicates its temperature and its apparent color.
+ */
 export enum SpectralType {
     O = 0,
     B = 1,
@@ -42,6 +54,10 @@ export type Star = {
     spec_type: SpectralType;
 };
 
+/**
+ * Simple variation of a `Star` that does not include a 'name' field.
+ * Used to pass to WASM functions.
+ */
 export type WasmStar = {
     right_ascension: number;
     declination: number;
@@ -58,8 +74,19 @@ export const sizedWasmStar: Sized<WasmStar> = {
 
 export type Constellation = {
     name: string;
+    /**
+     * This is roughly and English translation of the constellation name. For example, the epithet for
+     * Aries is "The Ram".
+     */
     epithet: string;
+    /**
+     * An Asterism is what is colloquially known as a constellation - it is the 'drawing' made by connecting stars
+     * in the sky.
+     */
     asterism: SkyCoord[];
+    /**
+     * The boundaries of a constellation define its official location in the sky.
+     */
     boundaries: SkyCoord[];
 };
 
@@ -73,6 +100,10 @@ export const sizedWasmConstellation: Sized<WasmConstellation> = {
     boundaries_len: WasmPrimative.u32,
 };
 
+/**
+ * A `SkyCoord` is the star equivalent of an Earth coord. Locations in space are noted using
+ * right ascension and declination, a system roughly corresponding to longitude and latitude, respectively.
+ */
 export type SkyCoord = {
     right_ascension: number;
     declination: number;
@@ -83,6 +114,9 @@ export const sizedSkyCoord: Sized<SkyCoord> = {
     declination: WasmPrimative.f32,
 };
 
+/**
+ * A location on the drawing canvas. (0, 0) is the top-left corner.
+ */
 export type CanvasPoint = {
     x: number;
     y: number;
@@ -168,8 +202,6 @@ export const isSimpleSize = (type: Sized<any>): type is SimpleSize<any> => {
 export const isComplexSize = (type: Sized<any>): type is ComplexSize<any> => {
     return !isSimpleSize(type);
 };
-
-export type pointer = number;
 
 /**
  * Get the number of bytes needed to store a given `WasmPrimative`.
