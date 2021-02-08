@@ -68,14 +68,6 @@ export class WasmInterface {
     }
 
     initialize(stars: Star[], constellations: Constellation[], canvas_settings: CanvasSettings): void {
-        let wasm_stars: WasmStar[] = stars.map(star => {
-            return {
-                right_ascension: star.right_ascension,
-                declination: star.declination,
-                brightness: star.brightness,
-                spec_type: star.spec_type,
-            };
-        });
         const boundaries: pointer<SkyCoord>[] = [];
         const asterisms: pointer<SkyCoord>[] = [];
         for (const c of constellations) {
@@ -84,18 +76,26 @@ export class WasmInterface {
             boundaries.push(bound_coords_ptr);
             asterisms.push(aster_coords_ptr);
         }
-        const boundary_lengths = constellations.map(c => c.boundaries.length);
-        const asterism_lengths = constellations.map(c => c.asterism.length);
         const boundaries_ptr = this.allocPrimativeArray(boundaries, WasmPrimative.u32);
         const asterisms_ptr = this.allocPrimativeArray(asterisms, WasmPrimative.u32);
+        const boundary_lengths = constellations.map(c => c.boundaries.length);
         const bound_coord_lens_ptr = this.allocPrimativeArray(boundary_lengths, WasmPrimative.u32);
+        const asterism_lengths = constellations.map(c => c.asterism.length);
         const aster_coord_lens_ptr = this.allocPrimativeArray(asterism_lengths, WasmPrimative.u32);
-        const star_ptr = this.allocArray(wasm_stars, sizedWasmStar);
-        const settings_ptr = this.allocObject(canvas_settings, sizedCanvasSettings);
-
-        this.lib.initializeStars(star_ptr, wasm_stars.length);
-        this.lib.initializeCanvas(settings_ptr);
         this.lib.initializeConstellations(boundaries_ptr, asterisms_ptr, bound_coord_lens_ptr, aster_coord_lens_ptr, constellations.length);
+
+        const wasm_stars: WasmStar[] = stars.map(star => {
+            return {
+                right_ascension: star.right_ascension,
+                declination: star.declination,
+                brightness: star.brightness,
+                spec_type: star.spec_type,
+            };
+        });
+        const star_ptr = this.allocArray(wasm_stars, sizedWasmStar);
+        this.lib.initializeStars(star_ptr, wasm_stars.length);
+        const settings_ptr = this.allocObject(canvas_settings, sizedCanvasSettings);
+        this.lib.initializeCanvas(settings_ptr);
     }
 
     projectStars(latitude: number, longitude: number, timestamp: BigInt): void {

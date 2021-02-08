@@ -8,7 +8,6 @@ body {
     background: linear-gradient(#01020f, #031131);
     font-family: 'Poppins', serif;
     margin: 0;
-    height: 100vh;
 }
 
 h1 {
@@ -19,7 +18,6 @@ h1 {
 
 .page-container {
     width: 65vw;
-    height: 100%;
     padding: 0 5%;
     margin-left: 50%;
     transform: translateX(-50%);
@@ -30,24 +28,19 @@ h1 {
     font-size: 0.85em;
 }
 
-#settings {
+#content {
     padding: 2% 0;
     display: flex;
-    flex-direction: row;
 }
 
-#settings > div {
-    height: auto;
-}
-
-#settings label {
+label {
     display: block;
     width: 100%;
     font-weight: 550;
     margin: 5px 0;
 }
 
-#main-settings {
+#settings {
     width: 25%;
 }
 
@@ -58,7 +51,6 @@ h1 {
 
 .input-row > input {
     padding: 3px;
-    /* margin: 0 5px; */
     color: #01020f;
     background-color: #ffffff00;
     border: 1px solid #01020f;
@@ -107,6 +99,22 @@ h1 {
     border: none;
 }
 
+.inline-input input:focus-visible {
+    outline: none;
+    border: none;
+}
+
+.inline-input button {
+    background-color: #ffffff00;
+    border: none;
+}
+
+.inline-input button:hover {
+    font-style: italic;
+    color: #222222;
+    cursor: pointer;
+}
+
 input[type='date'] {
     appearance: none;
     -webkit-appearance: none;
@@ -130,22 +138,6 @@ select {
     font-size: 1.1em;
     color: #4d4d4d;
     padding: 3px;
-}
-
-.inline-input input:focus-visible {
-    outline: none;
-    border: none;
-}
-
-.inline-input button {
-    background-color: #ffffff00;
-    border: none;
-}
-
-.inline-input button:hover {
-    font-style: italic;
-    color: #222222;
-    cursor: pointer;
 }
 
 div.toggle {
@@ -237,13 +229,30 @@ div.toggle input[type='checkbox']:checked + span {
 .canvas-container canvas#backdrop-canvas {
     z-index: 0;
 }
-.canvas-container canvas#star-canvas-alpha,
-.canvas-container canvas#star-canvas-beta {
-    z-index: 1;
-}
-.canvas-container canvas#star-debug-canvas {
-    z-index: 2;
-}
-.canvas-container canvas#grid-canvas {
-    z-index: 3;
+
+@media (max-width: 1550px) {
+    #content {
+        flex-direction: column;
+    }
+
+    #settings {
+        width: 100%;
+        height: 15%;
+        display: flex;
+        justify-content: space-evenly;
+    }
+
+    .input-row {
+        margin: 3% 5px 5%;
+    }
+
+    .canvas-container {
+        width: 100%;
+        margin-left: 0;
+        margin-bottom: 5%;
+    }
+
+    .canvas-container canvas {
+        width: 100%;
+    }
 }
