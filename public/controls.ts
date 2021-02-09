@@ -1,4 +1,5 @@
 import { Renderer } from './renderer';
+import { TouchInterface } from './touch-interface';
 import { CanvasPoint, Constellation, Coord } from './wasm/size';
 
 interface DragState {
@@ -37,6 +38,8 @@ export class Controls {
 
     private timelapse_is_on = false;
 
+    private touch_handler: TouchInterface;
+
     private drag_state: DragState = {
         is_dragging: false,
         x: 0,
@@ -74,6 +77,21 @@ export class Controls {
             this.select_constellation.style.display =
                 this.renderer.draw_asterisms || this.renderer.draw_constellation_grid ? 'block' : 'none';
         }
+
+        this.touch_handler = new TouchInterface(this.renderer.canvas);
+
+        const mql = window.matchMedia('only screen and (max-width: 1000px)');
+        if (mql.matches) {
+            this.renderer.drag_speed = Renderer.DefaultMobileDragSpeed;
+        }
+        // Listen for future changes
+        mql.addEventListener('change', event => {
+            if (mql.matches) {
+                this.renderer.drag_speed = Renderer.DefaultMobileDragSpeed;
+            } else {
+                this.renderer.drag_speed = Renderer.DefaultDragSpeed;
+            }
+        });
 
         this.location_input?.addEventListener('change', () => {
             this.user_changed_location = true;

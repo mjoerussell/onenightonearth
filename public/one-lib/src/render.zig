@@ -29,6 +29,7 @@ pub const Canvas = struct {
         height: u32,
         background_radius: f32,
         zoom_factor: f32,
+        drag_speed: f32,
         draw_north_up: bool,
         draw_constellation_grid: bool,
         draw_asterisms: bool

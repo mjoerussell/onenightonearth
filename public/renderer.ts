@@ -3,12 +3,15 @@ export type CanvasSettings = {
     height: number;
     background_radius: number;
     zoom_factor: number;
+    drag_speed: number;
     draw_north_up: boolean;
     draw_constellation_grid: boolean;
     draw_asterisms: boolean;
 };
 
 export class Renderer {
+    public static readonly DefaultDragSpeed = 1.5;
+    public static readonly DefaultMobileDragSpeed = 3;
     /**
      * The main canvas is the one that's shown to the user. It's only drawn to in single batches, once the workers
      * have finished drawing everything to the offscreen buffer.
@@ -29,6 +32,7 @@ export class Renderer {
             height: this.main_canvas.height,
             background_radius: 0.45 * Math.min(this.main_canvas.width, this.main_canvas.height),
             zoom_factor: 1.0,
+            drag_speed: Renderer.DefaultDragSpeed,
             draw_north_up: true,
             draw_constellation_grid: false,
             draw_asterisms: false,
@@ -153,5 +157,14 @@ export class Renderer {
 
     get draw_asterisms(): boolean {
         return this.settings.draw_asterisms;
+    }
+
+    set drag_speed(value: number) {
+        this._settings_did_change = true;
+        this.settings.drag_speed = value;
+    }
+
+    get drag_speed(): number {
+        return this.drag_speed;
     }
 }

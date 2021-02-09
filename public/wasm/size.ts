@@ -132,6 +132,7 @@ export const sizedCanvasSettings: Sized<CanvasSettings> = {
     height: WasmPrimative.u32,
     background_radius: WasmPrimative.f32,
     zoom_factor: WasmPrimative.f32,
+    drag_speed: WasmPrimative.f32,
     draw_north_up: WasmPrimative.bool,
     draw_constellation_grid: WasmPrimative.bool,
     draw_asterisms: WasmPrimative.bool,

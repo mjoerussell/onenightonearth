@@ -28,6 +28,7 @@ const ExternCanvasSettings = packed struct {
     height: u32,
     background_radius: f32,
     zoom_factor: f32,
+    drag_speed: f32,
     draw_north_up: u8,
     draw_constellation_grid: u8,
     draw_asterisms: u8,
@@ -38,6 +39,7 @@ const ExternCanvasSettings = packed struct {
             .height = self.height,
             .background_radius = self.background_radius,
             .zoom_factor = self.zoom_factor,
+            .drag_speed = self.drag_speed,
             .draw_north_up = self.draw_north_up == 1,
             .draw_constellation_grid = self.draw_constellation_grid == 1,
             .draw_asterisms = self.draw_asterisms == 1
@@ -111,10 +113,10 @@ pub export fn projectConstellationGrids(observer_latitude: f32, observer_longitu
     if (canvas.settings.draw_constellation_grid or canvas.settings.draw_asterisms) {
         for (constellations) |constellation| {
             if (canvas.settings.draw_constellation_grid) {
-                star_math.projectConstellationGrid(&canvas, constellation, Pixel.rgba(255, 245, 194, 105), 1, current_coord, observer_timestamp);
+                star_math.projectConstellationGrid(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, current_coord, observer_timestamp);
             }
             if (canvas.settings.draw_asterisms) {
-                star_math.projectConstellationAsterism(&canvas, constellation, Pixel.rgba(255, 245, 194, 105), 1, current_coord, observer_timestamp);
+                star_math.projectConstellationAsterism(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, current_coord, observer_timestamp);
             }
         }
     }
@@ -139,7 +141,7 @@ pub export fn getConstellationAtPoint(point: *Point, observer_latitude: f32, obs
 }
 
 pub export fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_end_y: f32) *Coord {
-    const coord = star_math.dragAndMove(drag_start_x, drag_start_y, drag_end_x, drag_end_y);
+    const coord = star_math.dragAndMove(&canvas, drag_start_x, drag_start_y, drag_end_x, drag_end_y);
     const coord_ptr = allocator.create(Coord) catch unreachable;
     coord_ptr.* = coord;
     return coord_ptr;

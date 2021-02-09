@@ -198,7 +198,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        renderStars(controls);
+        window.requestAnimationFrame(() => renderStars(controls));
+        // renderStars(controls);
     });
 
     controls.onMapZoom(zoom_factor => {

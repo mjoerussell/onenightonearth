@@ -69,6 +69,14 @@ pub const SpectralType = packed enum(u8) {
     }
 };
 
+fn getAlpha(brightness: f32) u8 {
+    return if (brightness >= 1.0)
+        255
+    else if (brightness <= 0) 
+        0
+    else @floatToInt(u8, brightness * 255.0);
+}
+
 pub fn projectStar(canvas: *Canvas, star: Star, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) void {
     const point = projectToCanvas(
         canvas, 
@@ -80,7 +88,7 @@ pub fn projectStar(canvas: *Canvas, star: Star, observer_location: Coord, observ
     if (point) |p| {
         if (canvas.isInsideCircle(p)) {
             var base_color = star.spec_type.getColor();
-            base_color.a = @floatToInt(u8, star.brightness * 255.0); 
+            base_color.a = getAlpha(star.brightness + 0.15);
             canvas.setPixelAt(p, base_color);
         }
     }
@@ -304,7 +312,7 @@ pub fn findWaypoints(allocator: *Allocator, f: Coord, t: Coord) []Coord {
     return waypoints;
 }
 
-pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_end_y: f32) Coord {
+pub fn dragAndMove(canvas: *Canvas, drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_end_y: f32) Coord {
     const dist_x = drag_end_x - drag_start_x;
     const dist_y = drag_end_y - drag_start_y;
 
@@ -318,7 +326,7 @@ pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_e
     // drag_distance is the angular distance between the starting location and the result location after a single drag
     // 2.35 is a magic number of degrees, picked because it results in what feels like an appropriate drag speed
     // Higher = move more with smaller cursor movements, and vice versa
-    const drag_distance: f32 = math_utils.degToRad(1.5);
+    const drag_distance: f32 = math_utils.degToRad(canvas.settings.drag_speed);
 
     // Calculate asin(new_latitude), and clamp the result between [-1, 1]
     var sin_lat_x = math.sin(drag_distance) * math.cos(dist_phi);
