@@ -24,10 +24,6 @@ h1 {
     background-color: #f5f5ec;
 }
 
-.info-box {
-    font-size: 0.85em;
-}
-
 #content {
     padding: 2% 0;
     display: flex;
@@ -49,9 +45,13 @@ label {
     margin: 10% 5px;
 }
 
+.input-row * {
+    font-size: 1em;
+    color: #4d4d4d;
+}
+
 .input-row > input {
     padding: 3px;
-    color: #01020f;
     background-color: #ffffff00;
     border: 1px solid #01020f;
     border-radius: 2px;
@@ -68,6 +68,10 @@ label {
     border-radius: 3px;
     color: #ffffff;
     background-color: var(--button-color);
+}
+
+.input-row label {
+    color: #01020f;
 }
 
 .input-row > button:hover {
@@ -88,11 +92,6 @@ label {
 
 .inline-input:focus-within {
     border-color: #065596;
-}
-
-.inline-input * {
-    font-size: 1.1em;
-    color: #4d4d4d;
 }
 
 .inline-input input {
@@ -119,8 +118,6 @@ input[type='date'] {
     appearance: none;
     -webkit-appearance: none;
     font-family: 'Poppins', serif;
-    font-size: 1.1em;
-    color: #4d4d4d;
     background-color: #fff;
     border: 1px solid #bdbdbd;
     border-radius: 3px;
@@ -135,8 +132,6 @@ input[type='date']::-webkit-clear-button {
 
 select {
     width: 100%;
-    font-size: 1.1em;
-    color: #4d4d4d;
     padding: 3px;
 }
 
