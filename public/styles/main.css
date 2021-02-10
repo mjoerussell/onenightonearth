@@ -176,6 +176,15 @@ div.toggle input[type='checkbox']:checked + span {
     right: 5%;
 }
 
+div.constellation-info {
+    text-align: center;
+}
+
+div.constellation-info.desktop {
+    margin-top: 5%;
+    font-size: 1.2em;
+}
+
 div.constellation-info.mobile {
     display: none;
 }
@@ -282,7 +291,6 @@ div.constellation-info.mobile {
 
     div.constellation-info.mobile {
         display: block;
-        text-align: center;
         font-size: 1.5em;
     }
 
