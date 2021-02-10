@@ -6,8 +6,6 @@ One Night on Earth is written in Typescript and Zig.
 
 [**onenightonearth.com**](https://onenightonearth.com)
 
-> Note: Currently appears to run best in Firefox, some issues have been seen in Chrome which are currently being worked on.
-
 ## Controls
 
 The controls currently available on the site are:
