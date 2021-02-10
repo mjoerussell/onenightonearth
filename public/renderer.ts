@@ -38,9 +38,6 @@ export class Renderer {
             draw_asterisms: false,
         };
 
-        console.log('Canvas width: ', this.settings.width);
-        console.log('Canvas height: ', this.settings.height);
-
         this.main_canvas.addEventListener('resize', event => {
             this.width = this.main_canvas.width;
             this.height = this.main_canvas.height;

@@ -82,13 +82,8 @@ document.addEventListener('DOMContentLoaded', () => {
             })
     );
 
-    controls.onDateChange(date => {
-        renderStars(controls);
-    });
-
-    controls.onChangeConstellationView(() => {
-        renderStars(controls);
-    });
+    controls.onDateChange(date => renderStars(controls));
+    controls.onChangeConstellationView(() => renderStars(controls));
 
     controls.onSetToday((current, target) => {
         const days_per_frame = 2;
