@@ -71,7 +71,11 @@ label {
 }
 
 .input-row label {
-    color: #01020f;
+    color: var(--text-color);
+}
+
+.input-row span {
+    color: var(--text-color);
 }
 
 .input-row > button:hover {
@@ -172,6 +176,10 @@ div.toggle input[type='checkbox']:checked + span {
     right: 5%;
 }
 
+div.constellation-info.mobile {
+    display: none;
+}
+
 .canvas-container {
     display: inline-block;
     position: relative;
@@ -266,6 +274,16 @@ div.toggle input[type='checkbox']:checked + span {
 
     body {
         height: 100%;
+    }
+
+    div.constellation-info.desktop {
+        display: none;
+    }
+
+    div.constellation-info.mobile {
+        display: block;
+        text-align: center;
+        font-size: 1.5em;
     }
 
     .canvas-container {

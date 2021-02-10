@@ -119,7 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const waypoints = wasm_interface.findWaypoints(start, new_coord);
         if (waypoints == null || waypoints.length === 0) {
-            console.log('No waypoints recieved');
             renderStars(controls);
             return;
         }
@@ -199,7 +198,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         window.requestAnimationFrame(() => renderStars(controls));
-        // renderStars(controls);
     });
 
     controls.onMapZoom(zoom_factor => {
@@ -237,10 +235,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     controls.onSelectConstellation(const_index => {
+        controls.constellation_name = `${constellations[const_index].name} - ${constellations[const_index].epithet}`;
         const constellation_center = wasm_interface.getCosntellationCentroid(const_index);
         if (constellation_center) {
             const new_coord = wasm_interface.getCoordForSkyCoord(constellation_center, BigInt(controls.date.valueOf()));
-            // const new_coord = wasm_interface.getCoordForSkyCoord(constellations[const_index].boundaries[0], BigInt(controls.date.valueOf()));
             if (new_coord) {
                 updateLocation(new_coord, 2.5);
             }

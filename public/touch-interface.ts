@@ -65,7 +65,6 @@ export class TouchInterface {
 
         this.el.addEventListener('touchmove', event => {
             event.preventDefault();
-            // this.was_moving_touches = true;
             if (event.changedTouches.length === 1 && this.current_touches.length === 1) {
                 const old_touch_index = this.getIndexOfTouchById(event.changedTouches[0].identifier);
                 if (old_touch_index >= 0) {

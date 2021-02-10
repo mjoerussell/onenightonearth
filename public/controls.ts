@@ -26,7 +26,8 @@ export class Controls {
     private show_constellations_input: HTMLInputElement | null;
     private show_constellation_grid_input: HTMLInputElement | null;
     private show_asterism_input: HTMLInputElement | null;
-    private constellation_name_display: HTMLSpanElement | null;
+    private constellation_info_displays: HTMLCollectionOf<HTMLDivElement> | null;
+    private _constellation_name: string | null = null;
     private select_constellation: HTMLSelectElement | null;
 
     public renderer: Renderer;
@@ -64,7 +65,7 @@ export class Controls {
         this.show_constellations_input = document.getElementById('showConstellations') as HTMLInputElement;
         this.show_asterism_input = document.getElementById('showAsterism') as HTMLInputElement;
         this.show_constellation_grid_input = document.getElementById('showGrid') as HTMLInputElement;
-        this.constellation_name_display = document.getElementById('constellationName') as HTMLSpanElement;
+        this.constellation_info_displays = document.getElementsByClassName('constellation-info') as HTMLCollectionOf<HTMLDivElement>;
 
         this.select_constellation = document.getElementById('selectConstellation') as HTMLSelectElement;
 
@@ -414,12 +415,18 @@ export class Controls {
     }
 
     get constellation_name(): string {
-        return this.constellation_name_display?.innerText ?? '';
+        return this._constellation_name ?? '';
     }
 
     set constellation_name(value: string) {
-        if (this.constellation_name_display) {
-            this.constellation_name_display.innerText = value;
+        this._constellation_name = value;
+        if (this.constellation_info_displays) {
+            for (let i = 0; i < this.constellation_info_displays.length; i += 1) {
+                const name_display = this.constellation_info_displays[i].getElementsByClassName('constellation-name')[0] as HTMLSpanElement;
+                if (name_display != null) {
+                    name_display.innerText = value;
+                }
+            }
         }
     }
 }

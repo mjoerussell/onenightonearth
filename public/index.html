@@ -39,10 +39,12 @@
                                 <span></span>
                             </div>
                         </label>
-                        <span id="constellationName"></span>
                         <select id="selectConstellation">
                             <option value="-1">Select a Constellation to View</option>
                         </select>
+                        <div class="constellation-info desktop">
+                            <span class="constellation-name"></span>
+                        </div>
                     </div>
                 </div>
                 
@@ -52,6 +54,10 @@
                     </div>
                     <canvas id="backdrop-canvas" width="850" height="850"></canvas>
                     <canvas id="star-canvas" width="850" height="850"></canvas>
+                </div>
+
+                <div class="constellation-info mobile">
+                    <span class="constellation-name"></span>
                 </div>
             </div>
             
