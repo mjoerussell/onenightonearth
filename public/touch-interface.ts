@@ -36,6 +36,7 @@ export class TouchInterface {
                 setTimeout(() => {
                     const touch = this.getTouchById(new_touch.id);
                     if (touch) {
+                        this.was_moving_touches = true;
                         for (const handler of this.touch_hold_handlers) {
                             handler(touch);
                         }
@@ -64,7 +65,7 @@ export class TouchInterface {
 
         this.el.addEventListener('touchmove', event => {
             event.preventDefault();
-            this.was_moving_touches = true;
+            // this.was_moving_touches = true;
             if (event.changedTouches.length === 1 && this.current_touches.length === 1) {
                 const old_touch_index = this.getIndexOfTouchById(event.changedTouches[0].identifier);
                 if (old_touch_index >= 0) {
@@ -108,8 +109,10 @@ export class TouchInterface {
             for (let i = 0; i < event.changedTouches.length; i += 1) {
                 const index = this.getIndexOfTouchById(event.changedTouches[i].identifier);
                 if (index >= 0) {
-                    this.touches_completed += 1;
-                    this.last_completed_touch = this.current_touches[index];
+                    if (!this.was_moving_touches) {
+                        this.touches_completed += 1;
+                        this.last_completed_touch = this.current_touches[index];
+                    }
                     this.current_touches.splice(index, 1);
                 }
             }

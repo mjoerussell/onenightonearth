@@ -238,28 +238,7 @@ export class Controls {
             handleDragMove(offset_x, offset_y);
         });
 
-        // this.renderer.addEventListener('touchstart', event => {
-        //     if (event.changedTouches.length !== 1 || this.pinch_state.is_zooming) {
-        //         return;
-        //     }
-        //     event.preventDefault();
-        //     const canvas_rect = this.renderer.canvas.getBoundingClientRect();
-        //     const touch = event.changedTouches[0];
-        //     const offset_x = touch.clientX - canvas_rect.x;
-        //     const offset_y = touch.clientY - canvas_rect.y;
-        //     handleDragStart(offset_x, offset_y);
-        // });
-
         this.renderer.addEventListener('mousemove', event => handleDragMove(event.offsetX, event.offsetY));
-
-        // this.renderer.addEventListener('touchmove', event => {
-        //     event.preventDefault();
-        //     const canvas_rect = this.renderer.canvas.getBoundingClientRect();
-        //     const touch = event.changedTouches[0];
-        //     const offset_x = touch.clientX - canvas_rect.x;
-        //     const offset_y = touch.clientY - canvas_rect.y;
-        //     handleDragMove(offset_x, offset_y, 2);
-        // });
 
         this.renderer.addEventListener('mouseup', event => {
             this.renderer.canvas.classList.remove('moving');
@@ -278,38 +257,6 @@ export class Controls {
     }
 
     onMapZoom(handler: (zoom_factor: number) => void): void {
-        // this.renderer.addEventListener('touchstart', event => {
-        //     if (event.changedTouches.length === 2) {
-        //         event.preventDefault();
-        //         this.pinch_state.is_zooming = true;
-        //     }
-        // });
-
-        // this.renderer.addEventListener('touchmove', event => {
-        //     if (this.pinch_state.is_zooming) {
-        //         event.preventDefault();
-        //         if (event.changedTouches.length !== 2 || this.drag_state.is_dragging) {
-        //             return;
-        //         }
-        //         const touch_a = event.changedTouches[0];
-        //         const touch_b = event.changedTouches[1];
-        //         const current_touch_distance = Math.sqrt(
-        //             Math.pow(touch_b.pageX - touch_a.pageX, 2) + Math.pow(touch_b.pageY - touch_a.pageY, 2)
-        //         );
-        //         const delta_amount = current_touch_distance < this.pinch_state.previous_distance ? -0.05 : 0.15;
-        //         this.pinch_state.previous_distance = current_touch_distance;
-        //         let zoom_factor = this.renderer.zoom_factor - this.renderer.zoom_factor * delta_amount;
-        //         if (zoom_factor < 1) {
-        //             zoom_factor = 1;
-        //         }
-        //         handler(zoom_factor);
-        //     }
-        // });
-
-        // this.renderer.addEventListener('touchend', event => {
-        //     this.pinch_state.is_zooming = false;
-        // });
-
         this.touch_handler.onPinch((change_a, change_b) => {
             const new_a = change_a[1];
             const new_b = change_b[1];
