@@ -14,15 +14,15 @@ const renderStars = (controls: Controls, date?: Date) => {
         return;
     }
 
-    if (controls.renderer.settings_did_change) {
-        wasm_interface.updateSettings(controls.renderer.getCanvasSettings());
-    }
+    // if (controls.renderer.settings_did_change) {
+    //     wasm_interface.updateSettings(controls.renderer.getCanvasSettings());
+    // }
 
-    wasm_interface.projectStars(controls.latitude, controls.longitude, BigInt(timestamp));
-    wasm_interface.projectConstellationGrids(controls.latitude, controls.longitude, BigInt(timestamp));
-    const data = wasm_interface.getImageData();
-    controls.renderer.drawData(data);
-    wasm_interface.resetImageData();
+    // wasm_interface.projectStars(controls.latitude, controls.longitude, BigInt(timestamp));
+    // wasm_interface.projectConstellationGrids(controls.latitude, controls.longitude, BigInt(timestamp));
+    // const data = wasm_interface.getImageData();
+    // controls.renderer.drawData(data);
+    // wasm_interface.resetImageData();
 };
 
 const drawUIElements = (controls: Controls) => {
@@ -208,9 +208,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 controls.longitude,
                 BigInt(controls.date.valueOf())
             );
-            const data = wasm_interface.getImageData();
-            controls.renderer.drawData(data);
-            renderStars(controls);
+            // const data = wasm_interface.getImageData();
+            // controls.renderer.drawData(data);
+            // renderStars(controls);
             if (index >= 0) {
                 controls.constellation_name = `${constellations[index].name} - ${constellations[index].epithet}`;
             }
