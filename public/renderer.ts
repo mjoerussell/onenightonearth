@@ -1,3 +1,5 @@
+import * as m3 from './matrix';
+
 export type CanvasSettings = {
     width: number;
     height: number;
@@ -43,14 +45,19 @@ export class Renderer {
         const vertex_shader_source = `#version 300 es
         in vec2 a_position;
 
-        uniform vec2 u_resolution;
+        // uniform vec2 u_resolution;
+        uniform mat3 u_matrix;
 
         void main() {
-            vec2 zeroToOne = a_position / u_resolution;
-            vec2 zeroToTwo = zeroToOne * 2.0;
-            vec2 clipSpace = zeroToTwo - 1.0;
 
-            gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
+            // vec2 position = (u_matrix * vec3(a_position, 1)).xy;
+
+            // vec2 zeroToOne = position / u_resolution;
+            // vec2 zeroToTwo = zeroToOne * 2.0;
+            // vec2 clipSpace = zeroToTwo - 1.0;
+
+            // gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
+            gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
         }
         `;
 
@@ -80,7 +87,7 @@ export class Renderer {
         }
 
         const position_attrib_location = this.gl.getAttribLocation(program, 'a_position');
-        const resolution_uniform_location = this.gl.getUniformLocation(program, 'u_resolution');
+        const matrix_location = this.gl.getUniformLocation(program, 'u_matrix');
         const color_location = this.gl.getUniformLocation(program, 'u_color');
 
         const position_buffer = this.gl.createBuffer();
@@ -94,13 +101,25 @@ export class Renderer {
         this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
 
         this.gl.clearColor(0, 0, 0, 0);
-        this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+        this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
         this.gl.useProgram(program);
         this.gl.bindVertexArray(vao);
 
-        this.gl.uniform2f(resolution_uniform_location, this.gl.canvas.width, this.gl.canvas.height);
-        // this.gl.uniform4f(color_location, 1, 0, 0.5, 1);
+        const translation = [0, 300];
+        const rotation_radians = Math.PI / 4;
+        const scale = [1, 1];
+
+        const projection_matrix = m3.projection(this.main_canvas.clientWidth, this.main_canvas.clientHeight);
+        const translation_matrix = m3.translation(translation[0], translation[1]);
+        const rotation_matrix = m3.rotation(rotation_radians);
+        const scale_matrix = m3.scaling(scale[0], scale[1]);
+
+        let matrix = m3.multiplyM3(projection_matrix, translation_matrix);
+        matrix = m3.multiplyM3(matrix, rotation_matrix);
+        matrix = m3.multiplyM3(matrix, scale_matrix);
+
+        this.gl.uniformMatrix3fv(matrix_location, false, matrix);
 
         const setRect = (x: number, y: number, width: number, height: number): void => {
             const x1 = x;
