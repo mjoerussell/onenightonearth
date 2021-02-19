@@ -18,14 +18,19 @@ const renderStars = (controls: Controls, date?: Date) => {
     const rotation_radians = Math.PI / 4;
     const scale = [1.5, 1];
 
-    let matrix = wasm_interface.getProjectionMatrix(controls.renderer.canvas.clientWidth, controls.renderer.canvas.clientHeight);
-    matrix = wasm_interface.matrixMult(wasm_interface.getTranslationMatrix(translation[0], translation[1]), matrix);
-    matrix = wasm_interface.matrixMult(wasm_interface.getRotationMatrix(rotation_radians), matrix);
-    matrix = wasm_interface.matrixMult(wasm_interface.getScalingMatrix(scale[0], scale[1]), matrix);
+    let matrix = wasm_interface.getProjectionMatrix3d(
+        controls.renderer.canvas.clientWidth,
+        controls.renderer.canvas.clientHeight,
+        controls.renderer.canvas.clientWidth
+    );
+    matrix = wasm_interface.matrixMult3d(wasm_interface.getTranslationMatrix3d(translation[0], translation[1], 0), matrix);
+    matrix = wasm_interface.matrixMult3d(wasm_interface.getXRotationMatrix3d(0), matrix);
+    matrix = wasm_interface.matrixMult3d(wasm_interface.getYRotationMatrix3d(0), matrix);
+    matrix = wasm_interface.matrixMult3d(wasm_interface.getZRotationMatrix3d(rotation_radians), matrix);
+    matrix = wasm_interface.matrixMult3d(wasm_interface.getScalingMatrix3d(scale[0], scale[1], 1), matrix);
 
-    const mat_array = Array.from(wasm_interface.readMatrix(matrix));
-    controls.renderer.drawScene(Array.from(wasm_interface.readMatrix(matrix)));
-    wasm_interface.freeMatrix(matrix);
+    controls.renderer.drawScene(Array.from(wasm_interface.readMatrix3d(matrix)));
+    wasm_interface.freeMatrix3d(matrix);
     // if (controls.renderer.settings_did_change) {
     //     wasm_interface.updateSettings(controls.renderer.getCanvasSettings());
     // }

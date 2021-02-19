@@ -49,10 +49,10 @@ export class Renderer {
         };
 
         const vertex_shader_source = `#version 300 es
-        in vec2 a_position;
+        in vec4 a_position;
 
         // uniform vec2 u_resolution;
-        uniform mat3 u_matrix;
+        uniform mat4 u_matrix;
 
         void main() {
 
@@ -63,7 +63,8 @@ export class Renderer {
             // vec2 clipSpace = zeroToTwo - 1.0;
 
             // gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
-            gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
+            // gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
+            gl_Position = u_matrix * a_position;
         }
         `;
 
@@ -104,7 +105,7 @@ export class Renderer {
         this.vao = this.gl.createVertexArray();
         this.gl.bindVertexArray(this.vao);
         this.gl.enableVertexAttribArray(position_attrib_location);
-        this.gl.vertexAttribPointer(position_attrib_location, 2, this.gl.FLOAT, false, 0, 0);
+        this.gl.vertexAttribPointer(position_attrib_location, 3, this.gl.FLOAT, false, 0, 0);
     }
 
     drawScene(matrix: number[]): void {
@@ -116,7 +117,7 @@ export class Renderer {
         this.gl.useProgram(this.program);
         this.gl.bindVertexArray(this.vao);
 
-        this.gl.uniformMatrix3fv(this.matrix_location, false, matrix);
+        this.gl.uniformMatrix4fv(this.matrix_location, false, matrix);
 
         const setRect = (x: number, y: number, width: number, height: number): void => {
             const x1 = x;
@@ -126,7 +127,7 @@ export class Renderer {
 
             this.gl.bufferData(
                 this.gl.ARRAY_BUFFER,
-                new Float32Array([x1, y1, x2, y1, x1, y2, x1, y2, x2, y1, x2, y2]),
+                new Float32Array([x1, y1, 0, x2, y1, 0, x1, y2, 0, x1, y2, 0, x2, y1, 0, x2, y2, 0]),
                 this.gl.STATIC_DRAW
             );
         };

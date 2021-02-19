@@ -59,13 +59,22 @@ interface WasmFns {
         observer_longitude: number,
         observer_timestamp: BigInt
     ) => pointer<Coord>;
-    getProjectionMatrix: (width: number, height: number) => pointer<any>;
-    getTranslationMatrix: (tx: number, ty: number) => pointer<any>;
-    getRotationMatrix: (radians: number) => pointer<any>;
-    getScalingMatrix: (sx: number, sy: number) => pointer<any>;
-    matrixMult: (a: pointer<any>, b: pointer<any>) => pointer<any>;
-    readMatrix: (m: pointer<any>) => pointer<number[]>;
-    freeMatrix: (m: pointer<any>) => void;
+    getProjectionMatrix2d: (width: number, height: number) => pointer<any>;
+    getTranslationMatrix2d: (tx: number, ty: number) => pointer<any>;
+    getRotationMatrix2d: (radians: number) => pointer<any>;
+    getScalingMatrix2d: (sx: number, sy: number) => pointer<any>;
+    matrixMult2d: (a: pointer<any>, b: pointer<any>) => pointer<any>;
+    readMatrix2d: (m: pointer<any>) => pointer<number[]>;
+    freeMatrix2d: (m: pointer<any>) => void;
+    getProjectionMatrix3d: (width: number, height: number, depth: number) => pointer<any>;
+    getTranslationMatrix3d: (tx: number, ty: number, tz: number) => pointer<any>;
+    getXRotationMatrix3d: (radians: number) => pointer<any>;
+    getYRotationMatrix3d: (radians: number) => pointer<any>;
+    getZRotationMatrix3d: (radians: number) => pointer<any>;
+    getScalingMatrix3d: (sx: number, sy: number, sz: number) => pointer<any>;
+    matrixMult3d: (a: pointer<any>, b: pointer<any>) => pointer<any>;
+    readMatrix3d: (m: pointer<any>) => pointer<number[]>;
+    freeMatrix3d: (m: pointer<any>) => void;
 }
 
 export class WasmInterface {
@@ -208,36 +217,76 @@ export class WasmInterface {
         this.lib.updateCanvasSettings(settings_ptr);
     }
 
-    getProjectionMatrix(width: number, height: number): number {
-        return this.lib.getProjectionMatrix(width, height);
+    getProjectionMatrix2d(width: number, height: number): number {
+        return this.lib.getProjectionMatrix2d(width, height);
     }
 
-    getTranslationMatrix(tx: number, ty: number): number {
-        return this.lib.getTranslationMatrix(tx, ty);
+    getProjectionMatrix3d(width: number, height: number, depth: number): number {
+        return this.lib.getProjectionMatrix3d(width, height, depth);
     }
 
-    getRotationMatrix(radians: number): number {
-        return this.lib.getRotationMatrix(radians);
+    getTranslationMatrix2d(tx: number, ty: number): number {
+        return this.lib.getTranslationMatrix2d(tx, ty);
     }
 
-    getScalingMatrix(sx: number, sy: number): number {
-        return this.lib.getScalingMatrix(sx, sy);
+    getTranslationMatrix3d(tx: number, ty: number, tz: number): number {
+        return this.lib.getTranslationMatrix3d(tx, ty, tz);
     }
 
-    matrixMult(a: number, b: number): number {
-        const res = this.lib.matrixMult(a, b);
-        this.lib.freeMatrix(a);
-        this.lib.freeMatrix(b);
+    getRotationMatrix2d(radians: number): number {
+        return this.lib.getRotationMatrix2d(radians);
+    }
+
+    getXRotationMatrix3d(radians: number): number {
+        return this.lib.getXRotationMatrix3d(radians);
+    }
+
+    getYRotationMatrix3d(radians: number): number {
+        return this.lib.getYRotationMatrix3d(radians);
+    }
+
+    getZRotationMatrix3d(radians: number): number {
+        return this.lib.getZRotationMatrix3d(radians);
+    }
+
+    getScalingMatrix2d(sx: number, sy: number): number {
+        return this.lib.getScalingMatrix2d(sx, sy);
+    }
+
+    getScalingMatrix3d(sx: number, sy: number, sz: number): number {
+        return this.lib.getScalingMatrix3d(sx, sy, sz);
+    }
+
+    matrixMult2d(a: number, b: number): number {
+        const res = this.lib.matrixMult2d(a, b);
+        this.lib.freeMatrix2d(a);
+        this.lib.freeMatrix2d(b);
         return res;
     }
 
-    readMatrix(a: number): Float32Array {
-        const data = this.lib.readMatrix(a);
+    matrixMult3d(a: number, b: number): number {
+        const res = this.lib.matrixMult3d(a, b);
+        this.lib.freeMatrix3d(a);
+        this.lib.freeMatrix3d(b);
+        return res;
+    }
+
+    readMatrix2d(a: number): Float32Array {
+        const data = this.lib.readMatrix2d(a);
         return new Float32Array(this.memory, data, 9);
     }
 
-    freeMatrix(a: number): void {
-        this.lib.freeMatrix(a);
+    readMatrix3d(a: number): Float32Array {
+        const data = this.lib.readMatrix3d(a);
+        return new Float32Array(this.memory, data, 16);
+    }
+
+    freeMatrix2d(a: number): void {
+        this.lib.freeMatrix2d(a);
+    }
+
+    freeMatrix3d(a: number): void {
+        this.lib.freeMatrix3d(a);
     }
 
     getString(ptr: pointer<string>, len: number): string {

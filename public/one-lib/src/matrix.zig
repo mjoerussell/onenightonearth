@@ -15,39 +15,103 @@ pub const MatrixType2D = packed enum(u8) {
     Scaling,
 };
 
-pub fn getRotation2d(radians: f32) Mat3f {
-    const c = math.cos(radians);
-    const s = math.sin(radians);
-    return Mat3f.init([3][3]f32{
-        [_]f32{ c, -s, 0 },
-        [_]f32{ s,  c, 0 },
-        [_]f32{ 0,  0, 1 },
-    });
-}
+pub const Mat2D = struct {
+    pub fn getTranslation(tx: f32, ty: f32) Mat3f {
+        return Mat3f.init([3][3]f32{
+            [_]f32{ 1, 0, 0 },
+            [_]f32{ 0, 1, 0 },
+            [_]f32{ tx, ty, 1 },
+        });
+    }
+    
+    pub fn getRotation(radians: f32) Mat3f {
+        const c = math.cos(radians);
+        const s = math.sin(radians);
+        return Mat3f.init([3][3]f32{
+            [_]f32{ c, -s, 0 },
+            [_]f32{ s,  c, 0 },
+            [_]f32{ 0,  0, 1 },
+        });
+    }
 
-pub fn getTranslation2d(tx: f32, ty: f32) Mat3f {
-    return Mat3f.init([3][3]f32{
-        [_]f32{ 1, 0, 0 },
-        [_]f32{ 0, 1, 0 },
-        [_]f32{ tx, ty, 1 },
-    });
-}
+    pub fn getScaling(sx: f32, sy: f32) Mat3f {
+        return Mat3f.init([3][3]f32{
+            [_]f32{ sx, 0, 0 },
+            [_]f32{ 0, sy, 0 },
+            [_]f32{ 0, 0, 1 },
+        });
+    }
 
-pub fn getScaling2d(sx: f32, sy: f32) Mat3f {
-    return Mat3f.init([3][3]f32{
-        [_]f32{ sx, 0, 0 },
-        [_]f32{ 0, sy, 0 },
-        [_]f32{ 0, 0, 1 },
-    });
-}
+    pub fn getProjection(width: f32, height: f32) Mat3f {
+        return Mat3f.init([3][3]f32{
+            [_]f32{ 2 / width, 0, 0 },
+            [_]f32{ 0, -2 / height, 0 },
+            [_]f32{ -1, 1, 1 }
+        });
+    }
+};
 
-pub fn getProjection2d(width: f32, height: f32) Mat3f {
-    return Mat3f.init([3][3]f32{
-        [_]f32{ 2 / width, 0, 0 },
-        [_]f32{ 0, -2 / height, 0 },
-        [_]f32{ -1, 1, 1 }
-    });
-}
+pub const Mat3D = struct {
+    pub fn getTranslation(tx: f32, ty: f32, tz: f32) Mat4f {
+        return Mat4f.init([4][4]f32{
+            [_]f32{ 1, 0, 0, 0 },
+            [_]f32{ 0, 1, 0, 0 },
+            [_]f32{ 0, 0, 1, 0 },
+            [_]f32{ tx, ty, tz, 1 },
+        });
+    }
+
+    pub fn getXRotation(radians: f32) Mat4f {
+        const c = math.cos(radians);
+        const s = math.sin(radians);
+        return Mat4f.init([4][4]f32{
+            [_]f32{ 1, 0, 0, 0 },
+            [_]f32{ 0, c, s, 0 },
+            [_]f32{ 0, -s, c, 0 },
+            [_]f32{ 0, 0, 0, 1 },
+        });
+    }
+
+    pub fn getYRotation(radians: f32) Mat4f {
+        const c = math.cos(radians);
+        const s = math.sin(radians);
+        return Mat4f.init([4][4]f32{
+            [_]f32{ c, 0, -s, 0 },
+            [_]f32{ 0, 1, 0, 0 },
+            [_]f32{ s, 0, c, 0 },
+            [_]f32{ 0, 0, 0, 1 },
+        });
+    }
+
+    pub fn getZRotation(radians: f32) Mat4f {
+        const c = math.cos(radians);
+        const s = math.sin(radians);
+        return Mat4f.init([4][4]f32{
+            [_]f32{ c, s, 0, 0 },
+            [_]f32{ -s, c, 0, 0 },
+            [_]f32{ 0, 0, 1, 0 },
+            [_]f32{ 0, 0, 0, 1 },
+        });
+    }
+
+    pub fn getScaling(sx: f32, sy: f32, sz: f32) Mat4f {
+        return Mat4f.init([4][4]f32{
+            [_]f32{ sx, 0, 0, 0 },
+            [_]f32{ 0, sy, 0, 0 },
+            [_]f32{ 0, 0, sz, 0 },
+            [_]f32{ 0, 0, 0, 1 },
+        });
+    }
+
+    pub fn getProjection(width: f32, height: f32, depth: f32) Mat4f {
+        return Mat4f.init([4][4]f32{
+            [_]f32{ 2 / width, 0, 0, 0 },
+            [_]f32{ 0, -2 / height, 0, 0 },
+            [_]f32{ 0, 0, 2 / depth, 0 },
+            [_]f32{ -1, 1, 0, 1 },
+        });
+    }
+};
 
 pub fn Vector(comptime T: type, comptime N: usize) type {
     return struct {

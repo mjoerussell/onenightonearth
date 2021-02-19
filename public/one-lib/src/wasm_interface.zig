@@ -18,7 +18,10 @@ const SkyCoord = star_math.SkyCoord;
 const Coord = star_math.Coord;
 
 const mat = @import("./matrix.zig");
+const Mat2D = mat.Mat2D;
+const Mat3D = mat.Mat3D;
 const Mat3f = mat.Mat3f;
+const Mat4f = mat.Mat4f;
 
 const allocator = std.heap.page_allocator;
 var canvas: Canvas = undefined;
@@ -208,49 +211,109 @@ pub export fn getConstellationCentroid(constellation_index: usize) ?*SkyCoord {
     return coord_ptr;
 }
 
-pub export fn getProjectionMatrix(width: f32, height: f32) *Mat3f {
-    const m = mat.getProjection2d(width, height);
+pub export fn getProjectionMatrix2d(width: f32, height: f32) *Mat3f {
+    const m = Mat2D.getProjection(width, height);
     const m_ptr = allocator.create(Mat3f) catch unreachable;
     m_ptr.* = m;
     return m_ptr;
 }
 
-pub export fn getRotationMatrix(radians: f32) *Mat3f {
-    const m = mat.getRotation2d(radians);
+pub export fn getProjectionMatrix3d(width: f32, height: f32, depth: f32) *Mat4f {
+    const m = Mat3D.getProjection(width, height, depth);
+    const m_ptr = allocator.create(Mat4f) catch unreachable;
+    m_ptr.* = m;
+    return m_ptr;
+}
+
+pub export fn getRotationMatrix2d(radians: f32) *Mat3f {
+    const m = Mat2D.getRotation(radians);
     const m_ptr = allocator.create(Mat3f) catch unreachable;
     m_ptr.* = m;
     return m_ptr;
 }
 
-pub export fn getTranslationMatrix(tx: f32, ty: f32) *Mat3f {
-    const m = mat.getTranslation2d(tx, ty);
+pub export fn getXRotationMatrix3d(radians: f32) *Mat4f {
+    const m = Mat3D.getXRotation(radians);
+    const m_ptr = allocator.create(Mat4f) catch unreachable;
+    m_ptr.* = m;
+    return m_ptr;
+}
+
+pub export fn getYRotationMatrix3d(radians: f32) *Mat4f {
+    const m = Mat3D.getYRotation(radians);
+    const m_ptr = allocator.create(Mat4f) catch unreachable;
+    m_ptr.* = m;
+    return m_ptr;
+}
+
+pub export fn getZRotationMatrix3d(radians: f32) *Mat4f {
+    const m = Mat3D.getZRotation(radians);
+    const m_ptr = allocator.create(Mat4f) catch unreachable;
+    m_ptr.* = m;
+    return m_ptr;
+}
+
+pub export fn getTranslationMatrix2d(tx: f32, ty: f32) *Mat3f {
+    const m = Mat2D.getTranslation(tx, ty);
     const m_ptr = allocator.create(Mat3f) catch unreachable;
     m_ptr.* = m;
     return m_ptr;
 }
 
-pub export fn getScalingMatrix(sx: f32, sy: f32) *Mat3f {
-    const m = mat.getScaling2d(sx, sy);
+pub export fn getTranslationMatrix3d(tx: f32, ty: f32, tz: f32) *Mat4f {
+    const m = Mat3D.getTranslation(tx, ty, tz);
+    const m_ptr = allocator.create(Mat4f) catch unreachable;
+    m_ptr.* = m;
+    return m_ptr;
+}
+
+pub export fn getScalingMatrix2d(sx: f32, sy: f32) *Mat3f {
+    const m = Mat2D.getScaling(sx, sy);
     const m_ptr = allocator.create(Mat3f) catch unreachable;
     m_ptr.* = m;
     return m_ptr;
 }
 
-pub export fn matrixMult(a: *Mat3f, b: *Mat3f) *Mat3f {
+pub export fn getScalingMatrix3d(sx: f32, sy: f32, sz: f32) *Mat4f {
+    const m = Mat3D.getScaling(sx, sy, sz);
+    const m_ptr = allocator.create(Mat4f) catch unreachable;
+    m_ptr.* = m;
+    return m_ptr;
+}
+
+pub export fn matrixMult2d(a: *Mat3f, b: *Mat3f) *Mat3f {
     const result = a.mult(b.*);
     const result_ptr = allocator.create(Mat3f) catch unreachable;
     result_ptr.* = result;
     return result_ptr;
 }
 
-pub export fn readMatrix(m: *Mat3f) *[9]f32 {
+pub export fn matrixMult3d(a: *Mat4f, b: *Mat4f) *Mat4f {
+    const result = a.mult(b.*);
+    const result_ptr = allocator.create(Mat4f) catch unreachable;
+    result_ptr.* = result;
+    return result_ptr;
+}
+
+pub export fn readMatrix2d(m: *Mat3f) *[9]f32 {
     var result: [9]f32 = m.flatten();
     const result_ptr = allocator.create([9]f32) catch unreachable;
     result_ptr.* = result;
     return result_ptr;
 }
 
-pub export fn freeMatrix(m: *Mat3f) void {
+pub export fn readMatrix3d(m: *Mat4f) *[16]f32 {
+    var result: [16]f32 = m.flatten();
+    const result_ptr = allocator.create([16]f32) catch unreachable;
+    result_ptr.* = result;
+    return result_ptr;
+}
+
+pub export fn freeMatrix2d(m: *Mat3f) void {
+    allocator.destroy(m);
+}
+
+pub export fn freeMatrix3d(m: *Mat4f) void {
     allocator.destroy(m);
 }
 
