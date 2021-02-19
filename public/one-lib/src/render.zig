@@ -180,6 +180,7 @@ test "translate point" {
         .draw_north_up = true,
         .background_radius = 0.45 * 700.0,
         .zoom_factor = 1.0,
+        .drag_speed = 2.5,
         .draw_asterisms = false,
         .draw_constellation_grid = false,
     };

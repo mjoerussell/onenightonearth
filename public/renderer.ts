@@ -25,6 +25,12 @@ export class Renderer {
 
     private _settings_did_change = true;
 
+    private program: WebGLProgram | null = null;
+    private vao: WebGLVertexArrayObject | null = null;
+
+    private matrix_location: WebGLUniformLocation | null = null;
+    private color_location: WebGLUniformLocation | null = null;
+
     constructor(canvas_id: string) {
         this.main_canvas = document.getElementById(canvas_id) as HTMLCanvasElement;
         this.main_canvas.width = this.main_canvas.clientWidth;
@@ -86,40 +92,31 @@ export class Renderer {
             return;
         }
 
+        this.program = program;
+
         const position_attrib_location = this.gl.getAttribLocation(program, 'a_position');
-        const matrix_location = this.gl.getUniformLocation(program, 'u_matrix');
-        const color_location = this.gl.getUniformLocation(program, 'u_color');
+        this.matrix_location = this.gl.getUniformLocation(program, 'u_matrix');
+        this.color_location = this.gl.getUniformLocation(program, 'u_color');
 
         const position_buffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, position_buffer);
 
-        const vao = this.gl.createVertexArray();
-        this.gl.bindVertexArray(vao);
+        this.vao = this.gl.createVertexArray();
+        this.gl.bindVertexArray(this.vao);
         this.gl.enableVertexAttribArray(position_attrib_location);
         this.gl.vertexAttribPointer(position_attrib_location, 2, this.gl.FLOAT, false, 0, 0);
+    }
 
+    drawScene(matrix: number[]): void {
         this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
 
         this.gl.clearColor(0, 0, 0, 0);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
-        this.gl.useProgram(program);
-        this.gl.bindVertexArray(vao);
+        this.gl.useProgram(this.program);
+        this.gl.bindVertexArray(this.vao);
 
-        const translation = [0, 300];
-        const rotation_radians = Math.PI / 4;
-        const scale = [1, 1];
-
-        const projection_matrix = m3.projection(this.main_canvas.clientWidth, this.main_canvas.clientHeight);
-        const translation_matrix = m3.translation(translation[0], translation[1]);
-        const rotation_matrix = m3.rotation(rotation_radians);
-        const scale_matrix = m3.scaling(scale[0], scale[1]);
-
-        let matrix = m3.multiplyM3(projection_matrix, translation_matrix);
-        matrix = m3.multiplyM3(matrix, rotation_matrix);
-        matrix = m3.multiplyM3(matrix, scale_matrix);
-
-        this.gl.uniformMatrix3fv(matrix_location, false, matrix);
+        this.gl.uniformMatrix3fv(this.matrix_location, false, matrix);
 
         const setRect = (x: number, y: number, width: number, height: number): void => {
             const x1 = x;
@@ -139,20 +136,10 @@ export class Renderer {
         for (let i = 0; i < 50; i += 1) {
             setRect(randomInt(300), randomInt(300), randomInt(300), randomInt(300));
 
-            this.gl.uniform4f(color_location, Math.random(), Math.random(), Math.random(), 1);
+            this.gl.uniform4f(this.color_location, Math.random(), Math.random(), Math.random(), 1);
 
             this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
         }
-
-        // const positions = [10, 20, 80, 20, 10, 30, 10, 30, 80, 20, 80, 30];
-        // this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW);
-        // this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
-
-        // this.main_canvas.addEventListener('resize', event => {
-        //     this.width = this.main_canvas.width;
-        //     this.height = this.main_canvas.height;
-        //     console.log('resize');
-        // });
     }
 
     private createShader(type: number, source: string): WebGLShader | null {

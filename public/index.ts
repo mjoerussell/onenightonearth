@@ -14,6 +14,18 @@ const renderStars = (controls: Controls, date?: Date) => {
         return;
     }
 
+    const translation = [100, 300];
+    const rotation_radians = Math.PI / 4;
+    const scale = [1.5, 1];
+
+    let matrix = wasm_interface.getProjectionMatrix(controls.renderer.canvas.clientWidth, controls.renderer.canvas.clientHeight);
+    matrix = wasm_interface.matrixMult(wasm_interface.getTranslationMatrix(translation[0], translation[1]), matrix);
+    matrix = wasm_interface.matrixMult(wasm_interface.getRotationMatrix(rotation_radians), matrix);
+    matrix = wasm_interface.matrixMult(wasm_interface.getScalingMatrix(scale[0], scale[1]), matrix);
+
+    const mat_array = Array.from(wasm_interface.readMatrix(matrix));
+    controls.renderer.drawScene(Array.from(wasm_interface.readMatrix(matrix)));
+    wasm_interface.freeMatrix(matrix);
     // if (controls.renderer.settings_did_change) {
     //     wasm_interface.updateSettings(controls.renderer.getCanvasSettings());
     // }

@@ -17,6 +17,9 @@ const Constellation = star_math.Constellation;
 const SkyCoord = star_math.SkyCoord;
 const Coord = star_math.Coord;
 
+const mat = @import("./matrix.zig");
+const Mat3f = mat.Mat3f;
+
 const allocator = std.heap.page_allocator;
 var canvas: Canvas = undefined;
 var stars: []Star = undefined;
@@ -188,9 +191,7 @@ pub export fn getCoordForCanvasPoint(point: *Point, observer_latitude: f32, obse
     };
     const sky_coord = star_math.getSkyCoordForCanvasPoint(&canvas, point.*, observer_location, observer_timestamp);
     if (sky_coord) |sk| {
-        log(.Debug, "Got sky coord ({d:.2}, {d:.2})", .{sk.right_ascension, sk.declination});
         const coord = star_math.getCoordForSkyCoord(sk, observer_timestamp);
-        log(.Debug, "Got coord ({d:.2}, {d:.2})", .{coord.latitude, coord.longitude});
         const coord_ptr = allocator.create(Coord) catch unreachable;
         coord_ptr.* = coord;
         return coord_ptr;
@@ -205,6 +206,52 @@ pub export fn getConstellationCentroid(constellation_index: usize) ?*SkyCoord {
     const coord_ptr = allocator.create(SkyCoord) catch unreachable;
     coord_ptr.* = star_math.getConstellationCentroid(constellations[constellation_index]);
     return coord_ptr;
+}
+
+pub export fn getProjectionMatrix(width: f32, height: f32) *Mat3f {
+    const m = mat.getProjection2d(width, height);
+    const m_ptr = allocator.create(Mat3f) catch unreachable;
+    m_ptr.* = m;
+    return m_ptr;
+}
+
+pub export fn getRotationMatrix(radians: f32) *Mat3f {
+    const m = mat.getRotation2d(radians);
+    const m_ptr = allocator.create(Mat3f) catch unreachable;
+    m_ptr.* = m;
+    return m_ptr;
+}
+
+pub export fn getTranslationMatrix(tx: f32, ty: f32) *Mat3f {
+    const m = mat.getTranslation2d(tx, ty);
+    const m_ptr = allocator.create(Mat3f) catch unreachable;
+    m_ptr.* = m;
+    return m_ptr;
+}
+
+pub export fn getScalingMatrix(sx: f32, sy: f32) *Mat3f {
+    const m = mat.getScaling2d(sx, sy);
+    const m_ptr = allocator.create(Mat3f) catch unreachable;
+    m_ptr.* = m;
+    return m_ptr;
+}
+
+pub export fn matrixMult(a: *Mat3f, b: *Mat3f) *Mat3f {
+    const result = a.mult(b.*);
+    const result_ptr = allocator.create(Mat3f) catch unreachable;
+    result_ptr.* = result;
+    return result_ptr;
+}
+
+pub export fn readMatrix(m: *Mat3f) *[9]f32 {
+    var result: [9]f32 = m.flatten();
+    const result_ptr = allocator.create([9]f32) catch unreachable;
+    result_ptr.* = result;
+    return result_ptr;
+}
+
+pub export fn freeMatrix(m: *Mat3f) void {
+    allocator.destroy(m);
 }
 
 pub export fn _wasm_alloc(byte_len: u32) ?[*]u8 {

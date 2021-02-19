@@ -59,6 +59,13 @@ interface WasmFns {
         observer_longitude: number,
         observer_timestamp: BigInt
     ) => pointer<Coord>;
+    getProjectionMatrix: (width: number, height: number) => pointer<any>;
+    getTranslationMatrix: (tx: number, ty: number) => pointer<any>;
+    getRotationMatrix: (radians: number) => pointer<any>;
+    getScalingMatrix: (sx: number, sy: number) => pointer<any>;
+    matrixMult: (a: pointer<any>, b: pointer<any>) => pointer<any>;
+    readMatrix: (m: pointer<any>) => pointer<number[]>;
+    freeMatrix: (m: pointer<any>) => void;
 }
 
 export class WasmInterface {
@@ -199,6 +206,38 @@ export class WasmInterface {
     updateSettings(settings: CanvasSettings): void {
         const settings_ptr = this.allocObject(settings, sizedCanvasSettings);
         this.lib.updateCanvasSettings(settings_ptr);
+    }
+
+    getProjectionMatrix(width: number, height: number): number {
+        return this.lib.getProjectionMatrix(width, height);
+    }
+
+    getTranslationMatrix(tx: number, ty: number): number {
+        return this.lib.getTranslationMatrix(tx, ty);
+    }
+
+    getRotationMatrix(radians: number): number {
+        return this.lib.getRotationMatrix(radians);
+    }
+
+    getScalingMatrix(sx: number, sy: number): number {
+        return this.lib.getScalingMatrix(sx, sy);
+    }
+
+    matrixMult(a: number, b: number): number {
+        const res = this.lib.matrixMult(a, b);
+        this.lib.freeMatrix(a);
+        this.lib.freeMatrix(b);
+        return res;
+    }
+
+    readMatrix(a: number): Float32Array {
+        const data = this.lib.readMatrix(a);
+        return new Float32Array(this.memory, data, 9);
+    }
+
+    freeMatrix(a: number): void {
+        this.lib.freeMatrix(a);
     }
 
     getString(ptr: pointer<string>, len: number): string {
