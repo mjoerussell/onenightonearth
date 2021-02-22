@@ -72,6 +72,8 @@ interface WasmFns {
     getYRotationMatrix3d: (radians: number) => pointer<any>;
     getZRotationMatrix3d: (radians: number) => pointer<any>;
     getScalingMatrix3d: (sx: number, sy: number, sz: number) => pointer<any>;
+    getOrthographicMatrix3d: (left: number, right: number, bottom: number, top: number, near: number, far: number) => pointer<any>;
+    getPerspectiveMatrix3d: (fov: number, aspect_ratio: number, near: number, far: number) => pointer<any>;
     matrixMult3d: (a: pointer<any>, b: pointer<any>) => pointer<any>;
     readMatrix3d: (m: pointer<any>) => pointer<number[]>;
     freeMatrix3d: (m: pointer<any>) => void;
@@ -255,6 +257,14 @@ export class WasmInterface {
 
     getScalingMatrix3d(sx: number, sy: number, sz: number): number {
         return this.lib.getScalingMatrix3d(sx, sy, sz);
+    }
+
+    getOrthographicMatrix3d(left: number, right: number, bottom: number, top: number, near: number, far: number): number {
+        return this.lib.getOrthographicMatrix3d(left, right, bottom, top, near, far);
+    }
+
+    getPerspectiveMatrix3d(fov: number, aspect_ratio: number, near: number, far: number): number {
+        return this.lib.getPerspectiveMatrix3d(fov, aspect_ratio, near, far);
     }
 
     matrixMult2d(a: number, b: number): number {

@@ -31,6 +31,9 @@ export class Renderer {
     private matrix_location: WebGLUniformLocation | null = null;
     private color_location: WebGLUniformLocation | null = null;
 
+    private position_buffer: WebGLBuffer | null = null;
+    private color_buffer: WebGLBuffer | null = null;
+
     constructor(canvas_id: string) {
         this.main_canvas = document.getElementById(canvas_id) as HTMLCanvasElement;
         this.main_canvas.width = this.main_canvas.clientWidth;
@@ -50,33 +53,27 @@ export class Renderer {
 
         const vertex_shader_source = `#version 300 es
         in vec4 a_position;
+        in vec4 a_color;
 
+        out vec4 v_color;
         // uniform vec2 u_resolution;
         uniform mat4 u_matrix;
 
         void main() {
-
-            // vec2 position = (u_matrix * vec3(a_position, 1)).xy;
-
-            // vec2 zeroToOne = position / u_resolution;
-            // vec2 zeroToTwo = zeroToOne * 2.0;
-            // vec2 clipSpace = zeroToTwo - 1.0;
-
-            // gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
-            // gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
             gl_Position = u_matrix * a_position;
+            v_color = a_color;
         }
         `;
 
         const fragment_shader_source = `#version 300 es
         precision highp float;
 
-        uniform vec4 u_color;
+        in vec4 v_color;
 
         out vec4 outColor;
 
         void main() {
-            outColor = u_color;
+            outColor = v_color;
         }
         `;
 
@@ -96,16 +93,25 @@ export class Renderer {
         this.program = program;
 
         const position_attrib_location = this.gl.getAttribLocation(program, 'a_position');
+        const color_attrib_location = this.gl.getAttribLocation(program, 'a_color');
         this.matrix_location = this.gl.getUniformLocation(program, 'u_matrix');
-        this.color_location = this.gl.getUniformLocation(program, 'u_color');
+        // this.color_location = this.gl.getUniformLocation(program, 'u_color');
 
-        const position_buffer = this.gl.createBuffer();
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, position_buffer);
+        this.position_buffer = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.position_buffer);
 
         this.vao = this.gl.createVertexArray();
         this.gl.bindVertexArray(this.vao);
         this.gl.enableVertexAttribArray(position_attrib_location);
         this.gl.vertexAttribPointer(position_attrib_location, 3, this.gl.FLOAT, false, 0, 0);
+
+        this.color_buffer = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.color_buffer);
+        this.gl.enableVertexAttribArray(color_attrib_location);
+        this.gl.vertexAttribPointer(color_attrib_location, 3, this.gl.UNSIGNED_BYTE, true, 0, 0);
+
+        this.gl.enable(this.gl.CULL_FACE);
+        this.gl.enable(this.gl.DEPTH_TEST);
     }
 
     drawScene(matrix: number[]): void {
@@ -119,15 +125,311 @@ export class Renderer {
 
         this.gl.uniformMatrix4fv(this.matrix_location, false, matrix);
 
-        const setRect = (x: number, y: number, width: number, height: number): void => {
+        const randomColor = (): number[] => {
+            return [randomInt(255), randomInt(255), randomInt(255), 255];
+        };
+
+        const setColor = (): void => {
+            const front_color = randomColor();
+            const back_color = randomColor();
+            const side_color = randomColor();
+            this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.color_buffer);
+            this.gl.bufferData(
+                this.gl.ARRAY_BUFFER,
+                new Uint8Array([
+                    // Front face
+                    front_color[0],
+                    front_color[1],
+                    front_color[2],
+                    front_color[3],
+                    front_color[0],
+                    front_color[1],
+                    front_color[2],
+                    front_color[3],
+                    front_color[0],
+                    front_color[1],
+                    front_color[2],
+                    front_color[3],
+                    front_color[0],
+                    front_color[1],
+                    front_color[2],
+                    front_color[3],
+                    front_color[0],
+                    front_color[1],
+                    front_color[2],
+                    front_color[3],
+                    front_color[0],
+                    front_color[1],
+                    front_color[2],
+                    front_color[3],
+
+                    // Top Face
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+
+                    // Left Face
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+
+                    // Right Face
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+
+                    // Bottom Face
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+                    side_color[0],
+                    side_color[1],
+                    side_color[2],
+                    side_color[3],
+
+                    // Back Face
+                    back_color[0],
+                    back_color[1],
+                    back_color[2],
+                    back_color[3],
+                    back_color[0],
+                    back_color[1],
+                    back_color[2],
+                    back_color[3],
+                    back_color[0],
+                    back_color[1],
+                    back_color[2],
+                    back_color[3],
+                    back_color[0],
+                    back_color[1],
+                    back_color[2],
+                    back_color[3],
+                    back_color[0],
+                    back_color[1],
+                    back_color[2],
+                    back_color[3],
+                    back_color[0],
+                    back_color[1],
+                    back_color[2],
+                    back_color[3],
+                ]),
+                this.gl.STATIC_DRAW
+            );
+        };
+
+        const setRect = (x: number, y: number, width: number, height: number, depth: number): void => {
             const x1 = x;
             const x2 = x + width;
             const y1 = y;
             const y2 = y + height;
 
+            const z = depth / 2;
+
+            this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.position_buffer);
+
             this.gl.bufferData(
                 this.gl.ARRAY_BUFFER,
-                new Float32Array([x1, y1, 0, x2, y1, 0, x1, y2, 0, x1, y2, 0, x2, y1, 0, x2, y2, 0]),
+                new Float32Array([
+                    // Front face
+                    x1,
+                    y1,
+                    z,
+                    x2,
+                    y1,
+                    z,
+                    x1,
+                    y2,
+                    z,
+                    x1,
+                    y2,
+                    z,
+                    x2,
+                    y1,
+                    z,
+                    x2,
+                    y2,
+                    z,
+
+                    // Top face
+                    x1,
+                    y1,
+                    z,
+                    x1,
+                    y1,
+                    -z,
+                    x2,
+                    y1,
+                    z,
+                    x1,
+                    y1,
+                    -z,
+                    x2,
+                    y1,
+                    -z,
+                    x2,
+                    y1,
+                    z,
+
+                    // Left face
+                    x1,
+                    y1,
+                    z,
+                    x1,
+                    y2,
+                    -z,
+                    x1,
+                    y1,
+                    -z,
+                    x1,
+                    y2,
+                    -z,
+                    x1,
+                    y1,
+                    z,
+                    x1,
+                    y2,
+                    z,
+
+                    // Right face
+                    x2,
+                    y1,
+                    z,
+                    x2,
+                    y1,
+                    -z,
+                    x2,
+                    y2,
+                    -z,
+                    x2,
+                    y2,
+                    -z,
+                    x2,
+                    y2,
+                    z,
+                    x2,
+                    y1,
+                    z,
+
+                    // Bottom face
+                    x1,
+                    y2,
+                    z,
+                    x2,
+                    y2,
+                    z,
+                    x1,
+                    y2,
+                    -z,
+                    x1,
+                    y2,
+                    -z,
+                    x2,
+                    y2,
+                    -z,
+                    x2,
+                    y2,
+                    z,
+
+                    // Back face
+                    x1,
+                    y1,
+                    -z,
+                    x1,
+                    y2,
+                    -z,
+                    x2,
+                    y1,
+                    -z,
+                    x1,
+                    y2,
+                    -z,
+                    x2,
+                    y2,
+                    -z,
+                    x2,
+                    y1,
+                    -z,
+                ]),
                 this.gl.STATIC_DRAW
             );
         };
@@ -135,11 +437,11 @@ export class Renderer {
         const randomInt = (range: number) => Math.floor(Math.random() * range);
 
         for (let i = 0; i < 50; i += 1) {
-            setRect(randomInt(300), randomInt(300), randomInt(300), randomInt(300));
+            setRect(randomInt(300), randomInt(300), randomInt(300), randomInt(300), randomInt(300));
+            setColor();
+            // this.gl.uniform4f(this.color_location, Math.random(), Math.random(), Math.random(), 1);
 
-            this.gl.uniform4f(this.color_location, Math.random(), Math.random(), Math.random(), 1);
-
-            this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
+            this.gl.drawArrays(this.gl.TRIANGLES, 0, 36);
         }
     }
 

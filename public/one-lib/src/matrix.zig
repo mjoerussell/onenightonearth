@@ -111,6 +111,27 @@ pub const Mat3D = struct {
             [_]f32{ -1, 1, 0, 1 },
         });
     }
+
+    pub fn getOrthographic(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f32) Mat4f {
+        return Mat4f.init([4][4]f32{
+            [_]f32{ 2 / (right - left), 0, 0, 0 },
+            [_]f32{ 0, 2 / (top - bottom), 0, 0 },
+            [_]f32{ 0, 0, 2 / (near - far), 0 },
+            [_]f32{ (left + right) / (left - right), (bottom + top) / (bottom - top), (near + far) / (near - far), 1 },
+        });
+    }
+
+    pub fn getPerspective(fov: f32, aspect_ratio: f32, near: f32, far: f32) Mat4f {
+        const f = math.tan((math.pi * 0.5) - (0.5 * fov));
+        const range_inv = 1.0 / (near - far);
+
+        return Mat4f.init([4][4]f32{
+            [_]f32{ f / aspect_ratio, 0, 0, 0 },
+            [_]f32{ 0, f, 0, 0 },
+            [_]f32{ 0, 0, (near + far) * range_inv, -1 },
+            [_]f32{ 0, 0, near * far * range_inv * 2, 0 },
+        });
+    }
 };
 
 pub fn Vector(comptime T: type, comptime N: usize) type {

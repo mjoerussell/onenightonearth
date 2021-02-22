@@ -281,6 +281,20 @@ pub export fn getScalingMatrix3d(sx: f32, sy: f32, sz: f32) *Mat4f {
     return m_ptr;
 }
 
+pub export fn getOrthographicMatrix3d(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f32) *Mat4f {
+    const m = Mat3D.getOrthographic(left, right, bottom, top, near, far);
+    const m_ptr = allocator.create(Mat4f) catch unreachable;
+    m_ptr.* = m;
+    return m_ptr;
+}
+
+pub export fn getPerspectiveMatrix3d(fov: f32, aspect_ratio: f32, near: f32, far: f32) *Mat4f {
+    const m = Mat3D.getPerspective(fov, aspect_ratio, near, far);
+    const m_ptr = allocator.create(Mat4f) catch unreachable;
+    m_ptr.* = m;
+    return m_ptr;
+}
+
 pub export fn matrixMult2d(a: *Mat3f, b: *Mat3f) *Mat3f {
     const result = a.mult(b.*);
     const result_ptr = allocator.create(Mat3f) catch unreachable;
