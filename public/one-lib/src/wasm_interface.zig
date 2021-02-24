@@ -23,9 +23,13 @@ const Mat3D = mat.Mat3D;
 const Mat3f = mat.Mat3f;
 const Mat4f = mat.Mat4f;
 
+const Sphere = @import("./sphere.zig").Sphere;
+
 const allocator = std.heap.page_allocator;
 var canvas: Canvas = undefined;
 var stars: []Star = undefined;
+
+var test_sphere: Sphere = undefined;
 
 var constellations: []Constellation = undefined;
 
@@ -65,6 +69,8 @@ pub export fn initializeCanvas(settings: *ExternCanvasSettings) void {
             unreachable;
         }
     };
+
+    test_sphere = Sphere.init(allocator, 1, 36, 18) catch unreachable;
 }
 
 pub export fn initializeConstellations(constellation_grid_data: [*][*]SkyCoord, constellation_asterism_data: [*][*]SkyCoord, grid_coord_lens: [*]u32, asterism_coord_lens: [*]u32, num_constellations: u32) void {
@@ -329,6 +335,16 @@ pub export fn freeMatrix2d(m: *Mat3f) void {
 
 pub export fn freeMatrix3d(m: *Mat4f) void {
     allocator.destroy(m);
+}
+
+pub export fn getSphereVertices(result_len: *usize) [*]f32 {
+    result_len.* = test_sphere.vertices.len;
+    return test_sphere.vertices.ptr;
+}
+
+pub export fn getSphereIndices(result_len: *usize) [*]usize {
+    result_len.* = test_sphere.indices.len;
+    return test_sphere.indices.ptr;
 }
 
 pub export fn _wasm_alloc(byte_len: u32) ?[*]u8 {

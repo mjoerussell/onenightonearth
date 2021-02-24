@@ -30,9 +30,9 @@ const renderStars = (controls: Controls, date?: Date) => {
 
     current_rotation = increaseRotation(current_rotation);
 
-    const translation = [-150, 150, -1060];
-    const rotation = [170, current_rotation, 0];
-    const scale = [1, 1];
+    const translation = [0, 150, -1060];
+    const rotation = [0, 0, 0];
+    const scale = [200, 200, 200];
 
     let matrix = wasm_interface.getPerspectiveMatrix3d(
         degToRad(50),
@@ -44,9 +44,15 @@ const renderStars = (controls: Controls, date?: Date) => {
     matrix = wasm_interface.matrixMult3d(wasm_interface.getXRotationMatrix3d(degToRad(rotation[0])), matrix);
     matrix = wasm_interface.matrixMult3d(wasm_interface.getYRotationMatrix3d(degToRad(rotation[1])), matrix);
     matrix = wasm_interface.matrixMult3d(wasm_interface.getZRotationMatrix3d(degToRad(rotation[2])), matrix);
-    matrix = wasm_interface.matrixMult3d(wasm_interface.getScalingMatrix3d(scale[0], scale[1], 1), matrix);
+    matrix = wasm_interface.matrixMult3d(wasm_interface.getScalingMatrix3d(scale[0], scale[1], scale[2]), matrix);
 
-    controls.renderer.drawScene(Array.from(wasm_interface.readMatrix3d(matrix)));
+    // console.log(sphere_vertices);
+
+    controls.renderer.drawScene(
+        wasm_interface.getSphereVertices(),
+        wasm_interface.getSphereIndices(),
+        Array.from(wasm_interface.readMatrix3d(matrix))
+    );
     wasm_interface.freeMatrix3d(matrix);
 };
 
@@ -97,6 +103,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         controls.setConstellations(constellations);
                         wasm_interface = new WasmInterface(wasm_result.instance);
                         wasm_interface.initialize(stars, constellations, controls.renderer.getCanvasSettings());
+
+                        // sphere_vertices = wasm_interface.getSphereVertices();
+                        // console.log('Sphere vertices: ', sphere_vertices);
+                        // sphere_indices = wasm_interface.getSphereIndices();
 
                         drawUIElements(controls);
                         renderStars(controls);

@@ -268,6 +268,12 @@ pub fn Matrix(comptime T: type, comptime M: usize, comptime N: usize) type {
 
         data: [N][M]T,
 
+        pub fn init(data: [N][M]T) Self {
+            return Self{
+                .data = data
+            };
+        }
+
         pub fn identity() Self {
             var data: [N][M]T = undefined;
             comptime var row = 0;
@@ -279,12 +285,6 @@ pub fn Matrix(comptime T: type, comptime M: usize, comptime N: usize) type {
             }
 
             return Self.init(data);
-        }
-
-        pub fn init(data: [N][M]T) Self {
-            return Self{
-                .data = data
-            };
         }
 
         pub fn augmentRight(self: Self, other: Self) Matrix(T, M * 2, N) {
@@ -339,12 +339,6 @@ pub fn Matrix(comptime T: type, comptime M: usize, comptime N: usize) type {
             return Vector(T, N).init(vec_data);
         }
 
-        pub fn swapRows(self: *Self, row_a: usize, row_b: usize) void {
-            const tmp = self.data[row_a];
-            self.data[row_a] = self.data[row_b];
-            self.data[row_b] = tmp;
-        }
-
         pub fn add(self: Self, other: Self) Self {
             @setRuntimeSafety(false);
             var result: Self = undefined;
@@ -397,7 +391,7 @@ pub fn Matrix(comptime T: type, comptime M: usize, comptime N: usize) type {
             var current_modifier: T = 1;
             var column_index: usize = 0;
             while (column_index < M) : (column_index += 1) {
-                var submatrix_result: [N - 1][M - 1]T = undefined;
+                var submatrix: [N - 1][M - 1]T = undefined;
                 comptime var sub_row_index = 1;
                 inline while (sub_row_index < N) : (sub_row_index += 1) {
                     var sub_column_index: usize = 0;
@@ -405,12 +399,12 @@ pub fn Matrix(comptime T: type, comptime M: usize, comptime N: usize) type {
                         if (sub_column_index != column_index) {
                             const value = self.data[sub_row_index][sub_column_index];
                             const value_dest_column = if (sub_column_index < column_index) sub_column_index else sub_column_index - 1;
-                            submatrix_result[sub_row_index - 1][value_dest_column] = value;
+                            submatrix[sub_row_index - 1][value_dest_column] = value;
                         }
                     }
                 }
                 // Recursively determine the determinant of the submatrix
-                const submatrix_det = try Matrix(T, M - 1, N - 1).init(submatrix_result).determinant();
+                const submatrix_det = try Matrix(T, M - 1, N - 1).init(submatrix).determinant();
                 // Add the partial determinate to the acc. result, alternating + and - 
                 result_det += current_modifier * self.data[0][column_index] * submatrix_det;
                 current_modifier *= -1;
@@ -432,7 +426,7 @@ pub fn Matrix(comptime T: type, comptime M: usize, comptime N: usize) type {
                 const pivot = result.data[row_index][column_index];
                 // Divide row by value in pivot index
                 if (pivot != 1 and pivot != 0) {
-                    const div_result: Vector(T, M * 2) = try result.getRow(row_index).div(pivot);
+                    const div_result: Vector(T, M * 2) = result.getRow(row_index).div(pivot) catch unreachable;
                     result.data[row_index] = div_result.data;
                 }
 

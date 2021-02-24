@@ -77,6 +77,8 @@ interface WasmFns {
     matrixMult3d: (a: pointer<any>, b: pointer<any>) => pointer<any>;
     readMatrix3d: (m: pointer<any>) => pointer<number[]>;
     freeMatrix3d: (m: pointer<any>) => void;
+    getSphereVertices: (length_ptr: pointer<number>) => pointer<number[]>;
+    getSphereIndices: (length_ptr: pointer<number>) => pointer<number[]>;
 }
 
 export class WasmInterface {
@@ -267,6 +269,26 @@ export class WasmInterface {
         return this.lib.getPerspectiveMatrix3d(fov, aspect_ratio, near, far);
     }
 
+    getSphereVertices(): Float32Array {
+        const result_len_ptr = this.allocBytes(4);
+        const result_ptr = this.lib.getSphereVertices(result_len_ptr);
+
+        const result_len = this.readPrimative(result_len_ptr, WasmPrimative.u32);
+        this.freeBytes(result_len_ptr, 4);
+
+        return new Float32Array(this.memory, result_ptr, result_len);
+    }
+
+    getSphereIndices(): Uint32Array {
+        const result_len_ptr = this.allocBytes(4);
+        const result_ptr = this.lib.getSphereIndices(result_len_ptr);
+
+        const result_len = this.readPrimative(result_len_ptr, WasmPrimative.u32);
+        // const result = this.readPrimativeArray(result_ptr, result_len, WasmPrimative.u32);
+
+        return new Uint32Array(this.memory, result_ptr, result_len);
+    }
+
     matrixMult2d(a: number, b: number): number {
         const res = this.lib.matrixMult2d(a, b);
         this.lib.freeMatrix2d(a);
@@ -423,6 +445,20 @@ export class WasmInterface {
                 }
                 result_array[index] = result;
             }
+        }
+
+        return result_array;
+    }
+
+    readPrimativeArray(ptr: pointer<number>, num_items: number, type: WasmPrimative): number[] {
+        const item_bytes = sizeOfPrimative(type);
+        const total_bytes = item_bytes * num_items;
+        const data_mem = new DataView(this.memory, ptr, total_bytes);
+        const result_array: number[] = new Array(num_items);
+
+        for (let current_offset = 0; current_offset < total_bytes; current_offset += item_bytes) {
+            const value = this.getPrimative(data_mem, WasmPrimative.u32, current_offset) as number;
+            result_array.push(value);
         }
 
         return result_array;

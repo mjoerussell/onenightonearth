@@ -30,6 +30,7 @@ export class Renderer {
     private color_location: WebGLUniformLocation | null = null;
 
     private position_buffer: WebGLBuffer | null = null;
+    private index_buffer: WebGLBuffer | null = null;
     private color_buffer: WebGLBuffer | null = null;
 
     constructor(canvas_id: string) {
@@ -102,6 +103,9 @@ export class Renderer {
         this.gl.enableVertexAttribArray(position_attrib_location);
         this.gl.vertexAttribPointer(position_attrib_location, 3, this.gl.FLOAT, false, 0, 0);
 
+        this.index_buffer = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.index_buffer);
+
         this.color_buffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.color_buffer);
         this.gl.enableVertexAttribArray(color_attrib_location);
@@ -111,7 +115,19 @@ export class Renderer {
         this.gl.enable(this.gl.DEPTH_TEST);
     }
 
-    drawScene(matrix: number[]): void {
+    drawScene(vertices: Float32Array, indices: Uint32Array, matrix: number[]): void {
+        console.log('Drawing vertices ', vertices);
+        console.log('Drawing indices: ', indices);
+
+        const repeat = <T>(items: T[], times: number): T[] => {
+            let result: T[] = [];
+            for (let i = 0; i < times; i += 1) {
+                result = result.concat(items);
+            }
+
+            return result;
+        };
+
         this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
 
         this.gl.clearColor(0, 0, 0, 0);
@@ -122,288 +138,15 @@ export class Renderer {
 
         this.gl.uniformMatrix4fv(this.matrix_location, false, matrix);
 
-        const randomColor = (): number[] => {
-            return [randomInt(255), randomInt(255), randomInt(255)];
-        };
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.position_buffer);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STATIC_DRAW);
 
-        const setColor = (): void => {
-            const front_color = randomColor();
-            const back_color = randomColor();
-            const side_color = randomColor();
-            this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.color_buffer);
-            this.gl.bufferData(
-                this.gl.ARRAY_BUFFER,
-                new Uint8Array([
-                    // Front face
-                    front_color[0],
-                    front_color[1],
-                    front_color[2],
-                    front_color[0],
-                    front_color[1],
-                    front_color[2],
-                    front_color[0],
-                    front_color[1],
-                    front_color[2],
-                    front_color[0],
-                    front_color[1],
-                    front_color[2],
-                    front_color[0],
-                    front_color[1],
-                    front_color[2],
-                    front_color[0],
-                    front_color[1],
-                    front_color[2],
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.color_buffer);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Uint8Array(repeat([255, 255, 255], vertices.length)), this.gl.STATIC_DRAW);
 
-                    // Top Face
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
+        this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, indices, this.gl.STATIC_DRAW);
 
-                    // Left Face
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-
-                    // Right Face
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-
-                    // Bottom Face
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-                    side_color[0],
-                    side_color[1],
-                    side_color[2],
-
-                    // Back Face
-                    back_color[0],
-                    back_color[1],
-                    back_color[2],
-                    back_color[0],
-                    back_color[1],
-                    back_color[2],
-                    back_color[0],
-                    back_color[1],
-                    back_color[2],
-                    back_color[0],
-                    back_color[1],
-                    back_color[2],
-                    back_color[0],
-                    back_color[1],
-                    back_color[2],
-                    back_color[0],
-                    back_color[1],
-                    back_color[2],
-                ]),
-                this.gl.STATIC_DRAW
-            );
-        };
-
-        const setRect = (x: number, y: number, width: number, height: number, depth: number): void => {
-            const x1 = x;
-            const x2 = x + width;
-            const y1 = y;
-            const y2 = y + height;
-
-            const z = depth / 2;
-
-            this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.position_buffer);
-
-            this.gl.bufferData(
-                this.gl.ARRAY_BUFFER,
-                new Float32Array([
-                    // Front face
-                    x1,
-                    y1,
-                    z,
-                    x2,
-                    y1,
-                    z,
-                    x1,
-                    y2,
-                    z,
-                    x1,
-                    y2,
-                    z,
-                    x2,
-                    y1,
-                    z,
-                    x2,
-                    y2,
-                    z,
-
-                    // Top face
-                    x1,
-                    y1,
-                    z,
-                    x1,
-                    y1,
-                    -z,
-                    x2,
-                    y1,
-                    z,
-                    x1,
-                    y1,
-                    -z,
-                    x2,
-                    y1,
-                    -z,
-                    x2,
-                    y1,
-                    z,
-
-                    // Left face
-                    x1,
-                    y1,
-                    z,
-                    x1,
-                    y2,
-                    -z,
-                    x1,
-                    y1,
-                    -z,
-                    x1,
-                    y2,
-                    -z,
-                    x1,
-                    y1,
-                    z,
-                    x1,
-                    y2,
-                    z,
-
-                    // Right face
-                    x2,
-                    y1,
-                    z,
-                    x2,
-                    y1,
-                    -z,
-                    x2,
-                    y2,
-                    -z,
-                    x2,
-                    y2,
-                    -z,
-                    x2,
-                    y2,
-                    z,
-                    x2,
-                    y1,
-                    z,
-
-                    // Bottom face
-                    x1,
-                    y2,
-                    z,
-                    x1,
-                    y2,
-                    -z,
-                    x2,
-                    y2,
-                    z,
-                    x1,
-                    y2,
-                    -z,
-                    x2,
-                    y2,
-                    z,
-                    x2,
-                    y2,
-                    -z,
-
-                    // Back face
-                    x1,
-                    y1,
-                    -z,
-                    x1,
-                    y2,
-                    -z,
-                    x2,
-                    y1,
-                    -z,
-                    x1,
-                    y2,
-                    -z,
-                    x2,
-                    y2,
-                    -z,
-                    x2,
-                    y1,
-                    -z,
-                ]),
-                this.gl.STATIC_DRAW
-            );
-        };
-
-        const randomInt = (range: number) => Math.floor(Math.random() * range);
-
-        for (let i = 0; i < 50; i += 1) {
-            setRect(randomInt(300), randomInt(300), randomInt(300), randomInt(300), randomInt(300));
-            setColor();
-            // this.gl.uniform4f(this.color_location, Math.random(), Math.random(), Math.random(), 1);
-
-            this.gl.drawArrays(this.gl.TRIANGLES, 0, 36);
-        }
+        this.gl.drawElements(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_INT, 0);
     }
 
     private createShader(type: number, source: string): WebGLShader | null {
