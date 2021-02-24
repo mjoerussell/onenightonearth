@@ -115,7 +115,7 @@ export class Renderer {
         this.gl.enable(this.gl.DEPTH_TEST);
     }
 
-    drawScene(vertices: Float32Array, indices: Uint32Array, matrix: number[]): void {
+    drawScene(vertices: Float32Array, indices: Uint32Array, matrix: number[][]): void {
         console.log('Drawing vertices ', vertices);
         console.log('Drawing indices: ', indices);
 
@@ -136,8 +136,6 @@ export class Renderer {
         this.gl.useProgram(this.program);
         this.gl.bindVertexArray(this.vao);
 
-        this.gl.uniformMatrix4fv(this.matrix_location, false, matrix);
-
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.position_buffer);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STATIC_DRAW);
 
@@ -146,7 +144,10 @@ export class Renderer {
 
         this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, indices, this.gl.STATIC_DRAW);
 
-        this.gl.drawElements(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_INT, 0);
+        for (const m of matrix) {
+            this.gl.uniformMatrix4fv(this.matrix_location, false, m);
+            this.gl.drawElements(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_INT, 0);
+        }
     }
 
     private createShader(type: number, source: string): WebGLShader | null {

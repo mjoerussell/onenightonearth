@@ -20,40 +20,50 @@ const renderStars = (controls: Controls, date?: Date) => {
         return degrees * (Math.PI / 180);
     };
 
-    const increaseRotation = (current: number): number => {
-        const next_rotation = current + 5;
-        if (next_rotation >= 360) {
-            return 0;
-        }
-        return next_rotation;
-    };
+    current_rotation += 5;
+    if (current_rotation >= 360) {
+        current_rotation = 0;
+    }
 
-    current_rotation = increaseRotation(current_rotation);
-
-    const translation = [0, 150, -1060];
+    const translation = [0, 0, -3000];
     const rotation = [0, 0, 0];
-    const scale = [200, 200, 200];
+    const scale = [5, 5, 5];
 
-    let matrix = wasm_interface.getPerspectiveMatrix3d(
-        degToRad(50),
-        controls.renderer.canvas.clientWidth / controls.renderer.canvas.clientHeight,
-        1,
-        2000
-    );
-    matrix = wasm_interface.matrixMult3d(wasm_interface.getTranslationMatrix3d(translation[0], translation[1], translation[2]), matrix);
-    matrix = wasm_interface.matrixMult3d(wasm_interface.getXRotationMatrix3d(degToRad(rotation[0])), matrix);
-    matrix = wasm_interface.matrixMult3d(wasm_interface.getYRotationMatrix3d(degToRad(rotation[1])), matrix);
-    matrix = wasm_interface.matrixMult3d(wasm_interface.getZRotationMatrix3d(degToRad(rotation[2])), matrix);
-    matrix = wasm_interface.matrixMult3d(wasm_interface.getScalingMatrix3d(scale[0], scale[1], scale[2]), matrix);
+    const getView = () =>
+        wasm_interface.getPerspectiveMatrix3d(
+            degToRad(50),
+            controls.renderer.canvas.clientWidth / controls.renderer.canvas.clientHeight,
+            1,
+            4000
+        );
 
-    // console.log(sphere_vertices);
+    // let matrix = wasm_interface.getPerspectiveMatrix3d(
+    //     degToRad(50),
+    //     controls.renderer.canvas.clientWidth / controls.renderer.canvas.clientHeight,
+    //     1,
+    //     2000
+    // );
+    const matrices = [getView(), getView(), getView()].map((m, index) => {
+        let result = wasm_interface.matrixMult3d(
+            wasm_interface.getTranslationMatrix3d(translation[0] + 50 * index, translation[1], translation[2]),
+            m
+        );
+        result = wasm_interface.matrixMult3d(wasm_interface.getXRotationMatrix3d(degToRad(rotation[0])), result);
+        result = wasm_interface.matrixMult3d(wasm_interface.getYRotationMatrix3d(degToRad(rotation[1])), result);
+        result = wasm_interface.matrixMult3d(wasm_interface.getZRotationMatrix3d(degToRad(rotation[2])), result);
+        result = wasm_interface.matrixMult3d(wasm_interface.getScalingMatrix3d(scale[0], scale[1], scale[2]), result);
+        return Array.from(wasm_interface.readMatrix3d(result));
+    });
 
     controls.renderer.drawScene(
         wasm_interface.getSphereVertices(),
         wasm_interface.getSphereIndices(),
-        Array.from(wasm_interface.readMatrix3d(matrix))
+        matrices
+        // Array.from(wasm_interface.readMatrix3d(matrix))
     );
-    wasm_interface.freeMatrix3d(matrix);
+
+    matrices.forEach(m => wasm_interface.freeMatrix3d(m));
+    // wasm_interface.freeMatrix3d(matrix);
 };
 
 const drawUIElements = (controls: Controls) => {
