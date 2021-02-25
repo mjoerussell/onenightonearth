@@ -18,36 +18,36 @@ pub const MatrixType2D = packed enum(u8) {
 
 pub const Mat2D = struct {
     pub fn getTranslation(tx: f32, ty: f32) Mat3f {
-        return Mat3f.init([3][3]f32{
-            [_]f32{ 1, 0, 0 },
-            [_]f32{ 0, 1, 0 },
-            [_]f32{ tx, ty, 1 },
+        return Mat3f.init(.{
+            .{ 1, 0, 0 },
+            .{ 0, 1, 0 },
+            .{ tx, ty, 1 },
         });
     }
     
     pub fn getRotation(radians: f32) Mat3f {
         const c = math.cos(radians);
         const s = math.sin(radians);
-        return Mat3f.init([3][3]f32{
-            [_]f32{ c, -s, 0 },
-            [_]f32{ s,  c, 0 },
-            [_]f32{ 0,  0, 1 },
+        return Mat3f.init(.{
+            .{ c, -s, 0 },
+            .{ s,  c, 0 },
+            .{ 0,  0, 1 },
         });
     }
 
     pub fn getScaling(sx: f32, sy: f32) Mat3f {
-        return Mat3f.init([3][3]f32{
-            [_]f32{ sx, 0, 0 },
-            [_]f32{ 0, sy, 0 },
-            [_]f32{ 0, 0, 1 },
+        return Mat3f.init(.{
+            .{ sx, 0, 0 },
+            .{ 0, sy, 0 },
+            .{ 0, 0, 1 },
         });
     }
 
     pub fn getProjection(width: f32, height: f32) Mat3f {
-        return Mat3f.init([3][3]f32{
-            [_]f32{ 2 / width, 0, 0 },
-            [_]f32{ 0, -2 / height, 0 },
-            [_]f32{ -1, 1, 1 }
+        return Mat3f.init(.{
+            .{ 2 / width, 0, 0 },
+            .{ 0, -2 / height, 0 },
+            .{ -1, 1, 1 }
         });
     }
 
@@ -55,71 +55,71 @@ pub const Mat2D = struct {
 
 pub const Mat3D = struct {
     pub fn getTranslation(tx: f32, ty: f32, tz: f32) Mat4f {
-        return Mat4f.init([4][4]f32{
-            [_]f32{ 1, 0, 0, 0 },
-            [_]f32{ 0, 1, 0, 0 },
-            [_]f32{ 0, 0, 1, 0 },
-            [_]f32{ tx, ty, tz, 1 },
+        return Mat4f.init(.{
+            .{ 1, 0, 0, 0 },
+            .{ 0, 1, 0, 0 },
+            .{ 0, 0, 1, 0 },
+            .{ tx, ty, tz, 1 },
         });
     }
 
     pub fn getXRotation(radians: f32) Mat4f {
         const c = math.cos(radians);
         const s = math.sin(radians);
-        return Mat4f.init([4][4]f32{
-            [_]f32{ 1, 0, 0, 0 },
-            [_]f32{ 0, c, s, 0 },
-            [_]f32{ 0, -s, c, 0 },
-            [_]f32{ 0, 0, 0, 1 },
+        return Mat4f.init(.{
+            .{ 1, 0, 0, 0 },
+            .{ 0, c, s, 0 },
+            .{ 0, -s, c, 0 },
+            .{ 0, 0, 0, 1 },
         });
     }
 
     pub fn getYRotation(radians: f32) Mat4f {
         const c = math.cos(radians);
         const s = math.sin(radians);
-        return Mat4f.init([4][4]f32{
-            [_]f32{ c, 0, -s, 0 },
-            [_]f32{ 0, 1, 0, 0 },
-            [_]f32{ s, 0, c, 0 },
-            [_]f32{ 0, 0, 0, 1 },
+        return Mat4f.init(.{
+            .{ c, 0, -s, 0 },
+            .{ 0, 1, 0, 0 },
+            .{ s, 0, c, 0 },
+            .{ 0, 0, 0, 1 },
         });
     }
 
     pub fn getZRotation(radians: f32) Mat4f {
         const c = math.cos(radians);
         const s = math.sin(radians);
-        return Mat4f.init([4][4]f32{
-            [_]f32{ c, s, 0, 0 },
-            [_]f32{ -s, c, 0, 0 },
-            [_]f32{ 0, 0, 1, 0 },
-            [_]f32{ 0, 0, 0, 1 },
+        return Mat4f.init(.{
+            .{ c, s, 0, 0 },
+            .{ -s, c, 0, 0 },
+            .{ 0, 0, 1, 0 },
+            .{ 0, 0, 0, 1 },
         });
     }
 
     pub fn getScaling(sx: f32, sy: f32, sz: f32) Mat4f {
-        return Mat4f.init([4][4]f32{
-            [_]f32{ sx, 0, 0, 0 },
-            [_]f32{ 0, sy, 0, 0 },
-            [_]f32{ 0, 0, sz, 0 },
-            [_]f32{ 0, 0, 0, 1 },
+        return Mat4f.init(.{
+            .{ sx, 0, 0, 0 },
+            .{ 0, sy, 0, 0 },
+            .{ 0, 0, sz, 0 },
+            .{ 0, 0, 0, 1 },
         });
     }
 
     pub fn getProjection(width: f32, height: f32, depth: f32) Mat4f {
-        return Mat4f.init([4][4]f32{
-            [_]f32{ 2 / width, 0, 0, 0 },
-            [_]f32{ 0, -2 / height, 0, 0 },
-            [_]f32{ 0, 0, 2 / depth, 0 },
-            [_]f32{ -1, 1, 0, 1 },
+        return Mat4f.init(.{
+            .{ 2 / width, 0, 0, 0 },
+            .{ 0, -2 / height, 0, 0 },
+            .{ 0, 0, 2 / depth, 0 },
+            .{ -1, 1, 0, 1 },
         });
     }
 
     pub fn getOrthographic(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f32) Mat4f {
-        return Mat4f.init([4][4]f32{
-            [_]f32{ 2 / (right - left), 0, 0, 0 },
-            [_]f32{ 0, 2 / (top - bottom), 0, 0 },
-            [_]f32{ 0, 0, 2 / (near - far), 0 },
-            [_]f32{ (left + right) / (left - right), (bottom + top) / (bottom - top), (near + far) / (near - far), 1 },
+        return Mat4f.init(.{
+            .{ 2 / (right - left), 0, 0, 0 },
+            .{ 0, 2 / (top - bottom), 0, 0 },
+            .{ 0, 0, 2 / (near - far), 0 },
+            .{ (left + right) / (left - right), (bottom + top) / (bottom - top), (near + far) / (near - far), 1 },
         });
     }
 
@@ -127,11 +127,11 @@ pub const Mat3D = struct {
         const f = math.tan((math.pi * 0.5) - (0.5 * fov));
         const range_inv = 1.0 / (near - far);
 
-        return Mat4f.init([4][4]f32{
-            [_]f32{ f / aspect_ratio, 0, 0, 0 },
-            [_]f32{ 0, f, 0, 0 },
-            [_]f32{ 0, 0, (near + far) * range_inv, -1 },
-            [_]f32{ 0, 0, near * far * range_inv * 2, 0 },
+        return Mat4f.init(.{
+            .{ f / aspect_ratio, 0, 0, 0 },
+            .{ 0, f, 0, 0 },
+            .{ 0, 0, (near + far) * range_inv, -1 },
+            .{ 0, 0, near * far * range_inv * 2, 0 },
         });
     }
 
@@ -140,11 +140,11 @@ pub const Mat3D = struct {
         const x_axis = up.cross(z_axis).normalize();
         const y_axis = z_axis.cross(x_axis).normalize();
 
-        return Mat4f.init([4][4]f32{
-            [_]f32{ x_axis.data[0], x_axis.data[1], x_axis.data[2], 0 },
-            [_]f32{ y_axis.data[0], y_axis.data[1], y_axis.data[2], 0 },
-            [_]f32{ z_axis.data[0], z_axis.data[1], z_axis.data[2], 0 },
-            [_]f32{ camera_pos.data[0], camera_pos.data[1], camera_pos.data[2], 1 },
+        return Mat4f.init(.{
+            .{ x_axis.x(), x_axis.y(), x_axis.z(), 0 },
+            .{ y_axis.x(), y_axis.y(), y_axis.z(), 0 },
+            .{ z_axis.x(), z_axis.y(), z_axis.z(), 0 },
+            .{ camera_pos.x(), camera_pos.y(), camera_pos.z(), 1 },
         });
     }
 };
@@ -154,6 +154,19 @@ pub fn Vector(comptime T: type, comptime N: usize) type {
         const Self = @This();
 
         data: [N]T,
+
+        pub usingnamespace if (N >= 2) struct { 
+            pub inline fn x(self: Self) T { return self.data[0]; } 
+            pub inline fn y(self: Self) T { return self.data[1]; } 
+        } else struct {};
+
+        pub usingnamespace if (N >= 3) struct {
+            pub inline fn z(self: Self) T { return self.data[2]; }
+        } else struct {};
+
+        pub usingnamespace if (N >= 4) struct {
+            pub inline fn w(self: Self) T { return self.data[3]; }
+        } else struct {};
 
         pub fn init(data: [N]T) Self {
             return Self{ .data = data };
@@ -218,13 +231,11 @@ pub fn Vector(comptime T: type, comptime N: usize) type {
                     @compileError("Cross product requires a 3-Dimensional Vector");
                 }
             }
-            return Self{
-                .data = [N]T{ 
-                    self.data[1] * other.data[2] - self.data[2] * other.data[1],
-                    self.data[2] * other.data[0] - self.data[0] * other.data[2],
-                    self.data[0] * other.data[1] - self.data[1] * other.data[0]
-                }
-            };
+            return Self.init(.{
+                self.y() * other.z() - self.z() * other.y(),
+                self.z() * other.x() - self.x() * other.z(),
+                self.x() * other.y() - self.y() * other.z()
+            });
         }
 
         pub fn normalize(self: Vector(T, N)) Vector(T, N) {
@@ -498,16 +509,16 @@ pub fn Matrix(comptime T: type, comptime M: usize, comptime N: usize) type {
 }
 
 test "transpose" {
-    const m = Matrix(f32, 2, 3).init([3][2]f32{
-        [_]f32{ 1, 2 },
-        [_]f32{ 3, 4 },
-        [_]f32{ 5, 6 }
+    const m = Matrix(f32, 2, 3).init(.{
+        .{ 1, 2 },
+        .{ 3, 4 },
+        .{ 5, 6 }
     });
     const m_t = m.transpose();
 
-    const expected_transpose = Matrix(f32, 3, 2).init([2][3]f32{
-        [_]f32{ 1, 3, 5 },
-        [_]f32{ 2, 4, 6 }
+    const expected_transpose = Matrix(f32, 3, 2).init(.{
+        .{ 1, 3, 5 },
+        .{ 2, 4, 6 }
     });
 
     std.testing.expect(expected_transpose.eq(m_t));
@@ -515,20 +526,20 @@ test "transpose" {
 
 test "add" {
     const M = Matrix(f32, 3, 3);
-    const a = M.init([3][3]f32{
-        [_]f32 { 1, 2, 3 },
-        [_]f32 { 4, 5, 6 },
-        [_]f32 { 7, 8, 9 },
+    const a = M.init(.{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+        .{ 7, 8, 9 },
     });
-    const b = M.init([3][3]f32{
-        [_]f32 { 10, 11, 12 },
-        [_]f32 { 13, 14, 15 },
-        [_]f32 { 16, 17, 18 },
+    const b = M.init(.{
+        .{ 10, 11, 12 },
+        .{ 13, 14, 15 },
+        .{ 16, 17, 18 },
     });
-    const expected = M.init([3][3]f32{
-        [_]f32 { 11, 13, 15 },
-        [_]f32 { 17, 19, 21 },
-        [_]f32 { 23, 25, 27 },
+    const expected = M.init(.{
+        .{ 11, 13, 15 },
+        .{ 17, 19, 21 },
+        .{ 23, 25, 27 },
     });
 
     std.testing.expect(expected.eq(a.add(b)));
@@ -537,15 +548,15 @@ test "add" {
 
 test "scalar multiply" {
     const M = Matrix(f32, 3, 3);
-    const a = M.init([3][3]f32{
-        [_]f32 { 1, 2, 3 },
-        [_]f32 { 4, 5, 6 },
-        [_]f32 { 7, 8, 9 },
+    const a = M.init(.{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+        .{ 7, 8, 9 },
     });
-    const expected = M.init([3][3]f32{
-        [_]f32 { 2, 4, 6 },
-        [_]f32 { 8, 10, 12 },
-        [_]f32 { 14, 16, 18 },
+    const expected = M.init(.{
+        .{ 2, 4, 6 },
+        .{ 8, 10, 12 },
+        .{ 14, 16, 18 },
     });
 
     std.testing.expect(expected.eq(a.scalarMult(2)));
@@ -553,48 +564,48 @@ test "scalar multiply" {
 }
 
 test "matrix multiply" {
-    const m_a = Matrix(f32, 3, 2).init([2][3]f32{
-        [_]f32{ 1, 2, 3 },
-        [_]f32{ 4, 5, 6 }
+    const m_a = Matrix(f32, 3, 2).init(.{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 }
     });
-    const m_b = Matrix(f32, 2, 3).init([3][2]f32{
-        [_]f32{ 7, 8 },
-        [_]f32{ 9, 10 },
-        [_]f32{ 11, 12 },
+    const m_b = Matrix(f32, 2, 3).init(.{
+        .{ 7, 8 },
+        .{ 9, 10 },
+        .{ 11, 12 },
     });
 
-    const expected = Matrix(f32, 2, 2).init([2][2]f32{
-        [_]f32 { 58, 64 },
-        [_]f32 { 139, 154 },
+    const expected = Matrix(f32, 2, 2).init(.{
+        .{ 58, 64 },
+        .{ 139, 154 },
     });
 
     std.testing.expect(expected.eq(m_a.mult(m_b)));
 }
 
 test "sample projection times translation" {
-    const projection = Mat3f.init([3][3]f32{
-        [_]f32{ 0.002857, 0, 0 },
-        [_]f32{ 0, -0.002857, 0 },
-        [_]f32{ -1, 1, 1 },
+    const projection = Mat3f.init(.{
+        .{ 0.002857, 0, 0 },
+        .{ 0, -0.002857, 0 },
+        .{ -1, 1, 1 },
     });
 
-    const translation = Mat3f.init([3][3]f32{
-        [_]f32{ 1, 0, 0 },
-        [_]f32{ 0, 1, 0 },
-        [_]f32{ 100, 300, 1 },
+    const translation = Mat3f.init(.{
+        .{ 1, 0, 0 },
+        .{ 0, 1, 0 },
+        .{ 100, 300, 1 },
     });
 
-    const expected = Mat3f.init([3][3]f32{
-        [_]f32{ 0.002857, 0, 0 },
-        [_]f32{ 0, -0.002857, 0 },
-        [_]f32{ 99, 301, 1 },
+    const expected = Mat3f.init(.{
+        .{ 0.002857, 0, 0 },
+        .{ 0, -0.002857, 0 },
+        .{ 99, 301, 1 },
     });
 
     std.testing.expect(expected.eq(projection.mult(translation)));
 }
 
 test "flatten matrix" {
-    const m = Matrix(f32, 3, 2).init([2][3]f32{
+    const m = Matrix(f32, 3, 2).init(.{
         [_]f32{ 1, 2, 3 },
         [_]f32{ 4, 5, 6 }
     });
@@ -608,24 +619,24 @@ test "flatten matrix" {
 
 test "identity matrix" {
     const id = Matrix(f32, 3, 3).identity();
-    const expected = Matrix(f32, 3, 3).init([3][3]f32{
-        [_]f32{ 1, 0, 0 },
-        [_]f32{ 0, 1, 0 },
-        [_]f32{ 0, 0, 1 },
+    const expected = Matrix(f32, 3, 3).init(.{
+        .{ 1, 0, 0 },
+        .{ 0, 1, 0 },
+        .{ 0, 0, 1 },
     });
 
     std.testing.expect(id.eq(expected));
 }
 
 test "inverse matrix 2x2" {
-    const m = Matrix(f32, 2, 2).init([2][2]f32{
-        [_]f32{ 5, 3 },
-        [_]f32{ 10, 8 }
+    const m = Matrix(f32, 2, 2).init(.{
+        .{ 5, 3 },
+        .{ 10, 8 }
     });
 
-    const expected_inverse = Matrix(f32, 2, 2).init([2][2]f32{
-        [_]f32{ (4.0 / 5.0), (-3.0 / 10.0) },
-        [_]f32{ -1, 0.5 }
+    const expected_inverse = Matrix(f32, 2, 2).init(.{
+        .{ (4.0 / 5.0), (-3.0 / 10.0) },
+        .{ -1, 0.5 }
     });
 
     const actual_inverse = try m.inverse();
@@ -634,18 +645,18 @@ test "inverse matrix 2x2" {
 }
 
 test "inverse matrix 4x4" {
-    const m = Mat4f.init([4][4]f32{
-        [_]f32{ -18, 22, 3, 55 },
-        [_]f32{ 1, 1, 29, -11 },
-        [_]f32{ 0, 2, 44, 0 },
-        [_]f32{ 37, 37, 0, 1 },
+    const m = Mat4f.init(.{
+        .{ -18, 22, 3, 55 },
+        .{ 1, 1, 29, -11 },
+        .{ 0, 2, 44, 0 },
+        .{ 37, 37, 0, 1 },
     });
 
-    const expected_inverse = Mat4f.init([4][4]f32{
-        [_]f32{ -8947.0 / 298279.0, -44289/298279.0, 59601/596558.0, 4906/298279.0 },
-        [_]f32{ 8976/298279.0, 45166/298279.0, -60761/596558.0, 3146/298279.0},
-        [_]f32{ -408/298279.0, -2053/298279.0, 8160/298279.0, -143/298279.0},
-        [_]f32{ -1073/298279.0, -32449/298279.0, 21460/298279.0, 355/298279.0},
+    const expected_inverse = Mat4f.init(.{
+        .{ -8947.0 / 298279.0, -44289/298279.0, 59601/596558.0, 4906/298279.0 },
+        .{ 8976/298279.0, 45166/298279.0, -60761/596558.0, 3146/298279.0},
+        .{ -408/298279.0, -2053/298279.0, 8160/298279.0, -143/298279.0},
+        .{ -1073/298279.0, -32449/298279.0, 21460/298279.0, 355/298279.0},
     });
 
     const actual_inverse = try m.inverse();
@@ -654,10 +665,10 @@ test "inverse matrix 4x4" {
 }
 
 test "determinant" {
-    const m = Mat3f.init([3][3]f32{
-        [_]f32{ 6, 1, 1 },
-        [_]f32{ 4, -2, 5 },
-        [_]f32{ 2, 8, 7 },
+    const m = Mat3f.init(.{
+        .{ 6, 1, 1 },
+        .{ 4, -2, 5 },
+        .{ 2, 8, 7 },
     });
 
     const expected_det: f32 = -306;

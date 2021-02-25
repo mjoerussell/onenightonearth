@@ -50,8 +50,9 @@ pub const Canvas = struct {
         return canvas;
     }
 
-    pub fn getViewMatrix(self: *Canvas) matrix.Mat4f {
+    pub fn getProjectionMatrix(self: *Canvas) matrix.Mat4f {
         return matrix.Mat3D.getPerspective(self.settings.fov, @intToFloat(f32, self.settings.width) / @intToFloat(f32, self.settings.height), 1, 4000);
+        // return matrix.Mat3D.getOrthographic(0, 0, @intToFloat(f32, self.settings.width), @intToFloat(f32, self.settings.height), 1, 2000);
     }
 
     pub fn setPixelAt(self: *Canvas, point: Point, new_pixel: Pixel) void {
@@ -186,6 +187,7 @@ test "translate point" {
         .draw_north_up = true,
         .background_radius = 0.45 * 700.0,
         .zoom_factor = 1.0,
+        .fov = 40,
         .drag_speed = 2.5,
         .draw_asterisms = false,
         .draw_constellation_grid = false,

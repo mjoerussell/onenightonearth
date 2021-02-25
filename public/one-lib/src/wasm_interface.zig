@@ -23,6 +23,7 @@ const Mat2D = matrix.Mat2D;
 const Mat3D = matrix.Mat3D;
 const Mat3f = matrix.Mat3f;
 const Mat4f = matrix.Mat4f;
+const Vec3f = matrix.Vec3f;
 
 const Sphere = @import("./sphere.zig").Sphere;
 
@@ -114,16 +115,47 @@ pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, obse
 
     var star_matrices = std.ArrayList(f32).init(allocator);
 
-    var camera_matrix = Mat3D.getTranslation(0, 0, canvas.settings.background_radius * 3).inverse() catch unreachable;
-    if (!canvas.settings.draw_north_up) {
-        camera_matrix = camera_matrix.mult(Mat3D.getYRotation(math.pi));
-    }
-    var view_matrix = camera_matrix.mult(canvas.getViewMatrix());
+    // var camera_matrix = Mat3D.getXRotation(math.pi);
+    // camera_matrix = Mat3D.getTranslation(0, -canvas.settings.background_radius * 3, 0).mult(camera_matrix);
+    // if (!canvas.settings.draw_north_up) {
+    //     camera_matrix = camera_matrix.mult(Mat3D.getYRotation(math.pi));
+    // }
+
+    // camera_matrix = camera_matrix.inverse() catch unreachable;
+    // var view_matrix = camera_matrix.mult(canvas.getViewMatrix());
     
+    // var camera_matrix = Mat4f.identity();
+    const star_radius = canvas.settings.background_radius * canvas.settings.zoom_factor;
+
+    // const target = Vec3f.init(.{ 0, -1, 0 });
+
+    // const camera_matrix = Mat3D.lookAt(Vec3f.init(.{ 0, 0, 0 }), target, Vec3f.init(.{ 0, 1, 0 })); 
+    var camera_matrix = Mat3D.getTranslation(0, 0, 3 * star_radius).mult(Mat3D.getXRotation(math.pi));
+    if (!canvas.settings.draw_north_up) {
+        camera_matrix = Mat3D.getZRotation(math.pi).mult(camera_matrix);
+    }
+    // const camera_matrix = Mat4f.identity();
+    const view_matrix = camera_matrix.inverse() catch unreachable;
+    const view_projection_matrix = view_matrix.mult(canvas.getProjectionMatrix());
+    
+    // star_matrices.appendSlice(Mat3D.getScaling(40, 40, 40).mult(Mat3D.getTranslation(target.x(), target.y(), target.z())).flatten()[0..]) catch unreachable;
+
     for (stars) |star| {
-        const mat = star_math.projectStar(&canvas, star, current_coord, observer_timestamp, true);
-        if (mat) |m| {
-            star_matrices.appendSlice(m.mult(view_matrix).flatten()[0..]) catch |err| {
+        // const mat = star_math.projectStar(&canvas, star, current_coord, observer_timestamp, true);
+        const point = star_math.projectStar(&canvas, star, current_coord, observer_timestamp, true);
+        // if (mat) |m| {
+        if (point) |p| {
+            const star_x = @floatCast(f32, star_radius * math.cos(p.y) * math.cos(p.x));
+            const star_y = @floatCast(f32, star_radius * math.cos(p.y) * math.sin(p.x));
+            const star_z = @floatCast(f32, star_radius * math.sin(p.y));
+            
+            var star_matrix = Mat3D.getTranslation(-star_y, -star_x, star_z).mult(view_projection_matrix);
+            // var star_matrix = Mat3D.getTranslation(star_radius, 0, 0).mult(view_projection_matrix);
+            // star_matrix = Mat3D.getZRotation(p.y).mult(star_matrix);
+            // star_matrix = Mat3D.getYRotation(p.x).mult(star_matrix);
+            star_matrix = Mat3D.getScaling(0.5, 0.5, 0.5).mult(star_matrix);
+            // star_matrices.appendSlice(m.mult(view_projection_matrix).flatten()[0..]) catch |err| {
+            star_matrices.appendSlice(star_matrix.flatten()[0..]) catch |err| {
                 log(.Error, "{} error with {} matrices allocated", .{@errorName(err), star_matrices.items.len});
                 const mats = star_matrices.toOwnedSlice();
                 num_mats.* = mats.len;
