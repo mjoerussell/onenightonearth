@@ -131,7 +131,7 @@ export class WasmInterface {
         const result_len = this.readPrimative(result_len_ptr, WasmPrimative.u32);
         this.freeBytes(result_len_ptr, 4);
         const result = new Float32Array(this.memory, result_ptr, result_len);
-        this.freeBytes(result_ptr, sizeOfPrimative(WasmPrimative.u32) * result_len);
+        this.freeBytes(result_ptr, sizeOfPrimative(WasmPrimative.f32) * result_len);
         return result;
     }
 

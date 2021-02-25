@@ -1,4 +1,5 @@
 import { Controls } from './controls';
+import { Renderer } from './renderer';
 import { Constellation, Coord, Star } from './wasm/size';
 import { WasmInterface } from './wasm/wasm-interface';
 
@@ -12,6 +13,10 @@ const renderStars = (controls: Controls, date?: Date) => {
     if (controls.renderer == null) {
         console.error('Could not get canvas context!');
         return;
+    }
+
+    if (controls.renderer.settings_did_change) {
+        wasm_interface.updateSettings(controls.renderer.getCanvasSettings());
     }
 
     const matrices = wasm_interface.projectStars(controls.latitude, controls.longitude, BigInt(timestamp));

@@ -115,9 +115,9 @@ pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, obse
 
     var star_matrices = std.ArrayList(f32).init(allocator);
 
-    const star_radius = canvas.settings.background_radius * canvas.settings.zoom_factor;
+    const star_radius = canvas.settings.background_radius;
 
-    var camera_matrix = Mat3D.getTranslation(0, 0, 3 * star_radius).mult(Mat3D.getXRotation(math.pi));
+    var camera_matrix = Mat3D.getTranslation(0, 0, (3 * star_radius) / canvas.settings.zoom_factor).mult(Mat3D.getXRotation(math.pi));
     if (!canvas.settings.draw_north_up) {
         camera_matrix = Mat3D.getZRotation(math.pi).mult(camera_matrix);
     }
