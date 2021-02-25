@@ -74,7 +74,7 @@ pub export fn initializeCanvas(settings: *ExternCanvasSettings) void {
         }
     };
 
-    test_sphere = Sphere.init(allocator, 1, 9, 9) catch unreachable;
+    test_sphere = Sphere.init(allocator, 1, 9, 18) catch unreachable;
 }
 
 pub export fn initializeConstellations(constellation_grid_data: [*][*]SkyCoord, constellation_asterism_data: [*][*]SkyCoord, grid_coord_lens: [*]u32, asterism_coord_lens: [*]u32, num_constellations: u32) void {
@@ -117,7 +117,7 @@ pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, obse
 
     const star_radius = canvas.settings.background_radius;
 
-    var camera_matrix = Mat3D.getTranslation(0, 0, (3 * star_radius) / canvas.settings.zoom_factor).mult(Mat3D.getXRotation(math.pi));
+    var camera_matrix = Mat3D.getTranslation(0, 0, (4 * star_radius) / canvas.settings.zoom_factor).mult(Mat3D.getXRotation(math.pi / 2.0));
     if (!canvas.settings.draw_north_up) {
         camera_matrix = Mat3D.getZRotation(math.pi).mult(camera_matrix);
     }
@@ -125,15 +125,9 @@ pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, obse
     const view_projection_matrix = view_matrix.mult(canvas.getProjectionMatrix());
     
     for (stars) |star| {
-        const point = star_math.projectStar(&canvas, star, current_coord, observer_timestamp, true);
-        if (point) |p| {
-            const star_x = @floatCast(f32, star_radius * math.cos(p.y) * math.cos(p.x));
-            const star_y = @floatCast(f32, star_radius * math.cos(p.y) * math.sin(p.x));
-            const star_z = @floatCast(f32, star_radius * math.sin(p.y));
-            
-            var star_matrix = Mat3D.getTranslation(-star_y, -star_x, star_z).mult(view_projection_matrix);
-            star_matrix = Mat3D.getScaling(0.5, 0.5, 0.5).mult(star_matrix);
-            star_matrices.appendSlice(star_matrix.flatten()[0..]) catch |err| {
+        const m = star_math.projectStar(&canvas, star, current_coord, observer_timestamp, true);
+        if (m) |star_matrix| {
+            star_matrices.appendSlice(star_matrix.mult(view_projection_matrix).flatten()[0..]) catch |err| {
                 log(.Error, "{} error with {} matrices allocated", .{@errorName(err), star_matrices.items.len});
                 const mats = star_matrices.toOwnedSlice();
                 num_mats.* = mats.len;

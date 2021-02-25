@@ -44,7 +44,7 @@ export class Renderer {
             background_radius: 0.45 * Math.min(this.main_canvas.width, this.main_canvas.height),
             zoom_factor: 1.0,
             drag_speed: Renderer.DefaultDragSpeed,
-            fov: 40 * (Math.PI / 180),
+            fov: 30 * (Math.PI / 180),
             draw_north_up: true,
             draw_constellation_grid: false,
             draw_asterisms: false,

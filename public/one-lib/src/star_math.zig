@@ -81,7 +81,7 @@ fn getAlpha(brightness: f32) u8 {
     else @floatToInt(u8, brightness * 255.0);
 }
 
-pub fn projectStar(canvas: *Canvas, star: Star, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?Point {
+pub fn projectStar(canvas: *Canvas, star: Star, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?Mat4f {
     return projectToCanvas(
         canvas, 
         SkyCoord{ .right_ascension = star.right_ascension, .declination = star.declination }, 
@@ -162,7 +162,7 @@ pub fn drawSkyGrid(canvas: *Canvas, observer_location: Coord, observer_timestamp
     }
 }
 
-pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?Point {
+pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?Mat4f {
     const two_pi = comptime math.pi * 2.0;
     const half_pi = comptime math.pi / 2.0;
 
@@ -187,7 +187,11 @@ pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: 
     const azi = math.acos(cos_azi);
     const azimuth = if (math.sin(hour_angle_rad) < 0) azi else two_pi - azi;
 
-    return Point{ .x = @floatCast(f32, azimuth), .y = @floatCast(f32, altitude) };
+    const star_radius = canvas.settings.background_radius;
+    var star_matrix = Mat3D.getYRotation(-@floatCast(f32, azimuth));
+    star_matrix = Mat3D.getXRotation(-@floatCast(f32, altitude)).mult(star_matrix);
+    star_matrix = Mat3D.getTranslation(0, 0, star_radius).mult(star_matrix); // Move to celestial sphere surface
+    return Mat3D.getScaling(0.5, 0.5, 0.5).mult(star_matrix);
 }
 
 pub fn getProjectedCoord(altitude: f32, azimuth: f32) Point {
