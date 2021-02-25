@@ -14,7 +14,7 @@ const renderStars = (controls: Controls, date?: Date) => {
         return;
     }
 
-    const matrices: number[][] = wasm_interface.projectStars(controls.latitude, controls.longitude, BigInt(timestamp));
+    const matrices = wasm_interface.projectStars(controls.latitude, controls.longitude, BigInt(timestamp));
 
     controls.renderer.drawScene(wasm_interface.getSphereVertices(), wasm_interface.getSphereIndices(), matrices);
 };

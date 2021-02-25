@@ -31,6 +31,7 @@ export class Renderer {
     private color_location: WebGLUniformLocation | null = null;
 
     private position_buffer: WebGLBuffer | null = null;
+    private matrix_buffer: WebGLBuffer | null = null;
     private index_buffer: WebGLBuffer | null = null;
     private color_buffer: WebGLBuffer | null = null;
 
@@ -55,13 +56,13 @@ export class Renderer {
         const vertex_shader_source = `#version 300 es
         in vec4 a_position;
         in vec4 a_color;
+        // uniform mat4 u_matrix;
+        in mat4 a_matrix;
 
         out vec4 v_color;
-        // uniform vec2 u_resolution;
-        uniform mat4 u_matrix;
 
         void main() {
-            gl_Position = u_matrix * a_position;
+            gl_Position = a_matrix * a_position;
             v_color = a_color;
         }
         `;
@@ -95,7 +96,7 @@ export class Renderer {
 
         const position_attrib_location = this.gl.getAttribLocation(program, 'a_position');
         const color_attrib_location = this.gl.getAttribLocation(program, 'a_color');
-        this.matrix_location = this.gl.getUniformLocation(program, 'u_matrix');
+        const matrix_attrib_location = this.gl.getAttribLocation(program, 'a_matrix');
 
         this.position_buffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.position_buffer);
@@ -113,14 +114,22 @@ export class Renderer {
         this.gl.enableVertexAttribArray(color_attrib_location);
         this.gl.vertexAttribPointer(color_attrib_location, 3, this.gl.UNSIGNED_BYTE, true, 0, 0);
 
+        this.matrix_buffer = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.matrix_buffer);
+        const bytes_per_matrix = 4 * 16;
+        for (let i = 0; i < 4; i += 1) {
+            const location = matrix_attrib_location + i;
+            this.gl.enableVertexAttribArray(location);
+            const offset = i * 16;
+            this.gl.vertexAttribPointer(location, 4, this.gl.FLOAT, false, bytes_per_matrix, offset);
+            this.gl.vertexAttribDivisor(location, 1);
+        }
+
         this.gl.enable(this.gl.CULL_FACE);
         this.gl.enable(this.gl.DEPTH_TEST);
     }
 
-    drawScene(vertices: Float32Array, indices: Uint32Array, matrix: number[][]): void {
-        console.log('Drawing vertices ', vertices);
-        console.log('Drawing indices: ', indices);
-
+    drawScene(vertices: Float32Array, indices: Uint32Array, matrices: Float32Array): void {
         const repeat = <T>(items: T[], times: number): T[] => {
             let result: T[] = [];
             for (let i = 0; i < times; i += 1) {
@@ -141,15 +150,16 @@ export class Renderer {
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.position_buffer);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STATIC_DRAW);
 
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.matrix_buffer);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, matrices.byteLength, this.gl.DYNAMIC_DRAW);
+        this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, matrices);
+
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.color_buffer);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, new Uint8Array(repeat([255, 255, 255], vertices.length)), this.gl.STATIC_DRAW);
 
         this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, indices, this.gl.STATIC_DRAW);
 
-        for (const m of matrix) {
-            this.gl.uniformMatrix4fv(this.matrix_location, false, m);
-            this.gl.drawElements(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_INT, 0);
-        }
+        this.gl.drawElementsInstanced(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_INT, 0, matrices.length / 16);
     }
 
     private createShader(type: number, source: string): WebGLShader | null {

@@ -125,20 +125,14 @@ export class WasmInterface {
         this.lib.initializeCanvas(settings_ptr);
     }
 
-    projectStars(latitude: number, longitude: number, timestamp: BigInt): number[][] {
+    projectStars(latitude: number, longitude: number, timestamp: BigInt): Float32Array {
         const result_len_ptr = this.allocBytes(4);
         const result_ptr = this.lib.projectStars(latitude, longitude, timestamp, result_len_ptr);
         const result_len = this.readPrimative(result_len_ptr, WasmPrimative.u32);
         this.freeBytes(result_len_ptr, 4);
-        const result = Array.from(new Float32Array(this.memory, result_ptr, result_len));
+        const result = new Float32Array(this.memory, result_ptr, result_len);
         this.freeBytes(result_ptr, sizeOfPrimative(WasmPrimative.u32) * result_len);
-
-        const matrices: number[][] = [];
-        for (let i = 0; i < result.length; i += 16) {
-            matrices.push(result.slice(i, i + 16));
-        }
-
-        return matrices;
+        return result;
     }
 
     projectConstellationGrids(latitude: number, longitude: number, timestamp: BigInt): void {
