@@ -27,9 +27,6 @@ export class Renderer {
     private program: WebGLProgram | null = null;
     private vao: WebGLVertexArrayObject | null = null;
 
-    private matrix_location: WebGLUniformLocation | null = null;
-    private color_location: WebGLUniformLocation | null = null;
-
     private position_buffer: WebGLBuffer | null = null;
     private matrix_buffer: WebGLBuffer | null = null;
     private index_buffer: WebGLBuffer | null = null;
@@ -192,17 +189,6 @@ export class Renderer {
 
         return null;
     }
-
-    // drawData(data: Uint8ClampedArray): void {
-    //     try {
-    //         const image_data = new ImageData(data, this.main_canvas.width, this.main_canvas.height);
-    //         this.main_ctx.putImageData(image_data, 0, 0);
-    //     } catch (error) {
-    //         if (error instanceof DOMException) {
-    //             console.error('DOMException in drawPoint: ', error);
-    //         }
-    //     }
-    // }
 
     /**
      * Add an event listener to the main canvas.
