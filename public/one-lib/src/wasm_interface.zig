@@ -17,11 +17,11 @@ const Constellation = star_math.Constellation;
 const SkyCoord = star_math.SkyCoord;
 const Coord = star_math.Coord;
 
-const mat = @import("./matrix.zig");
-const Mat2D = mat.Mat2D;
-const Mat3D = mat.Mat3D;
-const Mat3f = mat.Mat3f;
-const Mat4f = mat.Mat4f;
+const matrix = @import("./matrix.zig");
+const Mat2D = matrix.Mat2D;
+const Mat3D = matrix.Mat3D;
+const Mat3f = matrix.Mat3f;
+const Mat4f = matrix.Mat4f;
 
 const Sphere = @import("./sphere.zig").Sphere;
 
@@ -39,6 +39,7 @@ const ExternCanvasSettings = packed struct {
     background_radius: f32,
     zoom_factor: f32,
     drag_speed: f32,
+    fov: f32,
     draw_north_up: u8,
     draw_constellation_grid: u8,
     draw_asterisms: u8,
@@ -50,6 +51,7 @@ const ExternCanvasSettings = packed struct {
             .background_radius = self.background_radius,
             .zoom_factor = self.zoom_factor,
             .drag_speed = self.drag_speed,
+            .fov = self.fov,
             .draw_north_up = self.draw_north_up == 1,
             .draw_constellation_grid = self.draw_constellation_grid == 1,
             .draw_asterisms = self.draw_asterisms == 1
@@ -103,53 +105,100 @@ pub export fn resetImageData() void {
     }   
 }
 
-pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
+// pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64, num_mats: *usize) [*]*Mat4f {
+pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64, num_mats: *usize) [*]f32 {
     const current_coord = Coord{
         .latitude = observer_latitude,
         .longitude = observer_longitude
     };
 
+    // log(.Debug, "Trying to allocate {} bytes", .{(stars.len / 2) * @sizeOf(*Mat4f)});
+    // var star_matrices = std.ArrayList(*Mat4f).init(allocator);
+    var star_matrices = std.ArrayList(f32).init(allocator);
+    // var star_matrices = std.ArrayList(*Mat4f).initCapacity(allocator, stars.len / 2) catch |err| {
+    //     switch (err) {
+    //         error.OutOfMemory => log(.Error, "Out of Memory", .{}),
+    //         else => log(.Error, "Unexpected error: {}", .{@errorName(err)})
+    //     }
+    //     unreachable;
+    // };
+
+    var camera_matrix = Mat3D.getTranslation(0, 0, 1000).inverse() catch unreachable;
+    // var view_matrix = canvas.getViewMatrix().mult(camera_matrix);
+    var view_matrix = camera_matrix.mult(canvas.getViewMatrix());
+    // var view_matrix = canvas.getViewMatrix();
+    
+    var debug_num_to_print: usize = 0;
     for (stars) |star| {
-        star_math.projectStar(&canvas, star, current_coord, observer_timestamp, true);
+        const mat = star_math.projectStar(&canvas, star, current_coord, observer_timestamp, true);
+        if (mat) |m| {
+            if (debug_num_to_print < 100) {
+                log(.Debug, "{}", .{m});
+                debug_num_to_print += 1;
+            }
+
+            star_matrices.appendSlice(m.mult(view_matrix).flatten()[0..]) catch |err| {
+                log(.Error, "{} error with {} matrices allocated", .{@errorName(err), star_matrices.items.len});
+                const mats = star_matrices.toOwnedSlice();
+                num_mats.* = mats.len;
+                return mats.ptr;
+            };
+            // const mat_ptr = allocator.create(Mat4f) catch unreachable;
+            // mat_ptr.* = m.mult(view_matrix);
+            // star_matrices.append(mat_ptr) catch |err| {
+            //     log(.Error, "{} error with {} matrices allocated", .{@errorName(err), star_matrices.items.len});
+            //     // unreachable;
+            //     const mats = star_matrices.toOwnedSlice();
+            //     num_mats.* = mats.len;
+            //     return mats.ptr;
+            // };
+        }
     }
+
+    const mats = star_matrices.toOwnedSlice();
+    num_mats.* = mats.len;
+
+    log(.Debug, "result_len = {} matrices => {} floats", .{mats.len / 16, mats.len});
+    return mats.ptr;
 
     // star_math.drawSkyGrid(&canvas, current_coord, observer_timestamp);
 }
 
 pub export fn projectConstellationGrids(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
-    const current_coord = Coord{
-        .latitude = observer_latitude,
-        .longitude = observer_longitude
-    };
+    // const current_coord = Coord{
+    //     .latitude = observer_latitude,
+    //     .longitude = observer_longitude
+    // };
 
-    if (canvas.settings.draw_constellation_grid or canvas.settings.draw_asterisms) {
-        for (constellations) |constellation| {
-            if (canvas.settings.draw_constellation_grid) {
-                star_math.projectConstellationGrid(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, current_coord, observer_timestamp);
-            }
-            if (canvas.settings.draw_asterisms) {
-                star_math.projectConstellationAsterism(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, current_coord, observer_timestamp);
-            }
-        }
-    }
+    // if (canvas.settings.draw_constellation_grid or canvas.settings.draw_asterisms) {
+    //     for (constellations) |constellation| {
+    //         if (canvas.settings.draw_constellation_grid) {
+    //             star_math.projectConstellationGrid(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, current_coord, observer_timestamp);
+    //         }
+    //         if (canvas.settings.draw_asterisms) {
+    //             star_math.projectConstellationAsterism(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, current_coord, observer_timestamp);
+    //         }
+    //     }
+    // }
 }
 
 pub export fn getConstellationAtPoint(point: *Point, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) isize {
-    const observer_coord = Coord{
-        .latitude = observer_latitude,
-        .longitude = observer_longitude
-    };
-    defer allocator.destroy(point);
-    const index = star_math.getConstellationAtPoint(&canvas, point.*, constellations, observer_coord, observer_timestamp);
-    if (index) |i| {
-        if (canvas.settings.draw_constellation_grid) {
-            star_math.projectConstellationGrid(&canvas, constellations[i], Pixel.rgb(255, 255, 255), 2, observer_coord, observer_timestamp);
-        }
-        if (canvas.settings.draw_asterisms) {
-            star_math.projectConstellationAsterism(&canvas, constellations[i], Pixel.rgb(255, 255, 255), 2, observer_coord, observer_timestamp);
-        }
-        return @intCast(isize, i);
-    } else return -1;
+    // const observer_coord = Coord{
+    //     .latitude = observer_latitude,
+    //     .longitude = observer_longitude
+    // };
+    // defer allocator.destroy(point);
+    // const index = star_math.getConstellationAtPoint(&canvas, point.*, constellations, observer_coord, observer_timestamp);
+    // if (index) |i| {
+    //     if (canvas.settings.draw_constellation_grid) {
+    //         star_math.projectConstellationGrid(&canvas, constellations[i], Pixel.rgb(255, 255, 255), 2, observer_coord, observer_timestamp);
+    //     }
+    //     if (canvas.settings.draw_asterisms) {
+    //         star_math.projectConstellationAsterism(&canvas, constellations[i], Pixel.rgb(255, 255, 255), 2, observer_coord, observer_timestamp);
+    //     }
+    //     return @intCast(isize, i);
+    // } else return -1;
+    return 0;
 }
 
 pub export fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_end_y: f32) *Coord {
@@ -168,53 +217,58 @@ pub export fn findWaypoints(f: *const Coord, t: *const Coord, num_waypoints: *u3
     return waypoints.ptr;
 }
 
-pub export fn getCoordForSkyCoord(sky_coord: *SkyCoord, observer_timestamp: i64) *Coord {
-    defer allocator.destroy(sky_coord);
-    const coord = star_math.getCoordForSkyCoord(sky_coord.*, observer_timestamp);
-    const coord_ptr = allocator.create(Coord) catch unreachable;
-    coord_ptr.* = coord;
-    return coord_ptr;
+pub export fn getCoordForSkyCoord(sky_coord: *SkyCoord, observer_timestamp: i64) ?*Coord {
+// pub export fn getCoordForSkyCoord(sky_coord: *SkyCoord, observer_timestamp: i64) *Coord {
+    // defer allocator.destroy(sky_coord);
+    // const coord = star_math.getCoordForSkyCoord(sky_coord.*, observer_timestamp);
+    // const coord_ptr = allocator.create(Coord) catch unreachable;
+    // coord_ptr.* = coord;
+    // return coord_ptr;
+    return null;
 }
 
 pub export fn getSkyCoordForCanvasPoint(point: *Point, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) ?*SkyCoord {
-    defer allocator.destroy(point);
-    const observer_location = Coord{
-        .latitude = observer_latitude,
-        .longitude = observer_longitude
-    };
-    const sky_coord = star_math.getSkyCoordForCanvasPoint(&canvas, point.*, observer_location, observer_timestamp);
-    if (sky_coord) |sk| {
-        const sky_coord_ptr = allocator.create(SkyCoord) catch unreachable;
-        sky_coord_ptr.* = sk;
-        return sky_coord_ptr;
-    } else {
-        return null;
-    }
+    // defer allocator.destroy(point);
+    // const observer_location = Coord{
+    //     .latitude = observer_latitude,
+    //     .longitude = observer_longitude
+    // };
+    // const sky_coord = star_math.getSkyCoordForCanvasPoint(&canvas, point.*, observer_location, observer_timestamp);
+    // if (sky_coord) |sk| {
+    //     const sky_coord_ptr = allocator.create(SkyCoord) catch unreachable;
+    //     sky_coord_ptr.* = sk;
+    //     return sky_coord_ptr;
+    // } else {
+    //     return null;
+    // }
+    return null;
 }
 
 pub export fn getCoordForCanvasPoint(point: *Point, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) ?*Coord {
-    defer allocator.destroy(point);
-    const observer_location = Coord{
-        .latitude = observer_latitude,
-        .longitude = observer_longitude
-    };
-    const sky_coord = star_math.getSkyCoordForCanvasPoint(&canvas, point.*, observer_location, observer_timestamp);
-    if (sky_coord) |sk| {
-        const coord = star_math.getCoordForSkyCoord(sk, observer_timestamp);
-        const coord_ptr = allocator.create(Coord) catch unreachable;
-        coord_ptr.* = coord;
-        return coord_ptr;
-    } else {
-        return null;
-    }
+    // defer allocator.destroy(point);
+    // const observer_location = Coord{
+    //     .latitude = observer_latitude,
+    //     .longitude = observer_longitude
+    // };
+    // const sky_coord = star_math.getSkyCoordForCanvasPoint(&canvas, point.*, observer_location, observer_timestamp);
+    // if (sky_coord) |sk| {
+    //     const coord = star_math.getCoordForSkyCoord(sk, observer_timestamp);
+    //     const coord_ptr = allocator.create(Coord) catch unreachable;
+    //     coord_ptr.* = coord;
+    //     return coord_ptr;
+    // } else {
+    //     return null;
+    // }
+    return null;
 }
 
 pub export fn getConstellationCentroid(constellation_index: usize) ?*SkyCoord {
-    if (constellation_index > constellations.len) return null;
+    // if (constellation_index > constellations.len) return null;
 
-    const coord_ptr = allocator.create(SkyCoord) catch unreachable;
-    coord_ptr.* = star_math.getConstellationCentroid(constellations[constellation_index]);
-    return coord_ptr;
+    // const coord_ptr = allocator.create(SkyCoord) catch unreachable;
+    // coord_ptr.* = star_math.getConstellationCentroid(constellations[constellation_index]);
+    // return coord_ptr;
+    return null;
 }
 
 pub export fn getProjectionMatrix2d(width: f32, height: f32) *Mat3f {
@@ -355,4 +409,6 @@ pub export fn _wasm_alloc(byte_len: u32) ?[*]u8 {
 pub export fn _wasm_free(items: [*]u8, byte_len: u32) void {
     const bounded_items = items[0..byte_len];
     allocator.free(bounded_items);
+
+    log(.Debug, "Freed {} bytes", .{byte_len});
 }

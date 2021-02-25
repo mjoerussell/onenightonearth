@@ -1,5 +1,5 @@
 import { Controls } from './controls';
-import { Constellation, Coord, Star } from './wasm/size';
+import { Constellation, Coord, Star, WasmPrimative } from './wasm/size';
 import { WasmInterface } from './wasm/wasm-interface';
 
 let constellations: Constellation[] = [];
@@ -16,26 +16,26 @@ const renderStars = (controls: Controls, date?: Date) => {
         return;
     }
 
-    const degToRad = (degrees: number): number => {
-        return degrees * (Math.PI / 180);
-    };
+    // const degToRad = (degrees: number): number => {
+    //     return degrees * (Math.PI / 180);
+    // };
 
-    current_rotation += 5;
-    if (current_rotation >= 360) {
-        current_rotation = 0;
-    }
+    // current_rotation += 5;
+    // if (current_rotation >= 360) {
+    //     current_rotation = 0;
+    // }
 
-    const translation = [0, 0, -3000];
-    const rotation = [0, 0, 0];
-    const scale = [5, 5, 5];
+    // const translation = [0, 0, -3000];
+    // const rotation = [0, 0, 0];
+    // const scale = [5, 5, 5];
 
-    const getView = () =>
-        wasm_interface.getPerspectiveMatrix3d(
-            degToRad(50),
-            controls.renderer.canvas.clientWidth / controls.renderer.canvas.clientHeight,
-            1,
-            4000
-        );
+    // const getView = () =>
+    //     wasm_interface.getPerspectiveMatrix3d(
+    //         degToRad(50),
+    //         controls.renderer.canvas.clientWidth / controls.renderer.canvas.clientHeight,
+    //         1,
+    //         4000
+    //     );
 
     // let matrix = wasm_interface.getPerspectiveMatrix3d(
     //     degToRad(50),
@@ -43,17 +43,26 @@ const renderStars = (controls: Controls, date?: Date) => {
     //     1,
     //     2000
     // );
-    const matrices = [getView(), getView(), getView()].map((m, index) => {
-        let result = wasm_interface.matrixMult3d(
-            wasm_interface.getTranslationMatrix3d(translation[0] + 50 * index, translation[1], translation[2]),
-            m
-        );
-        result = wasm_interface.matrixMult3d(wasm_interface.getXRotationMatrix3d(degToRad(rotation[0])), result);
-        result = wasm_interface.matrixMult3d(wasm_interface.getYRotationMatrix3d(degToRad(rotation[1])), result);
-        result = wasm_interface.matrixMult3d(wasm_interface.getZRotationMatrix3d(degToRad(rotation[2])), result);
-        result = wasm_interface.matrixMult3d(wasm_interface.getScalingMatrix3d(scale[0], scale[1], scale[2]), result);
-        return Array.from(wasm_interface.readMatrix3d(result));
-    });
+    // const matrices = [getView(), getView(), getView()].map((m, index) => {
+    //     let result = wasm_interface.matrixMult3d(
+    //         wasm_interface.getTranslationMatrix3d(translation[0] + 50 * index, translation[1], translation[2]),
+    //         m
+    //     );
+    //     result = wasm_interface.matrixMult3d(wasm_interface.getXRotationMatrix3d(degToRad(rotation[0])), result);
+    //     result = wasm_interface.matrixMult3d(wasm_interface.getYRotationMatrix3d(degToRad(rotation[1])), result);
+    //     result = wasm_interface.matrixMult3d(wasm_interface.getZRotationMatrix3d(degToRad(rotation[2])), result);
+    //     result = wasm_interface.matrixMult3d(wasm_interface.getScalingMatrix3d(scale[0], scale[1], scale[2]), result);
+    //     const array_res = Array.from(wasm_interface.readMatrix3d(result));
+    //     wasm_interface.freeMatrix3d(result);
+    //     return array_res;
+    // });
+
+    // const matrices: number[][] = wasm_interface.projectStars(controls.latitude, controls.longitude, BigInt(timestamp)).map(mat => {
+    //     const res = wasm_interface.readMatrix3d(mat);
+    //     wasm_interface.freeMatrix3d(mat);
+    //     return Array.from(res);
+    // });
+    const matrices: number[][] = wasm_interface.projectStars(controls.latitude, controls.longitude, BigInt(timestamp));
 
     controls.renderer.drawScene(
         wasm_interface.getSphereVertices(),
@@ -62,7 +71,7 @@ const renderStars = (controls: Controls, date?: Date) => {
         // Array.from(wasm_interface.readMatrix3d(matrix))
     );
 
-    matrices.forEach(m => wasm_interface.freeMatrix3d(m));
+    // matrices.forEach(m => wasm_interface.freeMatrix3d(m));
     // wasm_interface.freeMatrix3d(matrix);
 };
 

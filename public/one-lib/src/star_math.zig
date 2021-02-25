@@ -11,6 +11,8 @@ const math_utils = @import("./math_utils.zig");
 const Point = math_utils.Point;
 const Line = math_utils.Line;
 
+const matrix = @import("./matrix.zig");
+
 pub const Coord = packed struct {
     latitude: f32,
     longitude: f32,
@@ -77,21 +79,28 @@ fn getAlpha(brightness: f32) u8 {
     else @floatToInt(u8, brightness * 255.0);
 }
 
-pub fn projectStar(canvas: *Canvas, star: Star, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) void {
-    const point = projectToCanvas(
+pub fn projectStar(canvas: *Canvas, star: Star, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?matrix.Mat4f {
+    return projectToCanvas(
         canvas, 
         SkyCoord{ .right_ascension = star.right_ascension, .declination = star.declination }, 
         observer_location, 
         observer_timestamp, 
         true
     );
-    if (point) |p| {
-        if (canvas.isInsideCircle(p)) {
-            var base_color = star.spec_type.getColor();
-            base_color.a = getAlpha(star.brightness + 0.15);
-            canvas.setPixelAt(p, base_color);
-        }
-    }
+    // const point = projectToCanvas(
+    //     canvas, 
+    //     SkyCoord{ .right_ascension = star.right_ascension, .declination = star.declination }, 
+    //     observer_location, 
+    //     observer_timestamp, 
+    //     true
+    // );
+    // if (point) |p| {
+    //     if (canvas.isInsideCircle(p)) {
+    //         var base_color = star.spec_type.getColor();
+    //         base_color.a = getAlpha(star.brightness + 0.15);
+    //         canvas.setPixelAt(p, base_color);
+    //     }
+    // }
 }
 
 pub fn projectConstellationGrid(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, observer_location: Coord, observer_timestamp: i64) void {
@@ -165,7 +174,8 @@ pub fn drawSkyGrid(canvas: *Canvas, observer_location: Coord, observer_timestamp
     }
 }
 
-pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?Point {
+// pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?Point {
+pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?matrix.Mat4f {
     const two_pi = comptime math.pi * 2.0;
     const half_pi = comptime math.pi / 2.0;
 
@@ -190,7 +200,21 @@ pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: 
     const azi = math.acos(cos_azi);
     const azimuth = if (math.sin(hour_angle_rad) < 0) azi else two_pi - azi;
 
-    return canvas.translatePoint(getProjectedCoord(@floatCast(f32, altitude), @floatCast(f32, azimuth)));
+    // const star_point = getProjectedCoord(@floatCast(f32, altitude), @floatCast(f32, azimuth));
+    // const star_point = getProjectedCoord(@floatCast(f32, altitude), @floatCast(f32, azimuth));
+    const star_x = @floatCast(f32, canvas.settings.background_radius * math.cos(altitude) * math.cos(azimuth));
+    const star_y = @floatCast(f32, canvas.settings.background_radius * math.cos(altitude) * math.sin(azimuth));
+    const star_z = @floatCast(f32, canvas.settings.background_radius * math.sin(altitude));
+    
+    // var star_mat = canvas.getViewMatrix();
+    // star_mat = matrix.Mat3D.getTranslation()
+    // star_mat = matrix.Mat3D.getTranslation(star_x, star_y, star_z).mult(star_mat);
+    var star_mat = matrix.Mat3D.getTranslation(star_x, star_y, -star_z);
+    // star_mat = matrix.Mat3D.getXRotation(-90).mult(star_mat);
+    return matrix.Mat3D.getScaling(0.5, 0.5, 0.5).mult(star_mat);
+    // return matrix.Mat3D.getScaling(5, 5, 5).mult(star_mat)
+    //     .mult(matrix.Mat3D.getTranslation(star_x, star_y, star_z))
+    //     .mult(matrix.Mat3D.getScaling(5, 5, 5));
 }
 
 pub fn getProjectedCoord(altitude: f32, azimuth: f32) Point {

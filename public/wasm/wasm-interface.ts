@@ -35,7 +35,13 @@ interface WasmFns {
     updateCanvasSettings: (settings: pointer<CanvasSettings>) => void;
     getImageData: (size_in_bytes: pointer<number>) => pointer<number>;
     resetImageData: () => void;
-    projectStars: (observer_latitude: number, observer_longitude: number, observer_timestamp: BigInt) => void;
+    projectStars: (
+        observer_latitude: number,
+        observer_longitude: number,
+        observer_timestamp: BigInt,
+        mat_count: pointer<number>
+    ) => pointer<pointer<any>>;
+    // projectStars: (observer_latitude: number, observer_longitude: number, observer_timestamp: BigInt) => void;
     projectConstellationGrids: (observer_latitude: number, observer_longitude: number, observer_timestamp: BigInt) => void;
     getConstellationAtPoint: (
         point: pointer<CanvasPoint>,
@@ -119,8 +125,23 @@ export class WasmInterface {
         this.lib.initializeCanvas(settings_ptr);
     }
 
-    projectStars(latitude: number, longitude: number, timestamp: BigInt): void {
-        this.lib.projectStars(latitude, longitude, timestamp);
+    projectStars(latitude: number, longitude: number, timestamp: BigInt): number[][] {
+        const result_len_ptr = this.allocBytes(4);
+        const result_ptr = this.lib.projectStars(latitude, longitude, timestamp, result_len_ptr);
+        const result_len = this.readPrimative(result_len_ptr, WasmPrimative.u32);
+        this.freeBytes(result_len_ptr, 4);
+        // return Array.from(new Uint32Array(this.memory, result_ptr, result_len));
+        // const result = Array.from(new Uint32Array(this.memory, result_ptr, result_len));
+        const result = Array.from(new Float32Array(this.memory, result_ptr, result_len));
+        this.freeBytes(result_ptr, sizeOfPrimative(WasmPrimative.u32) * result_len);
+
+        const matrices: number[][] = [];
+        for (let i = 0; i < result.length; i += 16) {
+            matrices.push(result.slice(i, i + 16));
+        }
+
+        return matrices;
+        // return result;
     }
 
     projectConstellationGrids(latitude: number, longitude: number, timestamp: BigInt): void {

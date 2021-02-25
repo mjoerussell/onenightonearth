@@ -4,6 +4,7 @@ const math = std.math;
 
 const log = @import("./log.zig").log;
 const math_utils = @import("./math_utils.zig");
+const matrix = @import("./matrix.zig");
 const Point = math_utils.Point;
 const Line = math_utils.Line;
 
@@ -30,6 +31,7 @@ pub const Canvas = struct {
         background_radius: f32,
         zoom_factor: f32,
         drag_speed: f32,
+        fov: f32,
         draw_north_up: bool,
         draw_constellation_grid: bool,
         draw_asterisms: bool
@@ -46,6 +48,10 @@ pub const Canvas = struct {
             p.* = Pixel{};
         }
         return canvas;
+    }
+
+    pub fn getViewMatrix(self: *Canvas) matrix.Mat4f {
+        return matrix.Mat3D.getPerspective(self.settings.fov, @intToFloat(f32, self.settings.width) / @intToFloat(f32, self.settings.height), 1, 4000);
     }
 
     pub fn setPixelAt(self: *Canvas, point: Point, new_pixel: Pixel) void {

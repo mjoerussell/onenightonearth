@@ -4,6 +4,7 @@ export type CanvasSettings = {
     background_radius: number;
     zoom_factor: number;
     drag_speed: number;
+    fov: number;
     draw_north_up: boolean;
     draw_constellation_grid: boolean;
     draw_asterisms: boolean;
@@ -45,6 +46,7 @@ export class Renderer {
             background_radius: 0.45 * Math.min(this.main_canvas.width, this.main_canvas.height),
             zoom_factor: 1.0,
             drag_speed: Renderer.DefaultDragSpeed,
+            fov: 50 * (Math.PI / 180),
             draw_north_up: true,
             draw_constellation_grid: false,
             draw_asterisms: false,
@@ -140,7 +142,7 @@ export class Renderer {
         this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STATIC_DRAW);
 
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.color_buffer);
-        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Uint8Array(repeat([255, 255, 255], vertices.length)), this.gl.STATIC_DRAW);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Uint8Array(repeat([255, 0, 0], vertices.length)), this.gl.STATIC_DRAW);
 
         this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, indices, this.gl.STATIC_DRAW);
 
