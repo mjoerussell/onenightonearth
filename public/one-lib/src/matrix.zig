@@ -379,6 +379,7 @@ pub fn Matrix(comptime T: type, comptime M: usize, comptime N: usize) type {
         }
 
         pub fn determinant(self: Self) !T {
+            @setFloatMode(.Optimized);
             if (N != M) return error.NotSquare;
             if (N == 1) {
                 return self.data[0][0];
@@ -414,6 +415,7 @@ pub fn Matrix(comptime T: type, comptime M: usize, comptime N: usize) type {
         }
 
         pub fn inverse(self: Self) !Self {
+            @setFloatMode(.Optimized);
             const det = try self.determinant();
             if (det == 0) return error.NoInverse;
 

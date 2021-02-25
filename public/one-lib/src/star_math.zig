@@ -12,6 +12,8 @@ const Point = math_utils.Point;
 const Line = math_utils.Line;
 
 const matrix = @import("./matrix.zig");
+const Mat3D = matrix.Mat3D;
+const Mat4f = matrix.Mat4f;
 
 pub const Coord = packed struct {
     latitude: f32,
@@ -174,8 +176,7 @@ pub fn drawSkyGrid(canvas: *Canvas, observer_location: Coord, observer_timestamp
     }
 }
 
-// pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?Point {
-pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?matrix.Mat4f {
+pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?Mat4f {
     const two_pi = comptime math.pi * 2.0;
     const half_pi = comptime math.pi / 2.0;
 
@@ -200,21 +201,19 @@ pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: 
     const azi = math.acos(cos_azi);
     const azimuth = if (math.sin(hour_angle_rad) < 0) azi else two_pi - azi;
 
-    // const star_point = getProjectedCoord(@floatCast(f32, altitude), @floatCast(f32, azimuth));
-    // const star_point = getProjectedCoord(@floatCast(f32, altitude), @floatCast(f32, azimuth));
-    const star_x = @floatCast(f32, canvas.settings.background_radius * math.cos(altitude) * math.cos(azimuth));
-    const star_y = @floatCast(f32, canvas.settings.background_radius * math.cos(altitude) * math.sin(azimuth));
-    const star_z = @floatCast(f32, canvas.settings.background_radius * math.sin(altitude));
+    const direction_modifier = if (canvas.settings.draw_north_up) 
+        Mat4f.identity() 
+    else 
+        Mat3D.getZRotation(math.pi);
+
+    const translate_factor: f32 = canvas.settings.background_radius * canvas.settings.zoom_factor;
+
+    const star_x = @floatCast(f32, translate_factor * math.cos(altitude) * math.cos(azimuth));
+    const star_y = @floatCast(f32, translate_factor * math.cos(altitude) * math.sin(azimuth));
+    const star_z = @floatCast(f32, translate_factor * math.sin(altitude));
     
-    // var star_mat = canvas.getViewMatrix();
-    // star_mat = matrix.Mat3D.getTranslation()
-    // star_mat = matrix.Mat3D.getTranslation(star_x, star_y, star_z).mult(star_mat);
-    var star_mat = matrix.Mat3D.getTranslation(star_x, star_y, -star_z);
-    // star_mat = matrix.Mat3D.getXRotation(-90).mult(star_mat);
+    var star_mat = matrix.Mat3D.getTranslation(-star_y, star_x, -star_z).mult(direction_modifier);
     return matrix.Mat3D.getScaling(0.5, 0.5, 0.5).mult(star_mat);
-    // return matrix.Mat3D.getScaling(5, 5, 5).mult(star_mat)
-    //     .mult(matrix.Mat3D.getTranslation(star_x, star_y, star_z))
-    //     .mult(matrix.Mat3D.getScaling(5, 5, 5));
 }
 
 pub fn getProjectedCoord(altitude: f32, azimuth: f32) Point {
@@ -346,6 +345,7 @@ pub fn dragAndMove(canvas: *Canvas, drag_start_x: f32, drag_start_y: f32, drag_e
     // and vice versa
     // TODO Maybe hack to fix issue with backwards display? See getProjectedCoord
     const dist_phi = -math.atan2(f32, dist_x, dist_y);
+    // const dist_phi = -math.atan2(f32, dist_y, dist_x);
 
     // drag_distance is the angular distance between the starting location and the result location after a single drag
     // 2.35 is a magic number of degrees, picked because it results in what feels like an appropriate drag speed

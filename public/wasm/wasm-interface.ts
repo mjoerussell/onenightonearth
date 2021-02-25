@@ -130,8 +130,6 @@ export class WasmInterface {
         const result_ptr = this.lib.projectStars(latitude, longitude, timestamp, result_len_ptr);
         const result_len = this.readPrimative(result_len_ptr, WasmPrimative.u32);
         this.freeBytes(result_len_ptr, 4);
-        // return Array.from(new Uint32Array(this.memory, result_ptr, result_len));
-        // const result = Array.from(new Uint32Array(this.memory, result_ptr, result_len));
         const result = Array.from(new Float32Array(this.memory, result_ptr, result_len));
         this.freeBytes(result_ptr, sizeOfPrimative(WasmPrimative.u32) * result_len);
 
@@ -141,7 +139,6 @@ export class WasmInterface {
         }
 
         return matrices;
-        // return result;
     }
 
     projectConstellationGrids(latitude: number, longitude: number, timestamp: BigInt): void {

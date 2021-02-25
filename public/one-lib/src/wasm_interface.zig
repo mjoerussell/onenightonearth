@@ -1,4 +1,5 @@
 const std = @import("std");
+const math = std.math;
 const ArrayList = std.ArrayList;
 const parseFloat = std.fmt.parseFloat;
 
@@ -72,7 +73,7 @@ pub export fn initializeCanvas(settings: *ExternCanvasSettings) void {
         }
     };
 
-    test_sphere = Sphere.init(allocator, 1, 36, 18) catch unreachable;
+    test_sphere = Sphere.init(allocator, 1, 9, 9) catch unreachable;
 }
 
 pub export fn initializeConstellations(constellation_grid_data: [*][*]SkyCoord, constellation_asterism_data: [*][*]SkyCoord, grid_coord_lens: [*]u32, asterism_coord_lens: [*]u32, num_constellations: u32) void {
@@ -105,63 +106,36 @@ pub export fn resetImageData() void {
     }   
 }
 
-// pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64, num_mats: *usize) [*]*Mat4f {
 pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64, num_mats: *usize) [*]f32 {
     const current_coord = Coord{
         .latitude = observer_latitude,
         .longitude = observer_longitude
     };
 
-    // log(.Debug, "Trying to allocate {} bytes", .{(stars.len / 2) * @sizeOf(*Mat4f)});
-    // var star_matrices = std.ArrayList(*Mat4f).init(allocator);
     var star_matrices = std.ArrayList(f32).init(allocator);
-    // var star_matrices = std.ArrayList(*Mat4f).initCapacity(allocator, stars.len / 2) catch |err| {
-    //     switch (err) {
-    //         error.OutOfMemory => log(.Error, "Out of Memory", .{}),
-    //         else => log(.Error, "Unexpected error: {}", .{@errorName(err)})
-    //     }
-    //     unreachable;
-    // };
 
-    var camera_matrix = Mat3D.getTranslation(0, 0, 1000).inverse() catch unreachable;
-    // var view_matrix = canvas.getViewMatrix().mult(camera_matrix);
+    var camera_matrix = Mat3D.getTranslation(0, 0, canvas.settings.background_radius * 3).inverse() catch unreachable;
+    if (!canvas.settings.draw_north_up) {
+        camera_matrix = camera_matrix.mult(Mat3D.getYRotation(math.pi));
+    }
     var view_matrix = camera_matrix.mult(canvas.getViewMatrix());
-    // var view_matrix = canvas.getViewMatrix();
     
-    var debug_num_to_print: usize = 0;
     for (stars) |star| {
         const mat = star_math.projectStar(&canvas, star, current_coord, observer_timestamp, true);
         if (mat) |m| {
-            if (debug_num_to_print < 100) {
-                log(.Debug, "{}", .{m});
-                debug_num_to_print += 1;
-            }
-
             star_matrices.appendSlice(m.mult(view_matrix).flatten()[0..]) catch |err| {
                 log(.Error, "{} error with {} matrices allocated", .{@errorName(err), star_matrices.items.len});
                 const mats = star_matrices.toOwnedSlice();
                 num_mats.* = mats.len;
                 return mats.ptr;
             };
-            // const mat_ptr = allocator.create(Mat4f) catch unreachable;
-            // mat_ptr.* = m.mult(view_matrix);
-            // star_matrices.append(mat_ptr) catch |err| {
-            //     log(.Error, "{} error with {} matrices allocated", .{@errorName(err), star_matrices.items.len});
-            //     // unreachable;
-            //     const mats = star_matrices.toOwnedSlice();
-            //     num_mats.* = mats.len;
-            //     return mats.ptr;
-            // };
         }
     }
 
     const mats = star_matrices.toOwnedSlice();
     num_mats.* = mats.len;
 
-    log(.Debug, "result_len = {} matrices => {} floats", .{mats.len / 16, mats.len});
     return mats.ptr;
-
-    // star_math.drawSkyGrid(&canvas, current_coord, observer_timestamp);
 }
 
 pub export fn projectConstellationGrids(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
