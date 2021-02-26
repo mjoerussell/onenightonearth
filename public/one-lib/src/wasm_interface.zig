@@ -31,7 +31,7 @@ const allocator = std.heap.page_allocator;
 var canvas: Canvas = undefined;
 var stars: []Star = undefined;
 
-var test_sphere: Sphere = undefined;
+var star_sphere: Sphere = undefined;
 
 var constellations: []Constellation = undefined;
 
@@ -74,7 +74,7 @@ pub export fn initializeCanvas(settings: *ExternCanvasSettings) void {
         }
     };
 
-    test_sphere = Sphere.init(allocator, 1, 9, 18) catch unreachable;
+    star_sphere = Sphere.init(allocator, 1, 9, 18) catch unreachable;
 }
 
 pub export fn initializeConstellations(constellation_grid_data: [*][*]SkyCoord, constellation_asterism_data: [*][*]SkyCoord, grid_coord_lens: [*]u32, asterism_coord_lens: [*]u32, num_constellations: u32) void {
@@ -107,6 +107,24 @@ pub export fn resetImageData() void {
     }   
 }
 
+pub export fn getViewProjectionMatrix() *[16]f32 {
+    var camera_matrix = Mat3D.getXRotation(math.pi / 2.0);
+    camera_matrix = Mat3D.getTranslation(0, 0, (4 * canvas.settings.background_radius) / canvas.settings.zoom_factor).mult(camera_matrix);
+    if (!canvas.settings.draw_north_up) {
+        camera_matrix = Mat3D.getZRotation(math.pi).mult(camera_matrix);
+    }
+
+    const view_matrix = camera_matrix.inverse() catch |err| {
+        log(.Error, "Invalid camera position", .{});
+        unreachable;
+    };
+    const view_projection_matrix = view_matrix.mult(canvas.getProjectionMatrix());
+
+    const result_ptr = allocator.create([16]f32) catch unreachable;
+    result_ptr.* = view_projection_matrix.flatten();
+    return result_ptr;
+}
+
 pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64, num_mats: *usize) [*]f32 {
     const current_coord = Coord{
         .latitude = observer_latitude,
@@ -115,19 +133,10 @@ pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, obse
 
     var star_matrices = std.ArrayList(f32).init(allocator);
 
-    const star_radius = canvas.settings.background_radius;
-
-    var camera_matrix = Mat3D.getTranslation(0, 0, (4 * star_radius) / canvas.settings.zoom_factor).mult(Mat3D.getXRotation(math.pi / 2.0));
-    if (!canvas.settings.draw_north_up) {
-        camera_matrix = Mat3D.getZRotation(math.pi).mult(camera_matrix);
-    }
-    const view_matrix = camera_matrix.inverse() catch unreachable;
-    const view_projection_matrix = view_matrix.mult(canvas.getProjectionMatrix());
-    
     for (stars) |star| {
         const m = star_math.projectStar(&canvas, star, current_coord, observer_timestamp, true);
         if (m) |star_matrix| {
-            star_matrices.appendSlice(star_matrix.mult(view_projection_matrix).flatten()[0..]) catch |err| {
+            star_matrices.appendSlice(star_matrix.flatten()[0..]) catch |err| {
                 log(.Error, "{} error with {} matrices allocated", .{@errorName(err), star_matrices.items.len});
                 const mats = star_matrices.toOwnedSlice();
                 num_mats.* = mats.len;
@@ -370,13 +379,13 @@ pub export fn freeMatrix3d(m: *Mat4f) void {
 }
 
 pub export fn getSphereVertices(result_len: *usize) [*]f32 {
-    result_len.* = test_sphere.vertices.len;
-    return test_sphere.vertices.ptr;
+    result_len.* = star_sphere.vertices.len;
+    return star_sphere.vertices.ptr;
 }
 
 pub export fn getSphereIndices(result_len: *usize) [*]usize {
-    result_len.* = test_sphere.indices.len;
-    return test_sphere.indices.ptr;
+    result_len.* = star_sphere.indices.len;
+    return star_sphere.indices.ptr;
 }
 
 pub export fn _wasm_alloc(byte_len: u32) ?[*]u8 {

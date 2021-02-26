@@ -217,6 +217,7 @@ pub fn Vector(comptime T: type, comptime N: usize) type {
         }
 
         pub fn dot(self: Self, other: Self) T {
+            @setFloatMode(.Optimized);
             var result: T = 0;
             comptime var index = 0;
             inline while (index < N) : (index += 1) {
@@ -226,6 +227,7 @@ pub fn Vector(comptime T: type, comptime N: usize) type {
         }
 
         pub fn cross(self: Self, other: Self) Self {
+            @setFloatMode(.Optimized);
             comptime {
                 if (N != 3) {
                     @compileError("Cross product requires a 3-Dimensional Vector");

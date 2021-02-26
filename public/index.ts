@@ -1,5 +1,4 @@
 import { Controls } from './controls';
-import { Renderer } from './renderer';
 import { Constellation, Coord, Star } from './wasm/size';
 import { WasmInterface } from './wasm/wasm-interface';
 
@@ -19,9 +18,10 @@ const renderStars = (controls: Controls, date?: Date) => {
         wasm_interface.updateSettings(controls.renderer.getCanvasSettings());
     }
 
+    const view_projection = wasm_interface.getViewProjectionMatrix();
     const matrices = wasm_interface.projectStars(controls.latitude, controls.longitude, BigInt(timestamp));
 
-    controls.renderer.drawScene(wasm_interface.getSphereVertices(), wasm_interface.getSphereIndices(), matrices);
+    controls.renderer.drawScene(wasm_interface.getSphereVertices(), wasm_interface.getSphereIndices(), view_projection, matrices);
 };
 
 const drawUIElements = (controls: Controls) => {

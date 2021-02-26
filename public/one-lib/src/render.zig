@@ -52,7 +52,7 @@ pub const Canvas = struct {
 
     pub fn getProjectionMatrix(self: *Canvas) matrix.Mat4f {
         return matrix.Mat3D.getPerspective(self.settings.fov, @intToFloat(f32, self.settings.width) / @intToFloat(f32, self.settings.height), 1, 4000);
-        // return matrix.Mat3D.getOrthographic(0, 0, @intToFloat(f32, self.settings.width), @intToFloat(f32, self.settings.height), 1, 2000);
+        // return matrix.Mat3D.getOrthographic(0, 0, @intToFloat(f32, self.settings.width), @intToFloat(f32, self.settings.height), 1, 4000);
     }
 
     pub fn setPixelAt(self: *Canvas, point: Point, new_pixel: Pixel) void {

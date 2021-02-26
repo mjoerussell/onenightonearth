@@ -87,7 +87,7 @@ pub fn projectStar(canvas: *Canvas, star: Star, observer_location: Coord, observ
         SkyCoord{ .right_ascension = star.right_ascension, .declination = star.declination }, 
         observer_location, 
         observer_timestamp, 
-        true
+        filter_below_horizon
     );
 }
 
@@ -190,6 +190,7 @@ pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: 
     const star_radius = canvas.settings.background_radius;
     var star_matrix = Mat3D.getYRotation(-@floatCast(f32, azimuth));
     star_matrix = Mat3D.getXRotation(-@floatCast(f32, altitude)).mult(star_matrix);
+
     star_matrix = Mat3D.getTranslation(0, 0, star_radius).mult(star_matrix); // Move to celestial sphere surface
     return Mat3D.getScaling(0.5, 0.5, 0.5).mult(star_matrix);
 }

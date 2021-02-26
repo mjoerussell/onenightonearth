@@ -85,6 +85,7 @@ interface WasmFns {
     freeMatrix3d: (m: pointer<any>) => void;
     getSphereVertices: (length_ptr: pointer<number>) => pointer<number[]>;
     getSphereIndices: (length_ptr: pointer<number>) => pointer<number[]>;
+    getViewProjectionMatrix: () => pointer<number[]>;
 }
 
 export class WasmInterface {
@@ -133,6 +134,11 @@ export class WasmInterface {
         const result = new Float32Array(this.memory, result_ptr, result_len);
         this.freeBytes(result_ptr, sizeOfPrimative(WasmPrimative.f32) * result_len);
         return result;
+    }
+
+    getViewProjectionMatrix(): number[] {
+        const result_ptr = this.lib.getViewProjectionMatrix();
+        return Array.from(new Float32Array(this.memory, result_ptr, 16));
     }
 
     projectConstellationGrids(latitude: number, longitude: number, timestamp: BigInt): void {

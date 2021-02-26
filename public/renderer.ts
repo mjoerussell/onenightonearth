@@ -27,6 +27,8 @@ export class Renderer {
     private program: WebGLProgram | null = null;
     private vao: WebGLVertexArrayObject | null = null;
 
+    private view_projection_location: WebGLUniformLocation | null = null;
+
     private position_buffer: WebGLBuffer | null = null;
     private matrix_buffer: WebGLBuffer | null = null;
     private index_buffer: WebGLBuffer | null = null;
@@ -56,10 +58,12 @@ export class Renderer {
         // uniform mat4 u_matrix;
         in mat4 a_matrix;
 
+        uniform mat4 u_view_projection;
+
         out vec4 v_color;
 
         void main() {
-            gl_Position = a_matrix * a_position;
+            gl_Position = u_view_projection * a_matrix * a_position;
             v_color = a_color;
         }
         `;
@@ -95,6 +99,8 @@ export class Renderer {
         const color_attrib_location = this.gl.getAttribLocation(program, 'a_color');
         const matrix_attrib_location = this.gl.getAttribLocation(program, 'a_matrix');
 
+        this.view_projection_location = this.gl.getUniformLocation(program, 'u_view_projection');
+
         this.position_buffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.position_buffer);
 
@@ -126,7 +132,7 @@ export class Renderer {
         this.gl.enable(this.gl.DEPTH_TEST);
     }
 
-    drawScene(vertices: Float32Array, indices: Uint32Array, matrices: Float32Array): void {
+    drawScene(vertices: Float32Array, indices: Uint32Array, view_projection: number[], matrices: Float32Array): void {
         const repeat = <T>(items: T[], times: number): T[] => {
             let result: T[] = [];
             for (let i = 0; i < times; i += 1) {
@@ -155,6 +161,8 @@ export class Renderer {
         this.gl.bufferData(this.gl.ARRAY_BUFFER, new Uint8Array(repeat([255, 255, 255], vertices.length)), this.gl.STATIC_DRAW);
 
         this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, indices, this.gl.STATIC_DRAW);
+
+        this.gl.uniformMatrix4fv(this.view_projection_location, false, view_projection);
 
         this.gl.drawElementsInstanced(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_INT, 0, matrices.length / 16);
     }
