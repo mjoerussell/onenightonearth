@@ -74,7 +74,7 @@ pub export fn initializeCanvas(settings: *ExternCanvasSettings) void {
         }
     };
 
-    star_sphere = Sphere.init(allocator, 1, 9, 18) catch unreachable;
+    star_sphere = Sphere.init(allocator, 1, 18, 36) catch unreachable;
 }
 
 pub export fn initializeConstellations(constellation_grid_data: [*][*]SkyCoord, constellation_asterism_data: [*][*]SkyCoord, grid_coord_lens: [*]u32, asterism_coord_lens: [*]u32, num_constellations: u32) void {
@@ -109,6 +109,8 @@ pub export fn resetImageData() void {
 
 pub export fn getViewProjectionMatrix() *[16]f32 {
     var camera_matrix = Mat3D.getXRotation(math.pi / 2.0);
+    // var camera_matrix = Mat3D.getXRotation(0);
+    // camera_matrix = Mat3D.getTranslation(0, canvas.settings.background_radius / 2, (5 * canvas.settings.background_radius) / canvas.settings.zoom_factor).mult(camera_matrix);
     camera_matrix = Mat3D.getTranslation(0, 0, (4 * canvas.settings.background_radius) / canvas.settings.zoom_factor).mult(camera_matrix);
     if (!canvas.settings.draw_north_up) {
         camera_matrix = Mat3D.getZRotation(math.pi).mult(camera_matrix);
@@ -125,30 +127,38 @@ pub export fn getViewProjectionMatrix() *[16]f32 {
     return result_ptr;
 }
 
-pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64, num_mats: *usize) [*]f32 {
+pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64, num_stars: *usize) *[2][*]f32 {
     const current_coord = Coord{
         .latitude = observer_latitude,
         .longitude = observer_longitude
     };
 
     var star_matrices = std.ArrayList(f32).init(allocator);
+    var star_colors = std.ArrayList(f32).init(allocator);
 
     for (stars) |star| {
         const m = star_math.projectStar(&canvas, star, current_coord, observer_timestamp, true);
         if (m) |star_matrix| {
-            star_matrices.appendSlice(star_matrix.flatten()[0..]) catch |err| {
-                log(.Error, "{} error with {} matrices allocated", .{@errorName(err), star_matrices.items.len});
-                const mats = star_matrices.toOwnedSlice();
-                num_mats.* = mats.len;
-                return mats.ptr;
+            // TODO: Better error handling here (used to have logs + return immediately)
+            star_matrices.appendSlice(star_matrix.flatten()[0..]) catch unreachable;
+            const star_color = star.spec_type.getColor();
+            star_colors.appendSlice(&[4]f32{ @intToFloat(f32, star_color.r) / 255.0, @intToFloat(f32, star_color.g) / 255.0, @intToFloat(f32, star_color.b) / 255.0, @intToFloat(f32, star_color.a) / 255.0 }) catch |err| {
+                log(.Error, "{} error while setting star color", .{@errorName(err)});
             };
         }
     }
 
     const mats = star_matrices.toOwnedSlice();
-    num_mats.* = mats.len;
+    const colors = star_colors.toOwnedSlice();
 
-    return mats.ptr;
+    const result_ptr = allocator.create([2][*]f32) catch unreachable;
+
+    result_ptr[0] = mats.ptr;
+    result_ptr[1] = colors.ptr;
+
+    num_stars.* = mats.len / 16;
+
+    return result_ptr;
 }
 
 pub export fn projectConstellationGrids(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {

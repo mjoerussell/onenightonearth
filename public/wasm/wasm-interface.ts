@@ -126,14 +126,23 @@ export class WasmInterface {
         this.lib.initializeCanvas(settings_ptr);
     }
 
-    projectStars(latitude: number, longitude: number, timestamp: BigInt): Float32Array {
+    projectStars(latitude: number, longitude: number, timestamp: BigInt): [Float32Array, Float32Array] {
         const result_len_ptr = this.allocBytes(4);
+
         const result_ptr = this.lib.projectStars(latitude, longitude, timestamp, result_len_ptr);
+
         const result_len = this.readPrimative(result_len_ptr, WasmPrimative.u32);
         this.freeBytes(result_len_ptr, 4);
-        const result = new Float32Array(this.memory, result_ptr, result_len);
-        this.freeBytes(result_ptr, sizeOfPrimative(WasmPrimative.f32) * result_len);
-        return result;
+
+        const mats_ptr = this.readPrimative(result_ptr, WasmPrimative.u32);
+        const colors_ptr = this.readPrimative(result_ptr + sizeOfPrimative(WasmPrimative.u32), WasmPrimative.u32);
+
+        const mats = new Float32Array(this.memory, mats_ptr, result_len * 16);
+        const colors = new Float32Array(this.memory, colors_ptr, result_len * 4);
+
+        this.freeBytes(mats_ptr, sizeOfPrimative(WasmPrimative.f32) * result_len * 16);
+        this.freeBytes(colors_ptr, sizeOfPrimative(WasmPrimative.f32) * result_len * 4);
+        return [mats, colors];
     }
 
     getViewProjectionMatrix(): number[] {

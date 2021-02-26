@@ -27,7 +27,10 @@ export class Renderer {
     private program: WebGLProgram | null = null;
     private vao: WebGLVertexArrayObject | null = null;
 
-    private view_projection_location: WebGLUniformLocation | null = null;
+    // private view_projection_location: WebGLUniformLocation | null = null;
+    // private color_location: WebGLUniformLocation | null = null;
+
+    private uniforms: Record<string, WebGLUniformLocation> = {};
 
     private position_buffer: WebGLBuffer | null = null;
     private matrix_buffer: WebGLBuffer | null = null;
@@ -72,6 +75,7 @@ export class Renderer {
         precision highp float;
 
         in vec4 v_color;
+        // uniform vec4 u_color;
 
         out vec4 outColor;
 
@@ -96,10 +100,13 @@ export class Renderer {
         this.program = program;
 
         const position_attrib_location = this.gl.getAttribLocation(program, 'a_position');
-        const color_attrib_location = this.gl.getAttribLocation(program, 'a_color');
         const matrix_attrib_location = this.gl.getAttribLocation(program, 'a_matrix');
+        const color_attrib_location = this.gl.getAttribLocation(program, 'a_color');
 
-        this.view_projection_location = this.gl.getUniformLocation(program, 'u_view_projection');
+        this.assignUniform('u_view_projection');
+        // this.assignUniform('u_color');
+        // this.view_projection_location = this.gl.getUniformLocation(program, 'u_view_projection');
+        // this.color_location = this.gl.getUniformLocation(program, 'u_color');
 
         this.position_buffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.position_buffer);
@@ -112,11 +119,6 @@ export class Renderer {
         this.index_buffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.index_buffer);
 
-        this.color_buffer = this.gl.createBuffer();
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.color_buffer);
-        this.gl.enableVertexAttribArray(color_attrib_location);
-        this.gl.vertexAttribPointer(color_attrib_location, 3, this.gl.UNSIGNED_BYTE, true, 0, 0);
-
         this.matrix_buffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.matrix_buffer);
         const bytes_per_matrix = 4 * 16;
@@ -128,20 +130,17 @@ export class Renderer {
             this.gl.vertexAttribDivisor(location, 1);
         }
 
+        this.color_buffer = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.color_buffer);
+        this.gl.enableVertexAttribArray(color_attrib_location);
+        this.gl.vertexAttribPointer(color_attrib_location, 4, this.gl.FLOAT, false, 0, 0);
+        this.gl.vertexAttribDivisor(color_attrib_location, 1);
+
         this.gl.enable(this.gl.CULL_FACE);
         this.gl.enable(this.gl.DEPTH_TEST);
     }
 
-    drawScene(vertices: Float32Array, indices: Uint32Array, view_projection: number[], matrices: Float32Array): void {
-        const repeat = <T>(items: T[], times: number): T[] => {
-            let result: T[] = [];
-            for (let i = 0; i < times; i += 1) {
-                result = result.concat(items);
-            }
-
-            return result;
-        };
-
+    drawScene(vertices: Float32Array, indices: Uint32Array, view_projection: number[], matrices: Float32Array, colors: Float32Array): void {
         this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
 
         this.gl.clearColor(0, 0, 0, 0);
@@ -154,16 +153,16 @@ export class Renderer {
         this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STATIC_DRAW);
 
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.matrix_buffer);
-        this.gl.bufferData(this.gl.ARRAY_BUFFER, matrices.byteLength, this.gl.DYNAMIC_DRAW);
-        this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, matrices);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, matrices, this.gl.DYNAMIC_DRAW);
 
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.color_buffer);
-        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Uint8Array(repeat([255, 255, 255], vertices.length)), this.gl.STATIC_DRAW);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, colors, this.gl.DYNAMIC_DRAW);
 
         this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, indices, this.gl.STATIC_DRAW);
 
-        this.gl.uniformMatrix4fv(this.view_projection_location, false, view_projection);
+        this.gl.uniformMatrix4fv(this.uniforms['u_view_projection'], false, view_projection);
 
+        // TODO: Find out if I need to do cleanup of these buffers after binding them - find the mem leak
         this.gl.drawElementsInstanced(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_INT, 0, matrices.length / 16);
     }
 
@@ -196,6 +195,15 @@ export class Renderer {
         }
 
         return null;
+    }
+
+    private assignUniform(uniform_name: string): void {
+        const location = this.gl.getUniformLocation(this.program!, uniform_name);
+        if (location) {
+            this.uniforms[uniform_name] = location;
+        } else {
+            console.warn(`Tried to get location of invalid uniform '${uniform_name}'`);
+        }
     }
 
     /**
