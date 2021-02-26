@@ -33,6 +33,7 @@ export class Renderer {
     private uniforms: Record<string, WebGLUniformLocation> = {};
 
     private position_buffer: WebGLBuffer | null = null;
+    private normal_buffer: WebGLBuffer | null = null;
     private matrix_buffer: WebGLBuffer | null = null;
     private index_buffer: WebGLBuffer | null = null;
     private color_buffer: WebGLBuffer | null = null;
@@ -57,17 +58,19 @@ export class Renderer {
 
         const vertex_shader_source = `#version 300 es
         in vec4 a_position;
-        in vec4 a_color;
-        // uniform mat4 u_matrix;
         in mat4 a_matrix;
+        in vec4 a_color;
+        in vec3 a_normal;
 
         uniform mat4 u_view_projection;
 
         out vec4 v_color;
+        out vec3 v_normal;
 
         void main() {
             gl_Position = u_view_projection * a_matrix * a_position;
             v_color = a_color;
+            v_normal = mat3(a_matrix) * a_normal;
         }
         `;
 
@@ -75,12 +78,18 @@ export class Renderer {
         precision highp float;
 
         in vec4 v_color;
-        // uniform vec4 u_color;
+        in vec3 v_normal;
+
+        uniform vec3 u_reverseLightDirection;
 
         out vec4 outColor;
 
         void main() {
+            vec3 normal = normalize(v_normal);
+            float light = dot(normal, u_reverseLightDirection);
+
             outColor = v_color;
+            outColor.rgb *= light;
         }
         `;
 
@@ -99,26 +108,28 @@ export class Renderer {
 
         this.program = program;
 
-        const position_attrib_location = this.gl.getAttribLocation(program, 'a_position');
-        const matrix_attrib_location = this.gl.getAttribLocation(program, 'a_matrix');
-        const color_attrib_location = this.gl.getAttribLocation(program, 'a_color');
-
         this.assignUniform('u_view_projection');
-        // this.assignUniform('u_color');
-        // this.view_projection_location = this.gl.getUniformLocation(program, 'u_view_projection');
-        // this.color_location = this.gl.getUniformLocation(program, 'u_color');
-
-        this.position_buffer = this.gl.createBuffer();
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.position_buffer);
+        this.assignUniform('u_reverseLightDirection');
 
         this.vao = this.gl.createVertexArray();
         this.gl.bindVertexArray(this.vao);
+
+        const position_attrib_location = this.gl.getAttribLocation(program, 'a_position');
+        this.position_buffer = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.position_buffer);
         this.gl.enableVertexAttribArray(position_attrib_location);
         this.gl.vertexAttribPointer(position_attrib_location, 3, this.gl.FLOAT, false, 0, 0);
 
         this.index_buffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.index_buffer);
 
+        const normal_attrib_location = this.gl.getAttribLocation(program, 'a_normal');
+        this.normal_buffer = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.normal_buffer);
+        this.gl.enableVertexAttribArray(normal_attrib_location);
+        this.gl.vertexAttribPointer(normal_attrib_location, 3, this.gl.FLOAT, false, 0, 0);
+
+        const matrix_attrib_location = this.gl.getAttribLocation(program, 'a_matrix');
         this.matrix_buffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.matrix_buffer);
         const bytes_per_matrix = 4 * 16;
@@ -130,6 +141,7 @@ export class Renderer {
             this.gl.vertexAttribDivisor(location, 1);
         }
 
+        const color_attrib_location = this.gl.getAttribLocation(program, 'a_color');
         this.color_buffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.color_buffer);
         this.gl.enableVertexAttribArray(color_attrib_location);
@@ -140,7 +152,14 @@ export class Renderer {
         this.gl.enable(this.gl.DEPTH_TEST);
     }
 
-    drawScene(vertices: Float32Array, indices: Uint32Array, view_projection: number[], matrices: Float32Array, colors: Float32Array): void {
+    drawScene(
+        vertices: Float32Array,
+        normals: Float32Array,
+        indices: Uint32Array,
+        view_projection: number[],
+        matrices: Float32Array,
+        colors: Float32Array
+    ): void {
         this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
 
         this.gl.clearColor(0, 0, 0, 0);
@@ -152,6 +171,9 @@ export class Renderer {
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.position_buffer);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STATIC_DRAW);
 
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.normal_buffer);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, normals, this.gl.STATIC_DRAW);
+
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.matrix_buffer);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, matrices, this.gl.DYNAMIC_DRAW);
 
@@ -160,7 +182,11 @@ export class Renderer {
 
         this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, indices, this.gl.STATIC_DRAW);
 
+        // const normalized_color_value = 1 / Math.sqrt(3);
+
         this.gl.uniformMatrix4fv(this.uniforms['u_view_projection'], false, view_projection);
+        // this.gl.uniform3f(this.uniforms['u_reverseLightDirection'], normalized_color_value, normalized_color_value, normalized_color_value);
+        this.gl.uniform3f(this.uniforms['u_reverseLightDirection'], 0, -1, 0);
 
         // TODO: Find out if I need to do cleanup of these buffers after binding them - find the mem leak
         this.gl.drawElementsInstanced(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_INT, 0, matrices.length / 16);

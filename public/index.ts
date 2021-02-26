@@ -21,7 +21,14 @@ const renderStars = (controls: Controls, date?: Date) => {
     const view_projection = wasm_interface.getViewProjectionMatrix();
     const [matrices, colors] = wasm_interface.projectStars(controls.latitude, controls.longitude, BigInt(timestamp));
 
-    controls.renderer.drawScene(wasm_interface.getSphereVertices(), wasm_interface.getSphereIndices(), view_projection, matrices, colors);
+    controls.renderer.drawScene(
+        wasm_interface.getSphereVertices(),
+        wasm_interface.getSphereNormals(),
+        wasm_interface.getSphereIndices(),
+        view_projection,
+        matrices,
+        colors
+    );
 };
 
 const drawUIElements = (controls: Controls) => {

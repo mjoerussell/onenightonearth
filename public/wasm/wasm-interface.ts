@@ -85,6 +85,7 @@ interface WasmFns {
     freeMatrix3d: (m: pointer<any>) => void;
     getSphereVertices: (length_ptr: pointer<number>) => pointer<number[]>;
     getSphereIndices: (length_ptr: pointer<number>) => pointer<number[]>;
+    getSphereNormals: (length_ptr: pointer<number>) => pointer<number[]>;
     getViewProjectionMatrix: () => pointer<number[]>;
 }
 
@@ -306,12 +307,21 @@ export class WasmInterface {
         return new Float32Array(this.memory, result_ptr, result_len);
     }
 
+    getSphereNormals(): Float32Array {
+        const result_len_ptr = this.allocBytes(4);
+        const result_ptr = this.lib.getSphereNormals(result_len_ptr);
+
+        const result_len = this.readPrimative(result_len_ptr, WasmPrimative.u32);
+        this.freeBytes(result_len_ptr, 4);
+
+        return new Float32Array(this.memory, result_ptr, result_len);
+    }
+
     getSphereIndices(): Uint32Array {
         const result_len_ptr = this.allocBytes(4);
         const result_ptr = this.lib.getSphereIndices(result_len_ptr);
 
         const result_len = this.readPrimative(result_len_ptr, WasmPrimative.u32);
-        // const result = this.readPrimativeArray(result_ptr, result_len, WasmPrimative.u32);
 
         return new Uint32Array(this.memory, result_ptr, result_len);
     }

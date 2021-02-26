@@ -75,6 +75,7 @@ pub export fn initializeCanvas(settings: *ExternCanvasSettings) void {
     };
 
     star_sphere = Sphere.init(allocator, 1, 18, 36) catch unreachable;
+    // star_sphere = Sphere.init(allocator, 1, 9, 9) catch unreachable;
 }
 
 pub export fn initializeConstellations(constellation_grid_data: [*][*]SkyCoord, constellation_asterism_data: [*][*]SkyCoord, grid_coord_lens: [*]u32, asterism_coord_lens: [*]u32, num_constellations: u32) void {
@@ -108,10 +109,10 @@ pub export fn resetImageData() void {
 }
 
 pub export fn getViewProjectionMatrix() *[16]f32 {
-    var camera_matrix = Mat3D.getXRotation(math.pi / 2.0);
-    // var camera_matrix = Mat3D.getXRotation(0);
-    // camera_matrix = Mat3D.getTranslation(0, canvas.settings.background_radius / 2, (5 * canvas.settings.background_radius) / canvas.settings.zoom_factor).mult(camera_matrix);
-    camera_matrix = Mat3D.getTranslation(0, 0, (4 * canvas.settings.background_radius) / canvas.settings.zoom_factor).mult(camera_matrix);
+    var camera_matrix = Mat3D.getXRotation(0);
+    camera_matrix = Mat3D.getTranslation(0, canvas.settings.background_radius / 2, (5 * canvas.settings.background_radius) / canvas.settings.zoom_factor).mult(camera_matrix);
+    // var camera_matrix = Mat3D.getXRotation(math.pi / 2.0);
+    // camera_matrix = Mat3D.getTranslation(0, 0, (4 * canvas.settings.background_radius) / canvas.settings.zoom_factor).mult(camera_matrix);
     if (!canvas.settings.draw_north_up) {
         camera_matrix = Mat3D.getZRotation(math.pi).mult(camera_matrix);
     }
@@ -396,6 +397,11 @@ pub export fn getSphereVertices(result_len: *usize) [*]f32 {
 pub export fn getSphereIndices(result_len: *usize) [*]usize {
     result_len.* = star_sphere.indices.len;
     return star_sphere.indices.ptr;
+}
+
+pub export fn getSphereNormals(result_len: *usize) [*]f32 {
+    result_len.* = star_sphere.normals.len;
+    return star_sphere.normals.ptr;
 }
 
 pub export fn _wasm_alloc(byte_len: u32) ?[*]u8 {
