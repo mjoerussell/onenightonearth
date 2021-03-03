@@ -111,7 +111,11 @@ pub export fn resetImageData() void {
 pub export fn getViewProjectionMatrix() *[16]f32 {
     // var camera_matrix = Mat3D.getXRotation(0);
     // camera_matrix = Mat3D.getTranslation(0, canvas.settings.background_radius / 2, (4 * canvas.settings.background_radius) / canvas.settings.zoom_factor).mult(camera_matrix);
-    const z_pos = (5.15 * canvas.settings.background_radius) - (canvas.settings.zoom_factor * canvas.settings.background_radius);
+    const z_bound = -0.85 * canvas.settings.background_radius;
+    var z_pos = (5.15 * canvas.settings.background_radius) - (canvas.settings.zoom_factor * canvas.settings.background_radius);
+    if (z_pos < z_bound) {
+        z_pos = z_bound;
+    }
     var camera_matrix = Mat3D.getXRotation(math.pi / 2.0);
     camera_matrix = Mat3D.getTranslation(0, 0, z_pos).mult(camera_matrix);
     if (!canvas.settings.draw_north_up) {
