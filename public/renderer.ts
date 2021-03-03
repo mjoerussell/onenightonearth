@@ -40,6 +40,8 @@ export class Renderer {
 
     private stencil_position_buffer: WebGLBuffer | null = null;
 
+    private stencil_vertices: Float32Array;
+
     constructor(canvas_id: string) {
         this.main_canvas = document.getElementById(canvas_id) as HTMLCanvasElement;
         this.main_canvas.width = this.main_canvas.clientWidth;
@@ -57,6 +59,16 @@ export class Renderer {
             draw_constellation_grid: false,
             draw_asterisms: false,
         };
+
+        const triangle_count = 100;
+        const two_pi = Math.PI * 2;
+        const stencil_vertices: number[] = [0, 0];
+        for (let i = 0; i <= triangle_count; i += 1) {
+            const angle = i * (two_pi / triangle_count);
+            stencil_vertices.push(0.9 * Math.cos(angle));
+            stencil_vertices.push(0.9 * Math.sin(angle));
+        }
+        this.stencil_vertices = new Float32Array(stencil_vertices);
 
         const vertex_shader_source = `#version 300 es
         in vec4 a_position;
@@ -105,7 +117,6 @@ export class Renderer {
         in vec4 a_position;
 
         void main() {
-            // gl_Position = u_stencil_view_projection * vec4(a_position.yx, 0, 0);
             gl_Position = a_position;
         }
         `;
@@ -120,75 +131,38 @@ export class Renderer {
         }
         `;
 
-        const vertex_shader = this.createShader(this.gl.VERTEX_SHADER, vertex_shader_source);
-        const fragment_shader = this.createShader(this.gl.FRAGMENT_SHADER, fragment_shader_source);
+        this.gl.enable(this.gl.CULL_FACE);
+        this.gl.enable(this.gl.DEPTH_TEST);
+        this.gl.enable(this.gl.STENCIL_TEST);
+        this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
+        this.gl.clearColor(0, 0, 0, 0);
+        this.gl.clearStencil(0);
 
-        const stencil_vertex_shader = this.createShader(this.gl.VERTEX_SHADER, stencil_vertex_shader_source);
-        const stencil_fragment_shader = this.createShader(this.gl.FRAGMENT_SHADER, stencil_fragment_shader_source);
-
-        if (vertex_shader == null || fragment_shader == null || stencil_vertex_shader == null || stencil_fragment_shader == null) {
-            return;
-        }
-
-        this.star_program = this.createProgram(vertex_shader, fragment_shader);
-        this.stencil_program = this.createProgram(stencil_vertex_shader, stencil_fragment_shader);
-
-        if (this.star_program == null || this.stencil_program == null) {
+        this.star_program = this.createProgram(vertex_shader_source, fragment_shader_source);
+        if (this.star_program == null) {
             return;
         }
 
         this.assignUniform(this.star_program, 'u_view_projection');
 
         this.star_vao = this.gl.createVertexArray();
-        this.stencil_vao = this.gl.createVertexArray();
-
         this.gl.bindVertexArray(this.star_vao);
 
-        const position_attrib_location = this.gl.getAttribLocation(this.star_program, 'a_position');
-        this.position_buffer = this.gl.createBuffer();
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.position_buffer);
-        this.gl.enableVertexAttribArray(position_attrib_location);
-        this.gl.vertexAttribPointer(position_attrib_location, 3, this.gl.FLOAT, false, 0, 0);
-
+        this.position_buffer = this.getAttributef(this.star_program, 'a_position', 3);
+        this.normal_buffer = this.getAttributef(this.star_program, 'a_normal', 3);
+        this.color_buffer = this.getAttributef(this.star_program, 'a_color', 4, 1);
+        this.matrix_buffer = this.getAttributeMatNNf(this.star_program, 'a_matrix', 4, 1);
         this.index_buffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.index_buffer);
 
-        const normal_attrib_location = this.gl.getAttribLocation(this.star_program, 'a_normal');
-        this.normal_buffer = this.gl.createBuffer();
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.normal_buffer);
-        this.gl.enableVertexAttribArray(normal_attrib_location);
-        this.gl.vertexAttribPointer(normal_attrib_location, 3, this.gl.FLOAT, false, 0, 0);
-
-        const matrix_attrib_location = this.gl.getAttribLocation(this.star_program, 'a_matrix');
-        this.matrix_buffer = this.gl.createBuffer();
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.matrix_buffer);
-        const bytes_per_matrix = 4 * 16;
-        for (let i = 0; i < 4; i += 1) {
-            const location = matrix_attrib_location + i;
-            this.gl.enableVertexAttribArray(location);
-            const offset = i * 16;
-            this.gl.vertexAttribPointer(location, 4, this.gl.FLOAT, false, bytes_per_matrix, offset);
-            this.gl.vertexAttribDivisor(location, 1);
+        this.stencil_program = this.createProgram(stencil_vertex_shader_source, stencil_fragment_shader_source);
+        if (this.stencil_program == null) {
+            return;
         }
-
-        const color_attrib_location = this.gl.getAttribLocation(this.star_program, 'a_color');
-        this.color_buffer = this.gl.createBuffer();
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.color_buffer);
-        this.gl.enableVertexAttribArray(color_attrib_location);
-        this.gl.vertexAttribPointer(color_attrib_location, 4, this.gl.FLOAT, false, 0, 0);
-        this.gl.vertexAttribDivisor(color_attrib_location, 1);
-
+        this.stencil_vao = this.gl.createVertexArray();
         this.gl.bindVertexArray(this.stencil_vao);
 
-        const stencil_position_attrib_location = this.gl.getAttribLocation(this.stencil_program, 'a_position');
-        this.stencil_position_buffer = this.gl.createBuffer();
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.stencil_position_buffer);
-        this.gl.enableVertexAttribArray(stencil_position_attrib_location);
-        this.gl.vertexAttribPointer(stencil_position_attrib_location, 2, this.gl.FLOAT, false, 0, 0);
-
-        this.gl.enable(this.gl.CULL_FACE);
-        this.gl.enable(this.gl.DEPTH_TEST);
-        this.gl.enable(this.gl.STENCIL_TEST);
+        this.stencil_position_buffer = this.getAttributef(this.stencil_program, 'a_position', 2);
     }
 
     drawScene(
@@ -199,49 +173,29 @@ export class Renderer {
         matrices: Float32Array,
         colors: Float32Array
     ): void {
-        this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
-
-        this.gl.clearColor(0, 0, 0, 0);
-        this.gl.clearStencil(0);
         this.gl.stencilMask(0xff);
-        this.gl.depthMask(false);
-
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT | this.gl.STENCIL_BUFFER_BIT);
+
+        this.gl.depthMask(false);
 
         this.gl.useProgram(this.stencil_program);
         this.gl.bindVertexArray(this.stencil_vao);
-        // Disable drawing to the pixel buffer, prevents the color in the stencil frag shader from being rendered
         this.gl.colorMask(false, false, false, false);
         this.gl.stencilFunc(this.gl.ALWAYS, 1, 0xff);
-        // If any tests fail (stencil/depth) don't change the stencil buffer, if both pass then replace the value in the stencil buffer
-        // (0, just cleared) with the value set to `ref` in `stencilFunc` (1).
         this.gl.stencilOp(this.gl.KEEP, this.gl.KEEP, this.gl.REPLACE);
 
-        // Draw a circle using a triangle fan
-        const triangle_count = 100;
-        const two_pi = Math.PI * 2;
-        const stencil_vertices: number[] = [0, 0];
-        for (let i = 0; i <= triangle_count; i += 1) {
-            const angle = i * (two_pi / triangle_count);
-            stencil_vertices.push(0.9 * Math.cos(angle));
-            stencil_vertices.push(0.9 * Math.sin(angle));
-        }
-
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.stencil_position_buffer);
-        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(stencil_vertices), this.gl.STATIC_DRAW);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, this.stencil_vertices, this.gl.STATIC_DRAW);
 
-        this.gl.drawArrays(this.gl.TRIANGLE_FAN, 0, stencil_vertices.length / 2);
+        this.gl.drawArrays(this.gl.TRIANGLE_FAN, 0, this.stencil_vertices.length / 2);
 
-        // Re-enable drawing to the pixel buffer
         this.gl.colorMask(true, true, true, true);
-        // Only draw a fragment if the corresponding fragment in the stencil buffer is 1
         this.gl.stencilFunc(this.gl.EQUAL, 1, 0xff);
-        // Disable writing to the stencil buffer
         this.gl.stencilMask(0);
-        // No matter what tests pass/fail, always keep the current value in the stencil buffer (probably redundant with stencilMask(0x00)).
         this.gl.stencilOp(this.gl.KEEP, this.gl.KEEP, this.gl.KEEP);
-        this.gl.depthMask(true);
         // End stencil drawing...
+
+        this.gl.depthMask(true);
 
         this.gl.useProgram(this.star_program);
         this.gl.bindVertexArray(this.star_vao);
@@ -266,6 +220,26 @@ export class Renderer {
         this.gl.drawElementsInstanced(this.gl.TRIANGLES, indices.length, this.gl.UNSIGNED_INT, 0, matrices.length / 16);
     }
 
+    private createProgram(vertex_source: string, fragment_source: string): WebGLProgram | null {
+        const vertex_shader = this.createShader(this.gl.VERTEX_SHADER, vertex_source);
+        const fragment_shader = this.createShader(this.gl.FRAGMENT_SHADER, fragment_source);
+        if (vertex_shader == null || fragment_shader == null) {
+            return null;
+        }
+        const program = this.gl.createProgram();
+        if (program) {
+            this.gl.attachShader(program, vertex_shader);
+            this.gl.attachShader(program, fragment_shader);
+            this.gl.linkProgram(program);
+            const success = this.gl.getProgramParameter(program, this.gl.LINK_STATUS);
+            if (success) {
+                return program;
+            }
+        }
+
+        return null;
+    }
+
     private createShader(type: number, source: string): WebGLShader | null {
         const shader = this.gl.createShader(type);
         if (shader) {
@@ -282,23 +256,6 @@ export class Renderer {
         return null;
     }
 
-    private createProgram(vertex_shader: WebGLShader, fragment_shader?: WebGLShader): WebGLProgram | null {
-        const program = this.gl.createProgram();
-        if (program) {
-            this.gl.attachShader(program, vertex_shader);
-            if (fragment_shader != null) {
-                this.gl.attachShader(program, fragment_shader);
-            }
-            this.gl.linkProgram(program);
-            const success = this.gl.getProgramParameter(program, this.gl.LINK_STATUS);
-            if (success) {
-                return program;
-            }
-        }
-
-        return null;
-    }
-
     private assignUniform(program: WebGLProgram, uniform_name: string): void {
         const location = this.gl.getUniformLocation(program, uniform_name);
         if (location) {
@@ -306,6 +263,35 @@ export class Renderer {
         } else {
             console.warn(`Tried to get location of invalid uniform '${uniform_name}'`);
         }
+    }
+
+    private getAttributef(program: WebGLProgram, attribute_name: string, size: number, divisor: number = 0): WebGLBuffer | null {
+        const attrib_location = this.gl.getAttribLocation(program, attribute_name);
+        const buffer = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
+        this.gl.enableVertexAttribArray(attrib_location);
+        this.gl.vertexAttribPointer(attrib_location, size, this.gl.FLOAT, false, 0, 0);
+        this.gl.vertexAttribDivisor(attrib_location, divisor);
+
+        return buffer;
+    }
+
+    private getAttributeMatNNf(program: WebGLProgram, attribute_name: string, n: number, divisor: number = 0): WebGLBuffer | null {
+        const attrib_location = this.gl.getAttribLocation(program, attribute_name);
+        const buffer = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
+
+        const num_elems = n * n;
+        const bytes_per_matrix = 4 * num_elems;
+        for (let i = 0; i < n; i += 1) {
+            const location = attrib_location + i;
+            this.gl.enableVertexAttribArray(location);
+            const offset = i * num_elems;
+            this.gl.vertexAttribPointer(location, n, this.gl.FLOAT, false, bytes_per_matrix, offset);
+            this.gl.vertexAttribDivisor(location, divisor);
+        }
+
+        return buffer;
     }
 
     /**
