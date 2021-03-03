@@ -24,10 +24,10 @@ export class Renderer {
 
     private _settings_did_change = true;
 
-    private program: WebGLProgram | null = null;
+    private star_program: WebGLProgram | null = null;
     private stencil_program: WebGLProgram | null = null;
 
-    private vao: WebGLVertexArrayObject | null = null;
+    private star_vao: WebGLVertexArrayObject | null = null;
     private stencil_vao: WebGLVertexArrayObject | null = null;
 
     private uniforms: Record<string, WebGLUniformLocation> = {};
@@ -130,21 +130,21 @@ export class Renderer {
             return;
         }
 
-        this.program = this.createProgram(vertex_shader, fragment_shader);
+        this.star_program = this.createProgram(vertex_shader, fragment_shader);
         this.stencil_program = this.createProgram(stencil_vertex_shader, stencil_fragment_shader);
 
-        if (this.program == null || this.stencil_program == null) {
+        if (this.star_program == null || this.stencil_program == null) {
             return;
         }
 
-        this.assignUniform(this.program, 'u_view_projection');
+        this.assignUniform(this.star_program, 'u_view_projection');
 
-        this.vao = this.gl.createVertexArray();
+        this.star_vao = this.gl.createVertexArray();
         this.stencil_vao = this.gl.createVertexArray();
 
-        this.gl.bindVertexArray(this.vao);
+        this.gl.bindVertexArray(this.star_vao);
 
-        const position_attrib_location = this.gl.getAttribLocation(this.program, 'a_position');
+        const position_attrib_location = this.gl.getAttribLocation(this.star_program, 'a_position');
         this.position_buffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.position_buffer);
         this.gl.enableVertexAttribArray(position_attrib_location);
@@ -153,13 +153,13 @@ export class Renderer {
         this.index_buffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.index_buffer);
 
-        const normal_attrib_location = this.gl.getAttribLocation(this.program, 'a_normal');
+        const normal_attrib_location = this.gl.getAttribLocation(this.star_program, 'a_normal');
         this.normal_buffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.normal_buffer);
         this.gl.enableVertexAttribArray(normal_attrib_location);
         this.gl.vertexAttribPointer(normal_attrib_location, 3, this.gl.FLOAT, false, 0, 0);
 
-        const matrix_attrib_location = this.gl.getAttribLocation(this.program, 'a_matrix');
+        const matrix_attrib_location = this.gl.getAttribLocation(this.star_program, 'a_matrix');
         this.matrix_buffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.matrix_buffer);
         const bytes_per_matrix = 4 * 16;
@@ -171,7 +171,7 @@ export class Renderer {
             this.gl.vertexAttribDivisor(location, 1);
         }
 
-        const color_attrib_location = this.gl.getAttribLocation(this.program, 'a_color');
+        const color_attrib_location = this.gl.getAttribLocation(this.star_program, 'a_color');
         this.color_buffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.color_buffer);
         this.gl.enableVertexAttribArray(color_attrib_location);
@@ -243,8 +243,8 @@ export class Renderer {
         this.gl.depthMask(true);
         // End stencil drawing...
 
-        this.gl.useProgram(this.program);
-        this.gl.bindVertexArray(this.vao);
+        this.gl.useProgram(this.star_program);
+        this.gl.bindVertexArray(this.star_vao);
 
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.position_buffer);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STATIC_DRAW);
