@@ -109,10 +109,11 @@ pub export fn resetImageData() void {
 }
 
 pub export fn getViewProjectionMatrix() *[16]f32 {
-    var camera_matrix = Mat3D.getXRotation(0);
-    camera_matrix = Mat3D.getTranslation(0, canvas.settings.background_radius / 2, (5 * canvas.settings.background_radius) / canvas.settings.zoom_factor).mult(camera_matrix);
-    // var camera_matrix = Mat3D.getXRotation(math.pi / 2.0);
-    // camera_matrix = Mat3D.getTranslation(0, 0, (4 * canvas.settings.background_radius) / canvas.settings.zoom_factor).mult(camera_matrix);
+    // var camera_matrix = Mat3D.getXRotation(0);
+    // camera_matrix = Mat3D.getTranslation(0, canvas.settings.background_radius / 2, (4 * canvas.settings.background_radius) / canvas.settings.zoom_factor).mult(camera_matrix);
+    const z_pos = (5.15 * canvas.settings.background_radius) - (canvas.settings.zoom_factor * canvas.settings.background_radius);
+    var camera_matrix = Mat3D.getXRotation(math.pi / 2.0);
+    camera_matrix = Mat3D.getTranslation(0, 0, z_pos).mult(camera_matrix);
     if (!canvas.settings.draw_north_up) {
         camera_matrix = Mat3D.getZRotation(math.pi).mult(camera_matrix);
     }
@@ -215,49 +216,45 @@ pub export fn findWaypoints(f: *const Coord, t: *const Coord, num_waypoints: *u3
     return waypoints.ptr;
 }
 
-pub export fn getCoordForSkyCoord(sky_coord: *SkyCoord, observer_timestamp: i64) ?*Coord {
-// pub export fn getCoordForSkyCoord(sky_coord: *SkyCoord, observer_timestamp: i64) *Coord {
-    // defer allocator.destroy(sky_coord);
-    // const coord = star_math.getCoordForSkyCoord(sky_coord.*, observer_timestamp);
-    // const coord_ptr = allocator.create(Coord) catch unreachable;
-    // coord_ptr.* = coord;
-    // return coord_ptr;
-    return null;
+pub export fn getCoordForSkyCoord(sky_coord: *SkyCoord, observer_timestamp: i64) *Coord {
+    defer allocator.destroy(sky_coord);
+    const coord = star_math.getCoordForSkyCoord(sky_coord.*, observer_timestamp);
+    const coord_ptr = allocator.create(Coord) catch unreachable;
+    coord_ptr.* = coord;
+    return coord_ptr;
 }
 
 pub export fn getSkyCoordForCanvasPoint(point: *Point, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) ?*SkyCoord {
-    // defer allocator.destroy(point);
-    // const observer_location = Coord{
-    //     .latitude = observer_latitude,
-    //     .longitude = observer_longitude
-    // };
-    // const sky_coord = star_math.getSkyCoordForCanvasPoint(&canvas, point.*, observer_location, observer_timestamp);
-    // if (sky_coord) |sk| {
-    //     const sky_coord_ptr = allocator.create(SkyCoord) catch unreachable;
-    //     sky_coord_ptr.* = sk;
-    //     return sky_coord_ptr;
-    // } else {
-    //     return null;
-    // }
-    return null;
+    defer allocator.destroy(point);
+    const observer_location = Coord{
+        .latitude = observer_latitude,
+        .longitude = observer_longitude
+    };
+    const sky_coord = star_math.getSkyCoordForCanvasPoint(&canvas, point.*, observer_location, observer_timestamp);
+    if (sky_coord) |sk| {
+        const sky_coord_ptr = allocator.create(SkyCoord) catch unreachable;
+        sky_coord_ptr.* = sk;
+        return sky_coord_ptr;
+    } else {
+        return null;
+    }
 }
 
 pub export fn getCoordForCanvasPoint(point: *Point, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) ?*Coord {
-    // defer allocator.destroy(point);
-    // const observer_location = Coord{
-    //     .latitude = observer_latitude,
-    //     .longitude = observer_longitude
-    // };
-    // const sky_coord = star_math.getSkyCoordForCanvasPoint(&canvas, point.*, observer_location, observer_timestamp);
-    // if (sky_coord) |sk| {
-    //     const coord = star_math.getCoordForSkyCoord(sk, observer_timestamp);
-    //     const coord_ptr = allocator.create(Coord) catch unreachable;
-    //     coord_ptr.* = coord;
-    //     return coord_ptr;
-    // } else {
-    //     return null;
-    // }
-    return null;
+    defer allocator.destroy(point);
+    const observer_location = Coord{
+        .latitude = observer_latitude,
+        .longitude = observer_longitude
+    };
+    const sky_coord = star_math.getSkyCoordForCanvasPoint(&canvas, point.*, observer_location, observer_timestamp);
+    if (sky_coord) |sk| {
+        const coord = star_math.getCoordForSkyCoord(sk, observer_timestamp);
+        const coord_ptr = allocator.create(Coord) catch unreachable;
+        coord_ptr.* = coord;
+        return coord_ptr;
+    } else {
+        return null;
+    }
 }
 
 pub export fn getConstellationCentroid(constellation_index: usize) ?*SkyCoord {
