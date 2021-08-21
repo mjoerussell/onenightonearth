@@ -86,7 +86,7 @@ pub export fn getImageData(size_in_bytes: *u32) [*]Pixel {
 }
 
 pub export fn resetImageData() void {
-    for (canvas.data) |*p, i| {
+    for (canvas.data) |*p| {
         p.* = Pixel{};
     }   
 }
@@ -98,7 +98,8 @@ pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, obse
     };
 
     for (stars) |star| {
-        star_math.projectStar(&canvas, star, current_coord, observer_timestamp, true);
+        // star_math.projectStar(&canvas, star, current_coord, observer_timestamp, true);
+        star_math.projectStar(&canvas, star, current_coord, observer_timestamp);
     }
 
     // star_math.drawSkyGrid(&canvas, current_coord, observer_timestamp);
@@ -208,7 +209,7 @@ pub export fn getConstellationCentroid(constellation_index: usize) ?*SkyCoord {
 }
 
 pub export fn _wasm_alloc(byte_len: u32) ?[*]u8 {
-    const buffer = allocator.alloc(u8, byte_len) catch |err| return null;
+    const buffer = allocator.alloc(u8, byte_len) catch return null;
     return buffer.ptr;
 }
 

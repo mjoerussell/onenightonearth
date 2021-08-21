@@ -33,7 +33,7 @@ pub const Constellation = struct {
     boundaries: []SkyCoord,
 };
 
-pub const SpectralType = packed enum(u8) {
+pub const SpectralType = enum(u8) {
     /// > 30,000 K
     O,
     /// 10,000 K <> 30,000 K
@@ -77,7 +77,8 @@ fn getAlpha(brightness: f32) u8 {
     else @floatToInt(u8, brightness * 255.0);
 }
 
-pub fn projectStar(canvas: *Canvas, star: Star, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) void {
+// pub fn projectStar(canvas: *Canvas, star: Star, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) void {
+pub fn projectStar(canvas: *Canvas, star: Star, observer_location: Coord, observer_timestamp: i64) void {
     const point = projectToCanvas(
         canvas, 
         SkyCoord{ .right_ascension = star.right_ascension, .declination = star.declination }, 
@@ -167,7 +168,6 @@ pub fn drawSkyGrid(canvas: *Canvas, observer_location: Coord, observer_timestamp
 
 pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) ?Point {
     const two_pi = comptime math.pi * 2.0;
-    const half_pi = comptime math.pi / 2.0;
 
     const local_sidereal_time = getLocalSiderealTime(@intToFloat(f64, observer_timestamp), observer_location.longitude);
     const hour_angle = local_sidereal_time - @as(f64, sky_coord.right_ascension);
@@ -181,7 +181,7 @@ pub fn projectToCanvas(canvas: *Canvas, sky_coord: SkyCoord, observer_location: 
     const cos_lat = math.cos(lat_rad);
 
     const sin_alt = sin_dec * sin_lat + math.cos(declination_rad) * cos_lat * math.cos(hour_angle_rad);
-    const altitude = math_utils.boundedASin(sin_alt) catch |err| return null;
+    const altitude = math_utils.boundedASin(sin_alt) catch return null;
     if (filter_below_horizon and altitude < 0) {
         return null;
     }
@@ -201,7 +201,7 @@ pub fn getProjectedCoord(altitude: f32, azimuth: f32) Point {
 
     // Convert from polar to cartesian coordinates
     return .{ 
-        // TODO without negating x here, the whole chart is rendered backwards. Not sure if this is where the negations
+        // @note without negating x here, the whole chart is rendered backwards. Not sure if this is where the negations
         // is SUPPOSED to go, or if I messed up a negation somewhere else and this is just a hack that makes it work
         .x = -(s * math.sin(azimuth)), 
         .y = s * math.cos(azimuth) 
@@ -211,10 +211,12 @@ pub fn getProjectedCoord(altitude: f32, azimuth: f32) Point {
 pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []Constellation, observer_location: Coord, observer_timestamp: i64) ?usize {
     if (!canvas.isInsideCircle(point)) return null;
 
+    // Get a ray projected from the point to the right side of the canvas
     const point_ray_right = Line{ 
         .a = point, 
         .b = Point{ .x = @intToFloat(f32, canvas.settings.width), .y = point.y } 
     };
+    // Get a ray projected from the point to the left side of the canvas
     const point_ray_left = Line{ 
         .a = point, 
         .b = Point{ .x = -@intToFloat(f32, canvas.settings.width), .y = point.y } 
@@ -224,6 +226,9 @@ pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []
         var b_index: usize = 0;
         var num_intersections_right: u32 = 0;
         var num_intersections_left: u32 = 0;
+
+        // Loop over all of the boundaries and count how many times both rays intersect with the boundary line
+        // If they intersect inside the canvas circle, then add that to the left or right intersection counter
         while (b_index < c.boundaries.len - 1) : (b_index += 1) {
             const b_a = projectToCanvas(canvas, c.boundaries[b_index], observer_location, observer_timestamp, false);
             const b_b = projectToCanvas(canvas, c.boundaries[b_index + 1], observer_location, observer_timestamp, false);
@@ -251,19 +256,22 @@ pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []
         if (b_a == null or b_b == null) continue;
 
         const bound = Line{ .a = b_a.?, .b = b_b.? };
+        
         if (point_ray_right.segmentIntersection(bound)) |inter_point| {
             if (canvas.isInsideCircle(inter_point)) {
                 num_intersections_right += 1;
             }
         }
-         if (point_ray_left.segmentIntersection(bound)) |inter_point| {
-                if (canvas.isInsideCircle(inter_point)) {
-                    num_intersections_left += 1;
-                }
+
+        if (point_ray_left.segmentIntersection(bound)) |inter_point| {
+            if (canvas.isInsideCircle(inter_point)) {
+                num_intersections_left += 1;
             }
-        if (
-            (num_intersections_left % 2 == 1 and num_intersections_right % 2 == 1)
-        ) {
+        }
+
+        // If there are an odd number of intersections on the left and right side of the point, then the point
+        // is inside the shape
+        if (num_intersections_left % 2 == 1 and num_intersections_right % 2 == 1) {
             return constellation_index;
         }
     }
@@ -273,10 +281,6 @@ pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []
 /// Find waypoints along the great circle between two coordinates. Each waypoint will be
 /// 1/num_waypoints distance beyond the previous coordinate.
 pub fn findWaypoints(allocator: *Allocator, f: Coord, t: Coord) []Coord {
-    const quadrant_radians = comptime math.pi / 2.0;
-    const circle_radians = comptime math.pi * 2.0;
-    const waypoints_per_radian: f32 = 20;
-
     const t_radian = Coord{
         .latitude = math_utils.degToRad(t.latitude),
         .longitude = math_utils.degToRad(t.longitude)
@@ -289,17 +293,17 @@ pub fn findWaypoints(allocator: *Allocator, f: Coord, t: Coord) []Coord {
 
     const negative_dir = t_radian.longitude < f_radian.longitude and t_radian.longitude > (f_radian.longitude - math.pi);
 
-    const total_distance = findGreatCircleDistance(f_radian, t_radian) catch |err| 0;
+    const total_distance = findGreatCircleDistance(f_radian, t_radian) catch 0;
     
     const num_waypoints: usize = 100;
     const waypoint_inc: f32 = total_distance / @intToFloat(f32, num_waypoints);
-    const course_angle = findGreatCircleCourseAngle(f_radian, t_radian, total_distance) catch |err| 0;
+    const course_angle = findGreatCircleCourseAngle(f_radian, t_radian, total_distance) catch 0;
 
     var waypoints: []Coord = allocator.alloc(Coord, num_waypoints) catch unreachable;
     for (waypoints) |*waypoint, i| {
         const waypoint_rel_angle = @intToFloat(f32, i + 1) * waypoint_inc;
-        const lat = findWaypointLatitude(f_radian, waypoint_rel_angle, course_angle) catch |err| 0;
-        const rel_long = findWaypointRelativeLongitude(f_radian, lat, waypoint_rel_angle) catch |err| 0;
+        const lat = findWaypointLatitude(f_radian, waypoint_rel_angle, course_angle) catch 0;
+        const rel_long = findWaypointRelativeLongitude(f_radian, lat, waypoint_rel_angle) catch 0;
 
         const long = if (negative_dir) f_radian.longitude - rel_long else f_radian.longitude + rel_long;
 
@@ -320,11 +324,10 @@ pub fn dragAndMove(canvas: *Canvas, drag_start_x: f32, drag_start_y: f32, drag_e
     // Usually atan2 is used with the parameters in the reverse order (atan2(y, x)).
     // The order here (x, y) is intentional, since otherwise horizontal drags would result in vertical movement
     // and vice versa
-    // TODO Maybe hack to fix issue with backwards display? See getProjectedCoord
+    // @todo Maybe hack to fix issue with backwards display? See getProjectedCoord
     const dist_phi = -math.atan2(f32, dist_x, dist_y);
 
     // drag_distance is the angular distance between the starting location and the result location after a single drag
-    // 2.35 is a magic number of degrees, picked because it results in what feels like an appropriate drag speed
     // Higher = move more with smaller cursor movements, and vice versa
     const drag_distance: f32 = math_utils.degToRad(canvas.settings.drag_speed);
 
@@ -383,12 +386,12 @@ pub fn getSkyCoordForCanvasPoint(canvas: *Canvas, point: Point, observer_locatio
     const sin_lat = math.sin(observer_lat_rad);
     const cos_lat = math.cos(observer_lat_rad);
 
-    const declination = math_utils.boundedASin(((raw_point.y / s) * math.cos(altitude) * cos_lat) + (math.sin(altitude) * sin_lat)) catch |_| {
+    const declination = math_utils.boundedASin(((raw_point.y / s) * math.cos(altitude) * cos_lat) + (math.sin(altitude) * sin_lat)) catch {
         log(.Error, "Error computing declination", .{});
         return null;
     };
 
-    var hour_angle_rad = math_utils.boundedACos((math.sin(altitude) - (math.sin(declination) * sin_lat)) / (math.cos(declination) * cos_lat)) catch |_| {
+    var hour_angle_rad = math_utils.boundedACos((math.sin(altitude) - (math.sin(declination) * sin_lat)) / (math.cos(declination) * cos_lat)) catch {
         log(.Error, "Error computing hour angle. Declination was {d:.3}", .{declination});
         return null;
     };

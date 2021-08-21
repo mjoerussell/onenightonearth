@@ -1,5 +1,6 @@
 node_modules
 zig-cache
+zig-out
 **/*.js.map
 **/*.js
 !**/webpack.config.js
