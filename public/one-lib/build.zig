@@ -4,11 +4,14 @@ const Target = std.build.Target;
 
 pub fn build(b: *Builder) !void {
     const mode = b.standardReleaseOptions();
-    const target = try Target.parse(.{ .arch_os_abi = "wasm32-freestanding" });
-    const lib = b.addStaticLibrary("one-math", "src/main.zig");
+    // const target = try Target.parse(.{ .arch_os_abi = "wasm32-freestanding" });
+    const lib = b.addSharedLibrary("one-math", "src/main.zig", b.version(0, 0, 0));
     lib.setBuildMode(mode);
-    lib.setTarget(target);
-    lib.install();
+    lib.setTarget(.{ .cpu_arch = .wasm32, .os_tag = .freestanding });
+    // lib.install();
+
+    b.default_step.dependOn(&lib.step);
+    b.installArtifact(lib);
 
     // var main_tests = b.addTest("src/main.zig");
     // main_tests.setBuildMode(mode);

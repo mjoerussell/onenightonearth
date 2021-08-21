@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const controls = new Controls();
     controls.date = new Date();
 
-    WebAssembly.instantiateStreaming(fetch('./one-lib/zig-cache/lib/one-math.wasm'), {
+    WebAssembly.instantiateStreaming(fetch('./one-lib/zig-out/lib/one-math.wasm'), {
         env: {
             consoleLog: (msg_ptr: number, msg_len: number) => {
                 const message = wasm_interface.getString(msg_ptr, msg_len);

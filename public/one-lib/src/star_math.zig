@@ -77,7 +77,6 @@ fn getAlpha(brightness: f32) u8 {
     else @floatToInt(u8, brightness * 255.0);
 }
 
-// pub fn projectStar(canvas: *Canvas, star: Star, observer_location: Coord, observer_timestamp: i64, filter_below_horizon: bool) void {
 pub fn projectStar(canvas: *Canvas, star: Star, observer_location: Coord, observer_timestamp: i64) void {
     const point = projectToCanvas(
         canvas, 
@@ -416,7 +415,9 @@ pub fn getConstellationCentroid(constellation: Constellation) SkyCoord {
     for (constellation.boundaries) |b| {
         // convert to radians
         const ra_rad = b.right_ascension * (math.pi / 180.0);
+        // const ra_rad = math_utils.degToRad(b.right_ascension);
         const dec_rad = b.declination * (math.pi / 180.0);
+        // const dec_rad = math_utils.degToRad(b.declination);
 
         x += math.cos(dec_rad) * math.cos(ra_rad);
         y += math.cos(dec_rad) * math.sin(ra_rad);
@@ -433,7 +434,9 @@ pub fn getConstellationCentroid(constellation: Constellation) SkyCoord {
 
     return SkyCoord{
         .right_ascension = central_long * (180.0 / math.pi),
+        // .right_ascension = math_utils.radToDeg(central_long),
         .declination = central_lat * (180.0 / math.pi)
+        // .declination = math_utils.radToDeg(central_lat)
     };
 }
 

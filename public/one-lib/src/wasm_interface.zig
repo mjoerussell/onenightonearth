@@ -98,11 +98,8 @@ pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, obse
     };
 
     for (stars) |star| {
-        // star_math.projectStar(&canvas, star, current_coord, observer_timestamp, true);
         star_math.projectStar(&canvas, star, current_coord, observer_timestamp);
     }
-
-    // star_math.drawSkyGrid(&canvas, current_coord, observer_timestamp);
 }
 
 pub export fn projectConstellationGrids(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {

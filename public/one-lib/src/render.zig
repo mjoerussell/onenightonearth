@@ -105,42 +105,6 @@ pub const Canvas = struct {
         return point.getDist(center) <= self.settings.background_radius;
     }
 
-    pub fn isInsidePolygon(self: *Canvas, polygon: []Point, point: Point) bool {
-        const point_ray = Line{
-            .a = point,
-            .b = Point{ .x = @intToFloat(f32, self.settings.width), .y = point.y }
-        };
-        var num_intersections: u32 = 0;
-        var index: usize = 0;
-        while (index < polygon.len - 1) : (index += 1) {
-            const bound = Line{
-                .a = polygon[index],
-                .b = polygon[index + 1]
-            };
-
-            if (point_ray.intersection(bound)) |inter_point| {
-                const bound_min_x = std.math.min(bound.a.x, bound.b.x);
-                const bound_max_x = std.math.max(bound.a.x, bound.b.x);
-                if (inter_point.x >= bound_min_x and inter_point.x <= bound_max_x) {
-                    self.drawSquare(inter_point, 4, Pixel.rgb(255, 0, 0));
-                    num_intersections += 1;
-                }
-            }
-        }
-        return num_intersections % 2 == 1;
-    }
-
-    pub fn drawSquare(self: *Canvas, p: Point, width: usize, color: Pixel) void {
-        var index: f32 = 0;
-        var w = @intToFloat(f32, width);
-        while (index < w) : (index += 1) {
-            self.setPixelAt(Point{ .x = p.x + index, .y = p.y }, color);
-            self.setPixelAt(Point{ .x = p.x + index, .y = p.y + (w - 1) }, color);
-            self.setPixelAt(Point{ .x = p.x, .y = p.y + index }, color);
-            self.setPixelAt(Point{ .x = p.x + (w - 1), .y = p.y + index }, color);
-        }
-    }
-
     pub fn drawLine(self: *Canvas, line: Line, color: Pixel, thickness: u32) void {
         const num_points = @floatToInt(u32, 75 * self.settings.zoom_factor);
         const is_a_inside_circle = self.isInsideCircle(line.a);
