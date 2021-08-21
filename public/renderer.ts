@@ -7,6 +7,7 @@ export type CanvasSettings = {
     draw_north_up: boolean;
     draw_constellation_grid: boolean;
     draw_asterisms: boolean;
+    zodiac_only: boolean;
 };
 
 export class Renderer {
@@ -36,15 +37,12 @@ export class Renderer {
             draw_north_up: true,
             draw_constellation_grid: false,
             draw_asterisms: false,
+            zodiac_only: false,
         };
-
-        console.log('Canvas width: ', this.settings.width);
-        console.log('Canvas height: ', this.settings.height);
 
         this.main_canvas.addEventListener('resize', event => {
             this.width = this.main_canvas.width;
             this.height = this.main_canvas.height;
-            console.log('resize');
         });
     }
 
@@ -157,6 +155,15 @@ export class Renderer {
 
     get draw_asterisms(): boolean {
         return this.settings.draw_asterisms;
+    }
+
+    set zodiac_only(value: boolean) {
+        this._settings_did_change = true;
+        this.settings.zodiac_only = value;
+    }
+
+    get zodiac_only(): boolean {
+        return this.settings.zodiac_only;
     }
 
     set drag_speed(value: number) {

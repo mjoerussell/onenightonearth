@@ -23,12 +23,16 @@ export class Controls {
     private update_location_button: HTMLButtonElement | null;
     private current_position_button: HTMLButtonElement | null;
 
-    private show_constellations_input: HTMLInputElement | null;
     private show_constellation_grid_input: HTMLInputElement | null;
     private show_asterism_input: HTMLInputElement | null;
+    private show_only_zodiac_label: HTMLLabelElement | null;
+    private show_only_zodiac_input: HTMLInputElement | null;
+
     private constellation_info_displays: HTMLCollectionOf<HTMLDivElement> | null;
     private _constellation_name: string | null = null;
     private select_constellation: HTMLSelectElement | null;
+
+    private extraContellationControlsContainer: HTMLDivElement | null;
 
     public renderer: Renderer;
 
@@ -62,9 +66,12 @@ export class Controls {
         this.update_location_button = document.getElementById('locationUpdate') as HTMLButtonElement;
         this.current_position_button = document.getElementById('currentPosition') as HTMLButtonElement;
 
-        this.show_constellations_input = document.getElementById('showConstellations') as HTMLInputElement;
+        // this.show_constellations_input = document.getElementById('showConstellations') as HTMLInputElement;
         this.show_asterism_input = document.getElementById('showAsterism') as HTMLInputElement;
         this.show_constellation_grid_input = document.getElementById('showGrid') as HTMLInputElement;
+        this.show_only_zodiac_input = document.getElementById('onlyZodiac') as HTMLInputElement;
+        this.show_only_zodiac_label = document.getElementById('onlyZodiacLabel') as HTMLLabelElement;
+        this.extraContellationControlsContainer = document.getElementById('extraConstellationControls') as HTMLDivElement;
         this.constellation_info_displays = document.getElementsByClassName('constellation-info') as HTMLCollectionOf<HTMLDivElement>;
 
         this.select_constellation = document.getElementById('selectConstellation') as HTMLSelectElement;
@@ -73,9 +80,10 @@ export class Controls {
 
         this.renderer.draw_constellation_grid = this.show_constellation_grid_input?.checked ?? false;
         this.renderer.draw_asterisms = this.show_asterism_input?.checked ?? false;
+        this.renderer.zodiac_only = this.show_only_zodiac_input?.checked ?? false;
 
-        if (this.select_constellation) {
-            this.select_constellation.style.display =
+        if (this.extraContellationControlsContainer) {
+            this.extraContellationControlsContainer.style.display =
                 this.renderer.draw_asterisms || this.renderer.draw_constellation_grid ? 'block' : 'none';
         }
 
@@ -332,21 +340,23 @@ export class Controls {
         const handleAllInputs = () => {
             this.renderer.draw_asterisms = this.show_asterism_input?.checked ?? false;
             this.renderer.draw_constellation_grid = this.show_constellation_grid_input?.checked ?? false;
+            this.renderer.zodiac_only = this.show_only_zodiac_input?.checked ?? false;
 
             if (!this.renderer.draw_asterisms && !this.renderer.draw_constellation_grid) {
                 this.constellation_name = '';
             }
 
-            if (this.select_constellation) {
-                this.select_constellation.style.display =
+            if (this.extraContellationControlsContainer) {
+                this.extraContellationControlsContainer.style.display =
                     this.renderer.draw_asterisms || this.renderer.draw_constellation_grid ? 'block' : 'none';
             }
 
             handler();
         };
-        this.show_constellations_input?.addEventListener('change', () => handleAllInputs());
-        this.show_asterism_input?.addEventListener('change', () => handleAllInputs());
+
         this.show_constellation_grid_input?.addEventListener('change', () => handleAllInputs());
+        this.show_asterism_input?.addEventListener('change', () => handleAllInputs());
+        this.show_only_zodiac_input?.addEventListener('change', () => handleAllInputs());
     }
 
     setConstellations(constellations: Constellation[]): void {
@@ -401,16 +411,6 @@ export class Controls {
         if (this.location_input) {
             const [latitude, _] = this.location_input.value.split(',');
             this.location_input.value = `${latitude}, ${value.toPrecision(6)}`;
-        }
-    }
-
-    get show_constellations(): boolean {
-        return this.show_constellations_input?.checked ?? false;
-    }
-
-    set show_constellations(should_show: boolean) {
-        if (this.show_constellations_input) {
-            this.show_constellations_input.checked = should_show;
         }
     }
 

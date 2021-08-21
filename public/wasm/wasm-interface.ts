@@ -28,6 +28,7 @@ interface WasmFns {
     initializeConstellations: (
         grid_data: pointer<pointer<SkyCoord>>,
         asterism_data: pointer<pointer<SkyCoord>>,
+        zodiac_data: pointer<number>,
         grid_coord_lens: pointer<number>,
         asterism_coord_lens: pointer<number>,
         num_constellations: number
@@ -71,19 +72,32 @@ export class WasmInterface {
     initialize(stars: Star[], constellations: Constellation[], canvas_settings: CanvasSettings): void {
         const boundaries: pointer<SkyCoord>[] = [];
         const asterisms: pointer<SkyCoord>[] = [];
+        const is_zodiac: boolean[] = [];
         for (const c of constellations) {
             const bound_coords_ptr = this.allocArray(c.boundaries, sizedSkyCoord);
             const aster_coords_ptr = this.allocArray(c.asterism, sizedSkyCoord);
             boundaries.push(bound_coords_ptr);
             asterisms.push(aster_coords_ptr);
+            is_zodiac.push(c.is_zodiac);
         }
+
         const boundaries_ptr = this.allocPrimativeArray(boundaries, WasmPrimative.u32);
         const asterisms_ptr = this.allocPrimativeArray(asterisms, WasmPrimative.u32);
+        const is_zodiac_ptr = this.allocPrimativeArray(is_zodiac, WasmPrimative.bool);
+
         const boundary_lengths = constellations.map(c => c.boundaries.length);
         const bound_coord_lens_ptr = this.allocPrimativeArray(boundary_lengths, WasmPrimative.u32);
         const asterism_lengths = constellations.map(c => c.asterism.length);
         const aster_coord_lens_ptr = this.allocPrimativeArray(asterism_lengths, WasmPrimative.u32);
-        this.lib.initializeConstellations(boundaries_ptr, asterisms_ptr, bound_coord_lens_ptr, aster_coord_lens_ptr, constellations.length);
+
+        this.lib.initializeConstellations(
+            boundaries_ptr,
+            asterisms_ptr,
+            is_zodiac_ptr,
+            bound_coord_lens_ptr,
+            aster_coord_lens_ptr,
+            constellations.length
+        );
 
         const wasm_stars: WasmStar[] = stars.map(star => {
             return {
@@ -287,7 +301,7 @@ export class WasmInterface {
         return ptr;
     }
 
-    allocPrimativeArray(data: number[], size: WasmPrimative): pointer<number> {
+    allocPrimativeArray<T extends number | boolean>(data: T[], size: WasmPrimative): pointer<T> {
         const item_bytes = sizeOfPrimative(size);
         const total_bytes = item_bytes * data.length;
         const ptr = this.allocBytes(total_bytes);

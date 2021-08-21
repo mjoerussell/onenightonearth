@@ -32,7 +32,8 @@ pub const Canvas = struct {
         drag_speed: f32,
         draw_north_up: bool,
         draw_constellation_grid: bool,
-        draw_asterisms: bool
+        draw_asterisms: bool,
+        zodiac_only: bool,
     };
 
     data: []Pixel,

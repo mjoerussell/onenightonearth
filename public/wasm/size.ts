@@ -88,16 +88,7 @@ export type Constellation = {
      * The boundaries of a constellation define its official location in the sky.
      */
     boundaries: SkyCoord[];
-};
-
-export type WasmConstellation = {
-    boundaries_ptr: number;
-    boundaries_len: number;
-};
-
-export const sizedWasmConstellation: Sized<WasmConstellation> = {
-    boundaries_ptr: WasmPrimative.u32,
-    boundaries_len: WasmPrimative.u32,
+    is_zodiac: boolean;
 };
 
 /**
@@ -136,6 +127,7 @@ export const sizedCanvasSettings: Sized<CanvasSettings> = {
     draw_north_up: WasmPrimative.bool,
     draw_constellation_grid: WasmPrimative.bool,
     draw_asterisms: WasmPrimative.bool,
+    zodiac_only: WasmPrimative.bool,
 };
 
 /**

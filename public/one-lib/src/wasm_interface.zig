@@ -32,6 +32,7 @@ const ExternCanvasSettings = packed struct {
     draw_north_up: u8,
     draw_constellation_grid: u8,
     draw_asterisms: u8,
+    zodiac_only: u8,
 
     fn getCanvasSettings(self: ExternCanvasSettings) Canvas.Settings {
         return Canvas.Settings{
@@ -42,7 +43,8 @@ const ExternCanvasSettings = packed struct {
             .drag_speed = self.drag_speed,
             .draw_north_up = self.draw_north_up == 1,
             .draw_constellation_grid = self.draw_constellation_grid == 1,
-            .draw_asterisms = self.draw_asterisms == 1
+            .draw_asterisms = self.draw_asterisms == 1,
+            .zodiac_only = self.zodiac_only == 1,
         };
     }
 };
@@ -61,7 +63,7 @@ pub export fn initializeCanvas(settings: *ExternCanvasSettings) void {
     };
 }
 
-pub export fn initializeConstellations(constellation_grid_data: [*][*]SkyCoord, constellation_asterism_data: [*][*]SkyCoord, grid_coord_lens: [*]u32, asterism_coord_lens: [*]u32, num_constellations: u32) void {
+pub export fn initializeConstellations(constellation_grid_data: [*][*]SkyCoord, constellation_asterism_data: [*][*]SkyCoord, constellation_zodiac_data: [*]u8, grid_coord_lens: [*]u32, asterism_coord_lens: [*]u32, num_constellations: u32) void {
     constellations = allocator.alloc(Constellation, num_constellations) catch unreachable;
 
     defer allocator.free(grid_coord_lens[0..num_constellations]);
@@ -69,7 +71,8 @@ pub export fn initializeConstellations(constellation_grid_data: [*][*]SkyCoord, 
     for (constellations) |*c, i| {
         c.* = Constellation{
             .asterism = constellation_asterism_data[i][0..asterism_coord_lens[i]],
-            .boundaries = constellation_grid_data[i][0..grid_coord_lens[i]]
+            .boundaries = constellation_grid_data[i][0..grid_coord_lens[i]],
+            .is_zodiac = constellation_zodiac_data[i] == 1,
         };
     }
 
@@ -110,6 +113,8 @@ pub export fn projectConstellationGrids(observer_latitude: f32, observer_longitu
 
     if (canvas.settings.draw_constellation_grid or canvas.settings.draw_asterisms) {
         for (constellations) |constellation| {
+            if (canvas.settings.zodiac_only and !constellation.is_zodiac) continue;
+            
             if (canvas.settings.draw_constellation_grid) {
                 star_math.projectConstellationGrid(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, current_coord, observer_timestamp);
             }

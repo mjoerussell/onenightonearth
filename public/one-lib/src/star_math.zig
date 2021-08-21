@@ -31,6 +31,7 @@ pub const Star = packed struct {
 pub const Constellation = struct {
     asterism: []SkyCoord,
     boundaries: []SkyCoord,
+    is_zodiac: bool,
 };
 
 pub const SpectralType = enum(u8) {
@@ -222,6 +223,8 @@ pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []
     };
 
     for (constellations) |c, constellation_index| {
+        if (canvas.settings.zodiac_only and !c.is_zodiac) continue;
+        
         var b_index: usize = 0;
         var num_intersections_right: u32 = 0;
         var num_intersections_left: u32 = 0;
@@ -274,6 +277,7 @@ pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []
             return constellation_index;
         }
     }
+
     return null;
 }
 
