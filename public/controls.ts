@@ -25,7 +25,6 @@ export class Controls {
 
     private show_constellation_grid_input: HTMLInputElement | null;
     private show_asterism_input: HTMLInputElement | null;
-    private show_only_zodiac_label: HTMLLabelElement | null;
     private show_only_zodiac_input: HTMLInputElement | null;
 
     private constellation_info_displays: HTMLCollectionOf<HTMLDivElement> | null;
@@ -70,7 +69,6 @@ export class Controls {
         this.show_asterism_input = document.getElementById('showAsterism') as HTMLInputElement;
         this.show_constellation_grid_input = document.getElementById('showGrid') as HTMLInputElement;
         this.show_only_zodiac_input = document.getElementById('onlyZodiac') as HTMLInputElement;
-        this.show_only_zodiac_label = document.getElementById('onlyZodiacLabel') as HTMLLabelElement;
         this.extraContellationControlsContainer = document.getElementById('extraConstellationControls') as HTMLDivElement;
         this.constellation_info_displays = document.getElementsByClassName('constellation-info') as HTMLCollectionOf<HTMLDivElement>;
 

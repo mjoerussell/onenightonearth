@@ -1,8 +1,8 @@
 FROM alpine:3.13 AS zig
 
-ARG ZIG_VERSION=0.7.1
+ARG ZIG_VERSION=0.8.0
 ARG ZIG_URL=https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz
-ARG ZIG_SHA=18c7b9b200600f8bcde1cd8d7f1f578cbc3676241ce36d771937ce19a8159b8d
+ARG ZIG_SHA=502625d3da3ae595c5f44a809a87714320b7a40e6dff4a895b5fa7df3391d01e
 
 # Download Zig@ZIG_VERSION from official site
 WORKDIR /usr/src
@@ -52,6 +52,8 @@ RUN npm run build:prod
 
 FROM node:15-alpine
 
+ENV HOST=0.0.0.0
+
 WORKDIR /usr/src
 
 RUN mkdir public
@@ -65,7 +67,7 @@ COPY --from=build /usr/src/public/styles ./public/styles
 COPY --from=build /usr/src/public/index.html ./public/index.html
 COPY --from=build /usr/src/server/server.js ./server/server.js
 COPY --from=build /usr/src/public/dist ./public/dist
-COPY --from=zig /usr/src/zig-cache/lib/one-math.wasm ./public/one-lib/zig-cache/lib/
+COPY --from=zig /usr/src/zig-out/lib/one-math.wasm ./public/one-lib/zig-out/lib/
 
 COPY --from=build /usr/src/server/node_modules ./server/node_modules 
 

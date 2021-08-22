@@ -38,6 +38,7 @@ interface Constellation {
 }
 
 const PORT = 8080;
+const HOST = process.env['HOST'] ?? '127.0.0.1';
 const app = express();
 
 app.use(express.static(path.join(__dirname, '../public')));
@@ -110,14 +111,8 @@ const parseSkyFile = (data: string): SkyFile => {
                 i -= 1;
             }
         } else if (current_line.startsWith('#')) {
-            console.log(`Got attribute "${current_line}"`);
             const field_name = current_line.substring(1);
             fields[field_name] = 'true';
-        }
-    }
-    for (const key in fields) {
-        if (fields.hasOwnProperty(key)) {
-            console.log(`'${key}': ${fields[key]}`);
         }
     }
     return fields;
@@ -300,7 +295,7 @@ const main = async () => {
         res.send(constellations);
     });
 
-    http.createServer(app).listen(PORT, () => console.log(`Listening on port ${PORT}`));
+    http.createServer(app).listen(PORT, HOST, () => console.log(`Listening on port ${PORT}`));
 };
 
 main();

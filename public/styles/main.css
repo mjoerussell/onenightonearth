@@ -57,7 +57,7 @@ label {
     border-radius: 2px;
 }
 
-.input-row > button {
+.input-row button:not(.location-button) {
     width: 100%;
     padding: 0.3em 0;
     margin: 5px 0;
@@ -70,6 +70,12 @@ label {
     background-color: var(--button-color);
 }
 
+.input-row button:not(.location-button):hover {
+    color: #fff;
+    background-color: #030b1c;
+    cursor: pointer;
+}
+
 .input-row label {
     color: var(--text-color);
 }
@@ -78,10 +84,24 @@ label {
     color: var(--text-color);
 }
 
-.input-row > button:hover {
-    color: #fff;
-    background-color: #030b1c;
-    cursor: pointer;
+.input-row .button-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.input-row .button-row button {
+    margin-right: 0.1em;
+    margin-left: 0.1em;
+}
+
+.input-row .button-row button:first-of-type {
+    margin-left: 0;
+}
+
+.input-row .button-row button:last-of-type {
+    margin-right: 0;
 }
 
 .inline-input {
@@ -107,12 +127,12 @@ label {
     border: none;
 }
 
-.inline-input button {
+.inline-input button.location-button {
     background-color: #ffffff00;
     border: none;
 }
 
-.inline-input button:hover {
+.inline-input button.location-button:hover {
     font-style: italic;
     color: #222222;
     cursor: pointer;
