@@ -92,7 +92,7 @@ export class Controls {
             this.renderer.drag_speed = Renderer.DefaultMobileDragSpeed;
         }
         // Listen for future changes
-        mql.addEventListener('change', event => {
+        mql.addEventListener('change', _ => {
             if (mql.matches) {
                 this.renderer.drag_speed = Renderer.DefaultMobileDragSpeed;
             } else {
@@ -105,6 +105,11 @@ export class Controls {
         });
     }
 
+    /**
+     * Listen for changes in the current date. This is just for direct updates through the date field,
+     * not timelapses.
+     * @param handler The new date will be passed to this function.
+     */
     onDateChange(handler: (_: Date) => void): void {
         this.date_input?.addEventListener('change', () => {
             const new_date = this.date_input?.valueAsDate;
@@ -115,6 +120,12 @@ export class Controls {
         });
     }
 
+    /**
+     * Listen for the user to set the 'Today' button.
+     * @param handler The original date, then the current date ('Today') will be passed to this function.
+     * @deprecated Currently the 'Today' button is not shown because the resulting render is flipped for
+     * some reason.
+     */
     onSetToday(handler: (current: Date, target: Date) => Date): void {
         this.today_button?.addEventListener('click', () => {
             let current = this.date;
@@ -137,6 +148,11 @@ export class Controls {
         });
     }
 
+    /**
+     * Listen for manual changes in the user's location, via the location input
+     * element.
+     * @param handler Passes the new coordinate to the callback.
+     */
     onLocationUpdate(handler: (_: Coord) => void): void {
         this.update_location_button?.addEventListener('click', () => {
             if (this.user_changed_location) {
@@ -168,6 +184,10 @@ export class Controls {
         });
     }
 
+    /**
+     * Listen for the user to click the "Use my Location" button.
+     * @param handler Passes the user's current position to this callback.
+     */
     onUseCurrentPosition(handler: (_: Coord) => void): void {
         this.current_position_button?.addEventListener('click', () => {
             if ('geolocation' in navigator) {
@@ -178,6 +198,12 @@ export class Controls {
         });
     }
 
+    /**
+     * Listen for the user to click the "Timelapse" button.
+     * @param handler This function will be called repeatedly, as long as
+     * the timelapse feature is turned on. Each time, the new date will be
+     * passed in.
+     */
     onTimelapse(handler: (next_date: Date) => Date): void {
         this.time_travel_button?.addEventListener('click', () => {
             this.time_travel_button!.innerText = this.timelapse_is_on ? 'Timelapse' : 'Stop';
@@ -201,7 +227,15 @@ export class Controls {
         });
     }
 
+    /**
+     * Listens for the user to click-and-drag on the star map. Handles mouse movement and touch-drags.
+     * @param handler This function will be called each time the user's mouse moves. The first
+     * argument is the original mouse location, and the second argument is the new mouse location.
+     */
     onMapDrag(handler: (current_state: DragState, new_state: DragState) => void): void {
+        /**
+         * Initializes the drag state.
+         */
         const handleDragStart = (x: number, y: number) => {
             const center_x = this.renderer.width / 2;
             const center_y = this.renderer.height / 2;
@@ -213,6 +247,9 @@ export class Controls {
             this.drag_state.is_dragging = true;
         };
 
+        /**
+         * Update the drag state and call the drag handler.
+         */
         const handleDragMove = (x: number, y: number, drag_scale: number = 1) => {
             if (this.drag_state.is_dragging) {
                 const center_x = this.renderer.width / 2;
@@ -229,6 +266,11 @@ export class Controls {
             }
         };
 
+        const handleDragEnd = () => {
+            this.renderer.canvas.classList.remove('moving');
+            this.drag_state.is_dragging = false;
+        };
+
         this.renderer.addEventListener('mousedown', event => handleDragStart(event.offsetX, event.offsetY));
 
         this.touch_handler.onTouchHold(touch => {
@@ -238,7 +280,7 @@ export class Controls {
             handleDragStart(offset_x, offset_y);
         });
 
-        this.touch_handler.onTouchDrag(([old_touch, new_touch]) => {
+        this.touch_handler.onTouchDrag(([_, new_touch]) => {
             const canvas_rect = this.renderer.canvas.getBoundingClientRect();
             const offset_x = new_touch.client_x - canvas_rect.x;
             const offset_y = new_touch.client_y - canvas_rect.y;
@@ -247,48 +289,36 @@ export class Controls {
 
         this.renderer.addEventListener('mousemove', event => handleDragMove(event.offsetX, event.offsetY));
 
-        this.renderer.addEventListener('mouseup', event => {
-            this.renderer.canvas.classList.remove('moving');
-            this.drag_state.is_dragging = false;
-        });
-
-        this.renderer.addEventListener('mouseleave', event => {
-            this.renderer.canvas.classList.remove('moving');
-            this.drag_state.is_dragging = false;
-        });
-
-        this.renderer.addEventListener('touchend', event => {
-            this.renderer.canvas.classList.remove('moving');
-            this.drag_state.is_dragging = false;
-        });
+        this.renderer.addEventListener('mouseup', () => handleDragEnd());
+        this.renderer.addEventListener('mouseleave', () => handleDragEnd());
+        this.renderer.addEventListener('touchend', () => handleDragEnd());
     }
 
     onMapZoom(handler: (zoom_factor: number) => void): void {
+        const handleZoom = (current_zoom: number, previous_zoom: number) => {
+            // Zoom out faster than zooming in, because usually when you zoom out you just want
+            // to go all the way out and it's annoying to have to do a ton of scrolling
+            const delta_amount = current_zoom >= previous_zoom ? -0.05 : 0.15;
+            let zoom_factor = this.renderer.zoom_factor - this.renderer.zoom_factor * delta_amount;
+            if (zoom_factor < 1) {
+                zoom_factor = 1;
+            }
+            handler(zoom_factor);
+        };
+
         this.touch_handler.onPinch((change_a, change_b) => {
             const new_a = change_a[1];
             const new_b = change_b[1];
             const current_touch_distance = Math.sqrt(
                 Math.pow(new_b.client_x - new_a.client_x, 2) + Math.pow(new_b.client_y - new_a.client_y, 2)
             );
-            const delta_amount = current_touch_distance >= this.pinch_state.previous_distance ? -0.05 : 0.15;
+            handleZoom(current_touch_distance, this.pinch_state.previous_distance);
             this.pinch_state.previous_distance = current_touch_distance;
-            let zoom_factor = this.renderer.zoom_factor - this.renderer.zoom_factor * delta_amount;
-            if (zoom_factor < 1) {
-                zoom_factor = 1;
-            }
-            handler(zoom_factor);
         });
 
         this.renderer.addEventListener('wheel', event => {
             event.preventDefault();
-            // Zoom out faster than zooming in, because usually when you zoom out you just want
-            // to go all the way out and it's annoying to have to do a ton of scrolling
-            const delta_amount = event.deltaY < 0 ? -0.05 : 0.15;
-            let zoom_factor = this.renderer.zoom_factor - this.renderer.zoom_factor * delta_amount;
-            if (zoom_factor < 1) {
-                zoom_factor = 1;
-            }
-            handler(zoom_factor);
+            handleZoom(-event.deltaY, 0);
         });
     }
 
@@ -369,7 +399,7 @@ export class Controls {
     }
 
     onSelectConstellation(handler: (_: number) => void): void {
-        this.select_constellation?.addEventListener('change', event => {
+        this.select_constellation?.addEventListener('change', _ => {
             const index = parseInt(this.select_constellation!.value, 10);
             if (index >= 0) {
                 handler(index);
@@ -395,7 +425,7 @@ export class Controls {
     set latitude(value: number) {
         this.current_latitude = value;
         if (this.location_input) {
-            const [_, longitude] = this.location_input.value.split(',');
+            const longitude = this.location_input.value.split(',')[1];
             this.location_input.value = `${value.toPrecision(6)}, ${longitude}`;
         }
     }
@@ -407,7 +437,7 @@ export class Controls {
     set longitude(value: number) {
         this.current_longitude = value;
         if (this.location_input) {
-            const [latitude, _] = this.location_input.value.split(',');
+            const [latitude] = this.location_input.value.split(',');
             this.location_input.value = `${latitude}, ${value.toPrecision(6)}`;
         }
     }

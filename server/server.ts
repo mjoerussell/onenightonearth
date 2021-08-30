@@ -66,6 +66,10 @@ const stat = (path: string): Promise<fs.Stats> => {
     });
 };
 
+/**
+ * Get a list of all the filenames in the top level of a directory.
+ * @param dir_path The path to the directory to read
+ */
 const readDir = (dir_path: string): Promise<string[]> => {
     return new Promise((resolve, reject) => {
         fs.readdir(dir_path, async (err, files) => {

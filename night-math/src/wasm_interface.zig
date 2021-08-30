@@ -16,10 +16,14 @@ const Star = star_math.Star;
 const Constellation = star_math.Constellation;
 const SkyCoord = star_math.SkyCoord;
 const Coord = star_math.Coord;
+const ObserverPosition = star_math.ObserverPosition;
+const GreatCircle = star_math.GreatCircle;
 
 const allocator = std.heap.page_allocator;
 var canvas: Canvas = undefined;
 var stars: []Star = undefined;
+var waypoints: []Coord = undefined;
+const num_waypoints = 150;
 
 var constellations: []Constellation = undefined;
 
@@ -51,6 +55,7 @@ const ExternCanvasSettings = packed struct {
 
 pub export fn initializeStars(star_data: [*]Star, star_len: u32) void {
     stars = star_data[0..star_len];
+    waypoints = allocator.alloc(Coord, num_waypoints) catch unreachable;
 }
 
 pub export fn initializeCanvas(settings: *ExternCanvasSettings) void {
@@ -95,67 +100,60 @@ pub export fn resetImageData() void {
 }
 
 pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
-    const current_coord = Coord{
-        .latitude = observer_latitude,
-        .longitude = observer_longitude
-    };
-
+    const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
     for (stars) |star| {
-        star_math.projectStar(&canvas, star, current_coord, observer_timestamp);
+        star_math.projectStar(&canvas, star, pos);
     }
 }
 
 pub export fn projectConstellationGrids(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
-    const current_coord = Coord{
-        .latitude = observer_latitude,
-        .longitude = observer_longitude
-    };
+    const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
 
     if (canvas.settings.draw_constellation_grid or canvas.settings.draw_asterisms) {
         for (constellations) |constellation| {
             if (canvas.settings.zodiac_only and !constellation.is_zodiac) continue;
             
             if (canvas.settings.draw_constellation_grid) {
-                star_math.projectConstellationGrid(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, current_coord, observer_timestamp);
+                star_math.projectConstellationGrid(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, pos);
             }
             if (canvas.settings.draw_asterisms) {
-                star_math.projectConstellationAsterism(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, current_coord, observer_timestamp);
+                star_math.projectConstellationAsterism(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, pos);
             }
         }
     }
 }
 
 pub export fn getConstellationAtPoint(point: *Point, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) isize {
-    const observer_coord = Coord{
-        .latitude = observer_latitude,
-        .longitude = observer_longitude
-    };
     defer allocator.destroy(point);
-    const index = star_math.getConstellationAtPoint(&canvas, point.*, constellations, observer_coord, observer_timestamp);
+
+    const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
+    const index = star_math.getConstellationAtPoint(&canvas, point.*, constellations, pos);
     if (index) |i| {
         if (canvas.settings.draw_constellation_grid) {
-            star_math.projectConstellationGrid(&canvas, constellations[i], Pixel.rgb(255, 255, 255), 2, observer_coord, observer_timestamp);
+            star_math.projectConstellationGrid(&canvas, constellations[i], Pixel.rgb(255, 255, 255), 2, pos);
         }
         if (canvas.settings.draw_asterisms) {
-            star_math.projectConstellationAsterism(&canvas, constellations[i], Pixel.rgb(255, 255, 255), 2, observer_coord, observer_timestamp);
+            star_math.projectConstellationAsterism(&canvas, constellations[i], Pixel.rgb(255, 255, 255), 2, pos);
         }
         return @intCast(isize, i);
     } else return -1;
 }
 
 pub export fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_end_y: f32) *Coord {
-    const coord = star_math.dragAndMove(&canvas, drag_start_x, drag_start_y, drag_end_x, drag_end_y);
+    const coord = star_math.dragAndMove(drag_start_x, drag_start_y, drag_end_x, drag_end_y, canvas.settings.drag_speed);
     const coord_ptr = allocator.create(Coord) catch unreachable;
     coord_ptr.* = coord;
     return coord_ptr;
 }
 
-pub export fn findWaypoints(f: *const Coord, t: *const Coord, num_waypoints: *u32) [*]Coord {
-    defer allocator.destroy(f);
-    defer allocator.destroy(t);
+pub export fn findWaypoints(start_lat: f32, start_long: f32, end_lat: f32, end_long: f32) [*]Coord {
+    const start = Coord{ .latitude = start_lat, .longitude = start_long };
+    const end = Coord{ .latitude = end_lat, .longitude = end_long };
 
-    const waypoints = star_math.findWaypoints(allocator, f.*, t.*);
-    num_waypoints.* = @intCast(u32, waypoints.len);
+    const great_circle = GreatCircle(num_waypoints).init(start, end);
+
+    std.mem.copy(Coord, waypoints, great_circle.waypoints[0..]);
+
     return waypoints.ptr;
 }
 
@@ -169,11 +167,9 @@ pub export fn getCoordForSkyCoord(sky_coord: *SkyCoord, observer_timestamp: i64)
 
 pub export fn getSkyCoordForCanvasPoint(point: *Point, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) ?*SkyCoord {
     defer allocator.destroy(point);
-    const observer_location = Coord{
-        .latitude = observer_latitude,
-        .longitude = observer_longitude
-    };
-    const sky_coord = star_math.getSkyCoordForCanvasPoint(&canvas, point.*, observer_location, observer_timestamp);
+
+    const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
+    const sky_coord = star_math.getSkyCoordForCanvasPoint(&canvas, point.*, pos);
     if (sky_coord) |sk| {
         const sky_coord_ptr = allocator.create(SkyCoord) catch unreachable;
         sky_coord_ptr.* = sk;
@@ -185,15 +181,11 @@ pub export fn getSkyCoordForCanvasPoint(point: *Point, observer_latitude: f32, o
 
 pub export fn getCoordForCanvasPoint(point: *Point, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) ?*Coord {
     defer allocator.destroy(point);
-    const observer_location = Coord{
-        .latitude = observer_latitude,
-        .longitude = observer_longitude
-    };
-    const sky_coord = star_math.getSkyCoordForCanvasPoint(&canvas, point.*, observer_location, observer_timestamp);
+
+    const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
+    const sky_coord = star_math.getSkyCoordForCanvasPoint(&canvas, point.*, pos);
     if (sky_coord) |sk| {
-        log(.Debug, "Got sky coord ({d:.2}, {d:.2})", .{sk.right_ascension, sk.declination});
         const coord = star_math.getCoordForSkyCoord(sk, observer_timestamp);
-        log(.Debug, "Got coord ({d:.2}, {d:.2})", .{coord.latitude, coord.longitude});
         const coord_ptr = allocator.create(Coord) catch unreachable;
         coord_ptr.* = coord;
         return coord_ptr;
@@ -206,7 +198,7 @@ pub export fn getConstellationCentroid(constellation_index: usize) ?*SkyCoord {
     if (constellation_index > constellations.len) return null;
 
     const coord_ptr = allocator.create(SkyCoord) catch unreachable;
-    coord_ptr.* = star_math.getConstellationCentroid(constellations[constellation_index]);
+    coord_ptr.* = constellations[constellation_index].centroid();
     return coord_ptr;
 }
 

@@ -4,3 +4,4 @@ zig-out
 **/*.js.map
 **/*.js
 !**/webpack.config.js
+dist/

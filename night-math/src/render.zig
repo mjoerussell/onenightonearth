@@ -7,6 +7,10 @@ const math_utils = @import("./math_utils.zig");
 const Point = math_utils.Point;
 const Line = math_utils.Line;
 
+const star_math = @import("./star_math.zig");
+const SkyCoord = star_math.SkyCoord;
+const ObserverPosition = star_math.ObserverPosition;
+
 pub const Pixel = packed struct {
     r: u8 = 0,
     g: u8 = 0,
@@ -66,7 +70,49 @@ pub const Canvas = struct {
         self.data[p_index] = new_pixel;
     }
 
-    pub fn translatePoint(self: *Canvas, pt: Point) Point {
+    pub fn projectToCanvas(canvas: Canvas, sky_coord: SkyCoord, observer_pos: ObserverPosition, filter_below_horizon: bool) ?Point {
+        const two_pi = comptime math.pi * 2.0;
+
+        const local_sidereal_time = observer_pos.localSiderealTime();
+        const hour_angle = local_sidereal_time - @as(f64, sky_coord.right_ascension);
+        const hour_angle_rad = math_utils.floatMod(math_utils.degToRad(hour_angle), two_pi);
+
+        const declination_rad = @floatCast(f64, math_utils.degToRad(sky_coord.declination));
+        const sin_dec = math.sin(declination_rad);
+        
+        const lat_rad = math_utils.degToRad(observer_pos.latitude);
+        const sin_lat = math.sin(lat_rad);
+        const cos_lat = math.cos(lat_rad);
+
+        const sin_alt = sin_dec * sin_lat + math.cos(declination_rad) * cos_lat * math.cos(hour_angle_rad);
+        const altitude = math_utils.boundedASin(sin_alt) catch return null;
+        if (filter_below_horizon and altitude < 0) {
+            return null;
+        }
+
+        const cos_azi = (sin_dec - math.sin(altitude) * sin_lat) / (math.cos(altitude) * cos_lat);
+        const azi = math.acos(cos_azi);
+        const azimuth = if (math.sin(hour_angle_rad) < 0) azi else two_pi - azi;
+
+        const canvas_point = blk: {
+            const radius = comptime 2.0 / math.pi;
+            // s is the distance from the center of the projection circle to the point
+            // aka 1 - the angular distance along the surface of the sky sphere
+            const s = 1.0 - (radius * altitude);
+
+            // Convert from polar to cartesian coordinates
+            break :blk Point{ 
+                // @note without negating x here, the whole chart is rendered backwards. Not sure if this is where the negations
+                // is SUPPOSED to go, or if I messed up a negation somewhere else and this is just a hack that makes it work
+                .x = -@floatCast(f32, s * math.sin(azimuth)), 
+                .y = @floatCast(f32, s * math.cos(azimuth))
+            };
+        };
+
+        return canvas.translatePoint(canvas_point);
+    }
+
+    pub fn translatePoint(self: Canvas, pt: Point) Point {
         const center = Point{
             .x = @intToFloat(f32, self.settings.width) / 2.0,
             .y = @intToFloat(f32, self.settings.height) / 2.0,

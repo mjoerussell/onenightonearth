@@ -21,8 +21,8 @@ RUN rm zig.tar.xz
 RUN chmod +x /usr/local/bin/zig/zig-linux-x86_64-${ZIG_VERSION}/zig
 
 # Build WASM Module
-COPY ./public/one-lib .
-RUN /usr/local/bin/zig/zig-linux-x86_64-${ZIG_VERSION}/zig build -Drelease-small=true
+COPY ./night-math .
+RUN /usr/local/bin/zig/zig-linux-x86_64-${ZIG_VERSION}/zig build -Drelease-small
 
 FROM node:15-alpine AS build
 
@@ -67,10 +67,10 @@ COPY --from=build /usr/src/public/styles ./public/styles
 COPY --from=build /usr/src/public/index.html ./public/index.html
 COPY --from=build /usr/src/server/server.js ./server/server.js
 COPY --from=build /usr/src/public/dist ./public/dist
-COPY --from=zig /usr/src/zig-out/lib/one-math.wasm ./public/one-lib/zig-out/lib/
+COPY --from=zig /usr/public/dist/wasm ./public/dist/wasm
 
 COPY --from=build /usr/src/server/node_modules ./server/node_modules 
 
-RUN cd /usr/src/server
+# RUN cd /usr/src/server
 
 ENTRYPOINT [ "node", "/usr/src/server/server.js" ]

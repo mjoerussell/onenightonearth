@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const controls = new Controls();
     controls.date = new Date();
 
-    WebAssembly.instantiateStreaming(fetch('./one-lib/zig-out/lib/one-math.wasm'), {
+    WebAssembly.instantiateStreaming(fetch('./dist/wasm/bin/night-math.wasm'), {
         env: {
             consoleLog: (msg_ptr: number, msg_len: number) => {
                 const message = wasm_interface.getString(msg_ptr, msg_len);
@@ -61,33 +61,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error(`[WASM] ${message}`);
             },
         },
-    }).then(wasm_result =>
-        fetch('/stars')
-            .then(star_result => star_result.json())
-            .then((stars: Star[]) =>
-                fetch('/constellations')
-                    .then(const_result => const_result.json())
-                    .then((consts: Constellation[]) => {
-                        constellations = consts;
-                        controls.setConstellations(constellations);
-                        wasm_interface = new WasmInterface(wasm_result.instance);
-                        wasm_interface.initialize(stars, constellations, controls.renderer.getCanvasSettings());
+    }).then(async wasm_result => {
+        const stars: Star[] = await fetch('/stars').then(s => s.json());
+        constellations = await fetch('/constellations').then(c => c.json());
 
-                        drawUIElements(controls);
-                        renderStars(controls);
-                    })
-            )
-            .catch(error => {
-                console.error('In WebAssembly Promise: ', error);
-            })
-    );
+        controls.setConstellations(constellations);
 
-    controls.onDateChange(date => {
+        wasm_interface = new WasmInterface(wasm_result.instance);
+        wasm_interface.initialize(stars, constellations, controls.renderer.getCanvasSettings());
+
+        drawUIElements(controls);
+        renderStars(controls);
+    });
+
+    controls.onDateChange(_ => {
         renderStars(controls);
     });
 
     controls.onChangeConstellationView(() => {
-        renderStars(controls);
+        window.requestAnimationFrame(() => renderStars(controls));
     });
 
     controls.onSetToday((current, target) => {

@@ -18,7 +18,7 @@ export enum WasmPrimative {
     f64,
 }
 
-export type pointer<T> = number;
+export type pointer = number;
 
 /**
  * An Earth coordinate, used to determine the location of an observer.
@@ -231,7 +231,7 @@ export const sizeOf = <T extends Allocatable>(type: Sized<T>): number => {
     if (isSimpleSize(type)) {
         for (const key in type) {
             if (type.hasOwnProperty(key)) {
-                size += sizeOfPrimative(type[key]);
+                size += sizeOfPrimative(type[key] as WasmPrimative);
             }
         }
     } else if (isComplexSize(type)) {

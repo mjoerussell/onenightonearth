@@ -40,7 +40,7 @@ export class Renderer {
             zodiac_only: false,
         };
 
-        this.main_canvas.addEventListener('resize', event => {
+        this.main_canvas.addEventListener('resize', _ => {
             this.width = this.main_canvas.width;
             this.height = this.main_canvas.height;
         });
