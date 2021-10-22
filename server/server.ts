@@ -3,6 +3,7 @@ import bodyParser from 'body-parser';
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import { performance } from 'perf_hooks';
 
 enum SpectralType {
     O = 0,
@@ -274,6 +275,7 @@ const parseRightAscension = (ra: string): number => {
 };
 
 const main = async () => {
+    const star_parse_start = performance.now();
     const stars: Star[] = await readFile(path.join(__dirname, 'sao_catalog'))
         .then(catalog =>
             catalog
@@ -282,17 +284,26 @@ const main = async () => {
                 .filter(line => line.startsWith('SAO'))
         )
         .then(lines => lines.map(parseCatalogLine).filter(star => star != null) as Star[]);
+    const star_parse_end = performance.now();
 
+    console.log(`Star parsing took ${star_parse_end - star_parse_start} ms`);
+
+    const const_parse_start = performance.now();
     const constellations: Constellation[] = await readConstellationFiles();
+    const const_parse_end = performance.now();
 
+    console.log(`Constellation parsing took ${const_parse_end - const_parse_start} ms`);
     app.get('/', (req, res) => {
         res.sendFile(path.join(__dirname, 'index.html'));
     });
 
     app.get('/stars', (req, res) => {
+        const response_start = performance.now();
         const brightness_param = (req.query.brightness as string) ?? '0.3';
         const min_brightness = parseFloat(brightness_param);
         res.send(stars.filter(star => star.brightness >= min_brightness));
+        const response_end = performance.now();
+        console.log(`Sending stars took ${response_end - response_start} ms`);
     });
 
     app.get('/constellations', (req, res) => {

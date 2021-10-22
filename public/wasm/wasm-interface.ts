@@ -63,7 +63,8 @@ export class WasmInterface {
 
     initialize(stars: Star[], constellations: Constellation[], canvas_settings: CanvasSettings): void {
         // this.lib.initializeAllocator();
-
+        console.log(`Initializing ${stars.length} stars and ${constellations.length} constellations`);
+        const init_start = performance.now();
         const boundaries: pointer[] = [];
         const asterisms: pointer[] = [];
         const is_zodiac: boolean[] = [];
@@ -105,6 +106,9 @@ export class WasmInterface {
         this.lib.initializeStars(star_ptr, wasm_stars.length);
         const settings_ptr = this.allocObject(canvas_settings, sizedCanvasSettings);
         this.lib.initializeCanvas(settings_ptr);
+        const init_end = performance.now();
+
+        console.log(`Took ${init_end - init_start} ms to initialize`);
         this.lib.initializeAllocator();
     }
 
