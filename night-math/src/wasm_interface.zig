@@ -20,6 +20,9 @@ const ObserverPosition = star_math.ObserverPosition;
 const GreatCircle = star_math.GreatCircle;
 
 const allocator = std.heap.page_allocator;
+// var allocator_buffer: [1024]u8 = undefined;
+// var allocator: std.mem.Allocator = std.heap.page_allocator;
+
 var canvas: Canvas = undefined;
 var stars: []Star = undefined;
 var waypoints: []Coord = undefined;
@@ -53,12 +56,18 @@ const ExternCanvasSettings = packed struct {
     }
 };
 
+pub export fn initializeAllocator() void {
+    // var fba = std.heap.FixedBufferAllocator.init(allocator_buffer[0..]);
+    // allocator = fba.allocator;
+}
+
 pub export fn initializeStars(star_data: [*]Star, star_len: u32) void {
     stars = star_data[0..star_len];
     waypoints = allocator.alloc(Coord, num_waypoints) catch unreachable;
 }
 
 pub export fn initializeCanvas(settings: *ExternCanvasSettings) void {
+    // canvas = Canvas.init(&allocator, settings.getCanvasSettings()) catch |err| switch (err) {
     canvas = Canvas.init(allocator, settings.getCanvasSettings()) catch |err| switch (err) {
         error.OutOfMemory => {
             const num_pixels = canvas.settings.width * canvas.settings.height;
@@ -159,7 +168,7 @@ pub export fn findWaypoints(start_lat: f32, start_long: f32, end_lat: f32, end_l
 
 pub export fn getCoordForSkyCoord(sky_coord: *SkyCoord, observer_timestamp: i64) *Coord {
     defer allocator.destroy(sky_coord);
-    const coord = star_math.getCoordForSkyCoord(sky_coord.*, observer_timestamp);
+    const coord = sky_coord.getCoord(observer_timestamp);
     const coord_ptr = allocator.create(Coord) catch unreachable;
     coord_ptr.* = coord;
     return coord_ptr;
@@ -169,29 +178,21 @@ pub export fn getSkyCoordForCanvasPoint(point: *Point, observer_latitude: f32, o
     defer allocator.destroy(point);
 
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
-    const sky_coord = star_math.getSkyCoordForCanvasPoint(&canvas, point.*, pos);
-    if (sky_coord) |sk| {
-        const sky_coord_ptr = allocator.create(SkyCoord) catch unreachable;
-        sky_coord_ptr.* = sk;
-        return sky_coord_ptr;
-    } else {
-        return null;
-    }
+    const sky_coord = canvas.pointToCoord(point.*, pos) orelse return null;
+    const sky_coord_ptr = allocator.create(SkyCoord) catch unreachable;
+    sky_coord_ptr.* = sky_coord;
+    return sky_coord_ptr;
 }
 
 pub export fn getCoordForCanvasPoint(point: *Point, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) ?*Coord {
     defer allocator.destroy(point);
 
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
-    const sky_coord = star_math.getSkyCoordForCanvasPoint(&canvas, point.*, pos);
-    if (sky_coord) |sk| {
-        const coord = star_math.getCoordForSkyCoord(sk, observer_timestamp);
-        const coord_ptr = allocator.create(Coord) catch unreachable;
-        coord_ptr.* = coord;
-        return coord_ptr;
-    } else {
-        return null;
-    }
+    const sky_coord = canvas.pointToCoord(point.*, pos) orelse return null;
+    const coord = sky_coord.getCoord(observer_timestamp);
+    const coord_ptr = allocator.create(Coord) catch unreachable;
+    coord_ptr.* = coord;
+    return coord_ptr;
 }
 
 pub export fn getConstellationCentroid(constellation_index: usize) ?*SkyCoord {

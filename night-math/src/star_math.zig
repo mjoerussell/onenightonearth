@@ -18,7 +18,24 @@ pub const Coord = packed struct {
 
 pub const SkyCoord = packed struct {
     right_ascension: f32,
-    declination: f32
+    declination: f32,
+
+    pub fn getCoord(sky_coord: SkyCoord, observer_timestamp: i64) Coord {
+        const j2000_offset_millis = 949_428_000_000;
+        const days_since_j2000 = @intToFloat(f64, observer_timestamp - j2000_offset_millis) / 86400000.0;
+        var longitude = sky_coord.right_ascension - (100.46 + (0.985647 * days_since_j2000) + @intToFloat(f64, 15 * observer_timestamp));
+        longitude = math_utils.floatMod(longitude, 360);
+        if (longitude < -180) {
+            longitude += 360;
+        } else if (longitude > 180) {
+            longitude -= 360;
+        }
+
+        return Coord{
+            .latitude = sky_coord.declination,
+            .longitude = @floatCast(f32, longitude)
+        };
+    }
 };
 
 pub const ObserverPosition = struct {
@@ -226,15 +243,13 @@ pub const SpectralType = enum(u8) {
 };
 
 pub fn projectStar(canvas: *Canvas, star: Star, observer_pos: ObserverPosition) void {
-    const point = canvas.projectToCanvas(
+    const point = canvas.coordToPoint(
         SkyCoord{ .right_ascension = star.right_ascension, .declination = star.declination }, 
         observer_pos,
         true
     ) orelse return;
 
     if (canvas.isInsideCircle(point)) {
-        // var base_color = star.spec_type.getColor();
-        // base_color.a = getAlpha(star.brightness + 0.15);
         canvas.setPixelAt(point, star.getColor());
     }
 }
@@ -242,8 +257,8 @@ pub fn projectStar(canvas: *Canvas, star: Star, observer_pos: ObserverPosition) 
 pub fn projectConstellationGrid(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, observer_pos: ObserverPosition) void {
     var iter = constellation.boundary_iter();
     while (iter.next()) |bound| {
-        const point_a = canvas.projectToCanvas(bound[0], observer_pos, false) orelse continue;
-        const point_b = canvas.projectToCanvas(bound[1], observer_pos, false) orelse continue;
+        const point_a = canvas.coordToPoint(bound[0], observer_pos, false) orelse continue;
+        const point_b = canvas.coordToPoint(bound[1], observer_pos, false) orelse continue;
         
         canvas.drawLine(Line{ .a = point_a, .b = point_b }, color, line_width);
     }
@@ -252,8 +267,8 @@ pub fn projectConstellationGrid(canvas: *Canvas, constellation: Constellation, c
 pub fn projectConstellationAsterism(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, observer_pos: ObserverPosition) void {
     var branch_index: usize = 0;
     while (branch_index < constellation.asterism.len - 1) : (branch_index += 2) {
-        const point_a = canvas.projectToCanvas(constellation.asterism[branch_index], observer_pos, false) orelse continue;
-        const point_b = canvas.projectToCanvas(constellation.asterism[branch_index + 1], observer_pos, false) orelse continue;
+        const point_a = canvas.coordToPoint(constellation.asterism[branch_index], observer_pos, false) orelse continue;
+        const point_b = canvas.coordToPoint(constellation.asterism[branch_index + 1], observer_pos, false) orelse continue;
         
         canvas.drawLine(Line{ .a = point_a, .b = point_b }, color, line_width);
     }
@@ -267,7 +282,7 @@ pub fn drawSkyGrid(canvas: Canvas, observer_pos: ObserverPosition) void {
     while (base_right_ascension < 360) : (base_right_ascension += 15) {
         var declination: f32 = -90;
         while (declination <= 90) : (declination += 0.1) {
-            const point = canvas.projectToCanvas(.{ .right_ascension = base_right_ascension, .declination = declination }, observer_pos, true);
+            const point = canvas.coordToPoint(.{ .right_ascension = base_right_ascension, .declination = declination }, observer_pos, true);
             if (point) |p| {
                 if (canvas.isInsideCircle(p)) {
                     if (base_right_ascension == 0) {
@@ -284,7 +299,7 @@ pub fn drawSkyGrid(canvas: Canvas, observer_pos: ObserverPosition) void {
     while (base_declination <= 90) : (base_declination += 15) {
         var right_ascension: f32 = 0;
         while (right_ascension <= 360) : (right_ascension += 0.1) {
-            const point = canvas.projectToCanvas(.{ .right_ascension = right_ascension, .declination = base_declination }, observer_pos, true);
+            const point = canvas.coordToPoint(.{ .right_ascension = right_ascension, .declination = base_declination }, observer_pos, true);
             if (point) |p| {
                 if (canvas.isInsideCircle(p)) {
                     if (base_declination == 0) {
@@ -323,8 +338,8 @@ pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []
         // If they intersect inside the canvas circle, then add that to the left or right intersection counter
         var iter = c.boundary_iter();
         while (iter.next()) |bound| {
-            const b_a = canvas.projectToCanvas(bound[0], observer_pos, false) orelse continue;
-            const b_b = canvas.projectToCanvas(bound[1], observer_pos, false) orelse continue;
+            const b_a = canvas.coordToPoint(bound[0], observer_pos, false) orelse continue;
+            const b_b = canvas.coordToPoint(bound[1], observer_pos, false) orelse continue;
 
             const bound_line = Line{ .a = b_a, .b = b_b };
             if (point_ray_right.segmentIntersection(bound_line)) |inter_point| {
@@ -391,52 +406,3 @@ pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_e
     };
 }
 
-pub fn getCoordForSkyCoord(sky_coord: SkyCoord, observer_timestamp: i64) Coord {
-    const j2000_offset_millis = 949_428_000_000;
-    const days_since_j2000 = @intToFloat(f64, observer_timestamp - j2000_offset_millis) / 86400000.0;
-    var longitude = sky_coord.right_ascension - (100.46 + (0.985647 * days_since_j2000) + @intToFloat(f64, 15 * observer_timestamp));
-    longitude = math_utils.floatMod(longitude, 360);
-    if (longitude < -180) {
-        longitude += 360;
-    } else if (longitude > 180) {
-        longitude -= 360;
-    }
-
-    return Coord{
-        .latitude = sky_coord.declination,
-        .longitude = @floatCast(f32, longitude)
-    };
-}
-
-pub fn getSkyCoordForCanvasPoint(canvas: *Canvas, point: Point, observer_pos: ObserverPosition) ?SkyCoord {
-    if (!canvas.isInsideCircle(point)) return null;
-    const raw_point = canvas.untranslatePoint(point);
-    // Distance from raw_point to the center of the sky circle
-    const s = math.sqrt(math.pow(f32, raw_point.x, 2.0) + math.pow(f32, raw_point.y, 2.0));
-    const altitude = (math.pi * (1 - s)) / 2;
-
-    const observer_lat_rad = math_utils.degToRad(observer_pos.latitude);
-    const sin_lat = math.sin(observer_lat_rad);
-    const cos_lat = math.cos(observer_lat_rad);
-
-    const declination = math_utils.boundedASin(((raw_point.y / s) * math.cos(altitude) * cos_lat) + (math.sin(altitude) * sin_lat)) catch {
-        log(.Error, "Error computing declination", .{});
-        return null;
-    };
-
-    var hour_angle_rad = math_utils.boundedACos((math.sin(altitude) - (math.sin(declination) * sin_lat)) / (math.cos(declination) * cos_lat)) catch {
-        log(.Error, "Error computing hour angle. Declination was {d:.3}", .{declination});
-        return null;
-    };
-
-    hour_angle_rad = if (raw_point.x < 0) -hour_angle_rad else hour_angle_rad;
-
-    const hour_angle = math_utils.radToDeg(hour_angle_rad);
-    const lst = observer_pos.localSiderealTime();
-    const right_ascension = math_utils.floatMod(lst - hour_angle, 360);
-
-    return SkyCoord{
-        .right_ascension = @floatCast(f32, right_ascension),
-        .declination = math_utils.radToDeg(declination)
-    };
-}

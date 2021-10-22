@@ -23,6 +23,7 @@ import {
 import { CanvasSettings } from '../renderer';
 
 interface WasmFns {
+    initializeAllocator: () => void;
     initializeStars: (star_data: pointer, star_len: number) => void;
     initializeCanvas: (settings: pointer) => void;
     initializeConstellations: (
@@ -61,6 +62,8 @@ export class WasmInterface {
     }
 
     initialize(stars: Star[], constellations: Constellation[], canvas_settings: CanvasSettings): void {
+        // this.lib.initializeAllocator();
+
         const boundaries: pointer[] = [];
         const asterisms: pointer[] = [];
         const is_zodiac: boolean[] = [];
@@ -102,6 +105,7 @@ export class WasmInterface {
         this.lib.initializeStars(star_ptr, wasm_stars.length);
         const settings_ptr = this.allocObject(canvas_settings, sizedCanvasSettings);
         this.lib.initializeCanvas(settings_ptr);
+        this.lib.initializeAllocator();
     }
 
     projectStars(latitude: number, longitude: number, timestamp: BigInt): void {

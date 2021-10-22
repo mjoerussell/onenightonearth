@@ -70,7 +70,7 @@ pub const Canvas = struct {
         self.data[p_index] = new_pixel;
     }
 
-    pub fn projectToCanvas(canvas: Canvas, sky_coord: SkyCoord, observer_pos: ObserverPosition, filter_below_horizon: bool) ?Point {
+    pub fn coordToPoint(canvas: Canvas, sky_coord: SkyCoord, observer_pos: ObserverPosition, filter_below_horizon: bool) ?Point {
         const two_pi = comptime math.pi * 2.0;
 
         const local_sidereal_time = observer_pos.localSiderealTime();
@@ -112,6 +112,40 @@ pub const Canvas = struct {
         return canvas.translatePoint(canvas_point);
     }
 
+    pub fn pointToCoord(canvas: Canvas, point: Point, observer_pos: ObserverPosition) ?SkyCoord {
+        if (!canvas.isInsideCircle(point)) return null;
+
+        const raw_point = canvas.untranslatePoint(point);
+        // Distance from raw_point to the center of the sky circle
+        const s = math.sqrt(math.pow(f32, raw_point.x, 2.0) + math.pow(f32, raw_point.y, 2.0));
+        const altitude = (math.pi * (1 - s)) / 2;
+
+        const observer_lat_rad = math_utils.degToRad(observer_pos.latitude);
+        const sin_lat = math.sin(observer_lat_rad);
+        const cos_lat = math.cos(observer_lat_rad);
+
+        const declination = math_utils.boundedASin(((raw_point.y / s) * math.cos(altitude) * cos_lat) + (math.sin(altitude) * sin_lat)) catch {
+            log(.Error, "Error computing declination", .{});
+            return null;
+        };
+
+        var hour_angle_rad = math_utils.boundedACos((math.sin(altitude) - (math.sin(declination) * sin_lat)) / (math.cos(declination) * cos_lat)) catch {
+            log(.Error, "Error computing hour angle. Declination was {d:.3}", .{declination});
+            return null;
+        };
+
+        hour_angle_rad = if (raw_point.x < 0) -hour_angle_rad else hour_angle_rad;
+
+        const hour_angle = math_utils.radToDeg(hour_angle_rad);
+        const lst = observer_pos.localSiderealTime();
+        const right_ascension = math_utils.floatMod(lst - hour_angle, 360);
+
+        return SkyCoord{
+            .right_ascension = @floatCast(f32, right_ascension),
+            .declination = math_utils.radToDeg(declination)
+        };
+    }
+
     pub fn translatePoint(self: Canvas, pt: Point) Point {
         const center = Point{
             .x = @intToFloat(f32, self.settings.width) / 2.0,
@@ -129,7 +163,7 @@ pub const Canvas = struct {
         };
     }
 
-    pub fn untranslatePoint(self: *Canvas, pt: Point) Point {
+    pub fn untranslatePoint(self: Canvas, pt: Point) Point {
         const center = Point{
             .x = @intToFloat(f32, self.settings.width) / 2.0,
             .y = @intToFloat(f32, self.settings.height) / 2.0
@@ -143,7 +177,7 @@ pub const Canvas = struct {
         };
     }
 
-    pub fn isInsideCircle(self: *Canvas, point: Point) bool {
+    pub fn isInsideCircle(self: Canvas, point: Point) bool {
         const center = Point{
             .x = @intToFloat(f32, self.settings.width) / 2.0,
             .y = @intToFloat(f32, self.settings.height) / 2.0,
