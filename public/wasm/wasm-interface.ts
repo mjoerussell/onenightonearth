@@ -11,8 +11,6 @@ import {
     sizeOf,
     sizeOfPrimative,
     sizedCanvasSettings,
-    Star,
-    WasmStar,
     sizedWasmStar,
     Constellation,
     sizedSkyCoord,
@@ -42,7 +40,6 @@ interface WasmFns {
     getConstellationAtPoint: (point: pointer, observer_latitude: number, observer_longitude: number, observer_timestamp: BigInt) => number;
     getConstellationCentroid: (constellation_index: number) => pointer;
     dragAndMove: (drag_start_x: number, drag_start_y: number, drag_end_x: number, drag_end_y: number) => pointer;
-    // findWaypoints: (start: pointer, end: pointer) => pointer;
     findWaypoints: (start_lat: number, start_long: number, end_lat: number, end_long: number) => pointer;
     getCoordForSkyCoord: (sky_coord: pointer, observer_timestamp: BigInt) => pointer;
     getSkyCoordForCanvasPoint: (
@@ -61,10 +58,7 @@ export class WasmInterface {
         this.lib = this.instance.exports as any;
     }
 
-    // initialize(stars: Star[], constellations: Constellation[], canvas_settings: CanvasSettings): void {
     initialize(stars: Uint8Array, constellations: Constellation[], canvas_settings: CanvasSettings): void {
-        // this.lib.initializeAllocator();
-        // console.log(`Initializing ${stars.length} stars and ${constellations.length} constellations`);
         const init_start = performance.now();
         const boundaries: pointer[] = [];
         const asterisms: pointer[] = [];
@@ -95,15 +89,6 @@ export class WasmInterface {
             constellations.length
         );
 
-        // const wasm_stars: WasmStar[] = stars.map(star => {
-        //     return {
-        //         right_ascension: star.right_ascension,
-        //         declination: star.declination,
-        //         brightness: star.brightness,
-        //         spec_type: star.spec_type,
-        //     };
-        // });
-        // const star_ptr = this.allocArray(wasm_stars, sizedWasmStar);
         const star_ptr = this.allocBytes(stars.byteLength);
         const view = new Uint8Array(this.memory, star_ptr);
         view.set(stars);

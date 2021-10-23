@@ -46,32 +46,6 @@ export enum SpectralType {
     M = 6,
 }
 
-export type Star = {
-    name: string;
-    right_ascension: number;
-    declination: number;
-    brightness: number;
-    spec_type: SpectralType;
-};
-
-/**
- * Simple variation of a `Star` that does not include a 'name' field.
- * Used to pass to WASM functions.
- */
-export type WasmStar = {
-    right_ascension: number;
-    declination: number;
-    brightness: number;
-    spec_type: SpectralType;
-};
-
-export const sizedWasmStar: Sized<WasmStar> = {
-    right_ascension: WasmPrimative.f32,
-    declination: WasmPrimative.f32,
-    brightness: WasmPrimative.f32,
-    spec_type: WasmPrimative.u8,
-};
-
 export type Constellation = {
     name: string;
     /**
