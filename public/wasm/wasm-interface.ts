@@ -61,9 +61,10 @@ export class WasmInterface {
         this.lib = this.instance.exports as any;
     }
 
-    initialize(stars: Star[], constellations: Constellation[], canvas_settings: CanvasSettings): void {
+    // initialize(stars: Star[], constellations: Constellation[], canvas_settings: CanvasSettings): void {
+    initialize(stars: Uint8Array, constellations: Constellation[], canvas_settings: CanvasSettings): void {
         // this.lib.initializeAllocator();
-        console.log(`Initializing ${stars.length} stars and ${constellations.length} constellations`);
+        // console.log(`Initializing ${stars.length} stars and ${constellations.length} constellations`);
         const init_start = performance.now();
         const boundaries: pointer[] = [];
         const asterisms: pointer[] = [];
@@ -94,16 +95,21 @@ export class WasmInterface {
             constellations.length
         );
 
-        const wasm_stars: WasmStar[] = stars.map(star => {
-            return {
-                right_ascension: star.right_ascension,
-                declination: star.declination,
-                brightness: star.brightness,
-                spec_type: star.spec_type,
-            };
-        });
-        const star_ptr = this.allocArray(wasm_stars, sizedWasmStar);
-        this.lib.initializeStars(star_ptr, wasm_stars.length);
+        // const wasm_stars: WasmStar[] = stars.map(star => {
+        //     return {
+        //         right_ascension: star.right_ascension,
+        //         declination: star.declination,
+        //         brightness: star.brightness,
+        //         spec_type: star.spec_type,
+        //     };
+        // });
+        // const star_ptr = this.allocArray(wasm_stars, sizedWasmStar);
+        const star_ptr = this.allocBytes(stars.byteLength);
+        const view = new Uint8Array(this.memory, star_ptr);
+        view.set(stars);
+
+        this.lib.initializeStars(star_ptr, stars.byteLength / sizeOf(sizedWasmStar));
+
         const settings_ptr = this.allocObject(canvas_settings, sizedCanvasSettings);
         this.lib.initializeCanvas(settings_ptr);
         const init_end = performance.now();

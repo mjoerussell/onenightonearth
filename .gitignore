@@ -5,3 +5,4 @@ zig-out
 **/*.js
 !**/webpack.config.js
 dist/
+*.bin

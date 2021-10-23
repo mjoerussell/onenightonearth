@@ -124,7 +124,7 @@ const parseSkyFile = (data: string): SkyFile => {
 };
 
 const readConstellationFiles = async (): Promise<Constellation[]> => {
-    const sky_files = await readDir(path.join(__dirname, 'constellations', 'iau'));
+    const sky_files = await readDir(path.join(__dirname, 'parse-data', 'constellations', 'iau'));
     const result: Constellation[] = [];
     for (const filename of sky_files) {
         const file = await readFile(filename);
@@ -275,18 +275,22 @@ const parseRightAscension = (ra: string): number => {
 };
 
 const main = async () => {
-    const star_parse_start = performance.now();
-    const stars: Star[] = await readFile(path.join(__dirname, 'sao_catalog'))
-        .then(catalog =>
-            catalog
-                .toString()
-                .split('\n')
-                .filter(line => line.startsWith('SAO'))
-        )
-        .then(lines => lines.map(parseCatalogLine).filter(star => star != null) as Star[]);
-    const star_parse_end = performance.now();
+    // const star_parse_start = performance.now();
+    // const stars: Star[] = await readFile(path.join(__dirname, 'parse-data', 'sao_catalog'))
+    //     .then(catalog =>
+    //         catalog
+    //             .toString()
+    //             .split('\n')
+    //             .filter(line => line.startsWith('SAO'))
+    //     )
+    //     .then(lines => lines.map(parseCatalogLine).filter(star => star != null) as Star[]);
+    // const star_parse_end = performance.now();
 
-    console.log(`Star parsing took ${star_parse_end - star_parse_start} ms`);
+    // const bright_stars = stars.filter(star => star.brightness > 0.3);
+    // console.log(`There are ${bright_stars.length} stars`);
+
+    // console.log(`Star parsing took ${star_parse_end - star_parse_start} ms`);
+    const star_bin = await readFile(path.join(__dirname, 'parse-data', 'star_data.bin'));
 
     const const_parse_start = performance.now();
     const constellations: Constellation[] = await readConstellationFiles();
@@ -299,9 +303,17 @@ const main = async () => {
 
     app.get('/stars', (req, res) => {
         const response_start = performance.now();
-        const brightness_param = (req.query.brightness as string) ?? '0.3';
-        const min_brightness = parseFloat(brightness_param);
-        res.send(stars.filter(star => star.brightness >= min_brightness));
+        // const brightness_param = (req.query.brightness as string) ?? '0.3';
+        // const min_brightness = parseFloat(brightness_param);
+        // res.send(stars.filter(star => star.brightness >= min_brightness));
+        res.writeHead(200, {
+            'Content-Type': 'application/octet-stream',
+            'Content-Length': star_bin.buffer.byteLength,
+        });
+
+        console.log(`Content-Length is ${star_bin.buffer.byteLength / 1024} kB, or ${star_bin.buffer.byteLength / 13} stars`);
+        res.write(star_bin);
+        res.end();
         const response_end = performance.now();
         console.log(`Sending stars took ${response_end - response_start} ms`);
     });

@@ -18,7 +18,7 @@ pub const Star = packed struct {
     brightness: f32,
     spec_type: SpectralType,
 
-    fn parse(data: []const u8) Star {
+    fn parse(data: []const u8) !Star {
         var star: Star = undefined;
 
         var parts_iter = std.mem.split(u8, data, "|");
@@ -26,8 +26,8 @@ pub const Star = packed struct {
         while (parts_iter.next()) |part| : (part_index += 1) {
             if (part_index > 14) break;
             switch (part_index) {
-                1 => star.right_ascension = std.fmt.parseFloat(f32, part) catch 0,
-                5 => star.declination = std.fmt.parseFloat(f32, part) catch 0,
+                1 => star.right_ascension = try std.fmt.parseFloat(f32, part),
+                5 => star.declination = try std.fmt.parseFloat(f32, part),
                 13 => {
                     const dimmest_visible: f32 = 18.6;
                     const brightest_value: f32 = -4.6;
@@ -36,6 +36,10 @@ pub const Star = packed struct {
                     star.brightness = mag_display_factor;
                 },
                 14 => {
+                    if (part.len < 1) {
+                        star.spec_type = .A;
+                        continue;
+                    }
                     star.spec_type = switch (std.ascii.toLower(part[0])) {
                         'o' => SpectralType.O,
                         'b' => SpectralType.B,
@@ -56,38 +60,41 @@ pub const Star = packed struct {
 };
 
 pub fn main() anyerror!void {
+    var timer = std.time.Timer.start() catch unreachable;
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
+    const start = timer.read();
+    const output_file = try readSaoCatalog("sao_catalog", "star_data.bin");
+    defer output_file.close();
 
-    const allocator = &gpa.allocator;
+    const end = timer.read();
 
-    const stars = try readSaoCatalog(allocator, "sao_catalog");
-    defer allocator.free(stars);
-
-    for (stars) |star, index| {
-        if (index % 10_000 == 0) {
-            std.debug.print("{}\n", .{star});
-        } 
-    }
-
+    std.debug.print("Parsing took {d:.4} ms\n", .{(end - start) / 1_000_000});
 }
 
-fn readSaoCatalog(allocator: *Allocator, filename: []const u8) ![]Star {
+fn readSaoCatalog(catalog_filename: []const u8, out_filename: []const u8) !fs.File {
     const cwd = fs.cwd();
-    const sao_catalog = try cwd.openFile(filename, .{});
+    const sao_catalog = try cwd.openFile(catalog_filename, .{});
+    defer sao_catalog.close();
 
-    var catalog_reader = sao_catalog.reader();
+    const output_file = try cwd.createFile(out_filename, .{});
+    errdefer {
+        output_file.close();
+        cwd.deleteFile(out_filename) catch {};
+    }
 
-    var star_list = std.ArrayList(Star).init(allocator);
-    errdefer star_list.deinit();
+    var output_buffered_writer = std.io.bufferedWriter(output_file.writer());
+    var output_writer = output_buffered_writer.writer();
 
-    var read_buffer: [500]u8 = undefined;
+    var read_buffer: [std.mem.page_size]u8 = undefined;
     var read_start_index: usize = 0;
     var line_start_index: usize = 0;
     var line_end_index: usize = 0;
-    read_loop: while (catalog_reader.readAll(read_buffer[read_start_index..])) |bytes_read| {
-        std.debug.print("Read {} bytes", .{bytes_read});
+
+    var star_count: u64 = 0;
+
+    read_loop: while (sao_catalog.readAll(read_buffer[read_start_index..])) |bytes_read| {
+        if (bytes_read == 0) break;
+        // Get all the lines currently read into the buffer
         while (line_start_index < read_buffer.len and line_end_index < read_buffer.len) {
             // Search for the end of the current line
             line_end_index = while (line_end_index < read_buffer.len) : (line_end_index += 1) {
@@ -105,15 +112,25 @@ fn readSaoCatalog(allocator: *Allocator, filename: []const u8) ![]Star {
 
             const line = read_buffer[line_start_index..line_end_index];
             if (std.mem.startsWith(u8, line, "SAO")) {
-                std.debug.print("Got star at {}-{}\n", .{line_start_index, line_end_index});
-                const star = Star.parse(line);
-                try star_list.append(star);
+                if (Star.parse(line)) |star| {
+                    if (star.brightness >= 0.3) {
+                        star_count += 1;
+                        try output_writer.writeAll(std.mem.toBytes(star)[0..]);
+                    }
+                } else |_| {}
             }
 
             line_start_index = line_end_index + 1; 
             line_end_index = line_start_index;
         }
+
+        line_start_index = 0;
+        line_end_index = 0;
+        read_start_index = 0;
     } else |err| return err;
 
-    return star_list.toOwnedSlice();
+    try output_buffered_writer.flush();
+
+    std.debug.print("Wrote {} stars\n", .{star_count});
+    return output_file;
 }
