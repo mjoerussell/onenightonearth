@@ -1,13 +1,9 @@
 import {
     WasmPrimative,
-    Allocatable,
     Coord,
     sizedCoord,
     pointer,
     Sized,
-    isSimpleSize,
-    isSimpleAlloc,
-    isComplexSize,
     sizeOf,
     sizeOfPrimative,
     sizedCanvasSettings,
@@ -15,6 +11,7 @@ import {
     CanvasPoint,
     sizedCanvasPoint,
     SkyCoord,
+    Allocatable,
 } from './size';
 import { CanvasSettings } from '../renderer';
 
@@ -83,7 +80,7 @@ export class WasmInterface {
         return constellation_index;
     }
 
-    getCosntellationCentroid(index: number): SkyCoord | null {
+    getConstellationCentroid(index: number): SkyCoord | null {
         const coord_ptr = this.lib.getConstellationCentroid(index);
         if (coord_ptr === 0) {
             return null;
@@ -195,19 +192,6 @@ export class WasmInterface {
         return this.getPrimative(data_mem, size) as number;
     }
 
-    allocString(data: string): pointer {
-        const ptr = this.allocBytes(data.length);
-        const encoder = new TextEncoder();
-        const data_mem = new DataView(this.memory, ptr, data.length);
-        const encoded_data = encoder.encode(data);
-
-        for (const [index, char] of encoded_data.entries()) {
-            data_mem.setUint8(index, char);
-        }
-
-        return ptr;
-    }
-
     allocObject<T extends Allocatable>(data: T, size: Sized<T>): pointer {
         const total_bytes = sizeOf(size);
         const ptr = this.allocBytes(total_bytes);
@@ -221,34 +205,13 @@ export class WasmInterface {
         const data_mem = new DataView(this.memory, ptr, total_bytes);
         const result: any = {};
         let current_offset = 0;
-        if (isSimpleSize(size)) {
-            for (const key in size) {
-                const value = this.getPrimative(data_mem, size[key] as WasmPrimative, current_offset);
-                result[key] = value;
-                current_offset += sizeOfPrimative(size[key] as WasmPrimative);
-            }
-        } else if (isComplexSize(size)) {
-            for (const key in size) {
-                const value = this.getObject(data_mem, size[key], current_offset);
-                result[key] = value;
-                current_offset += sizeOf(size[key]);
-            }
+        for (const key in size) {
+            const value = this.getPrimative(data_mem, size[key] as WasmPrimative, current_offset);
+            result[key] = value;
+            current_offset += sizeOfPrimative(size[key] as WasmPrimative);
         }
 
         return result;
-    }
-
-    allocArray<T extends Allocatable>(data: T[], size: Sized<T>): pointer {
-        const item_bytes = sizeOf(size);
-        const total_bytes = item_bytes * data.length;
-        const ptr = this.allocBytes(total_bytes);
-        const data_mem = new DataView(this.memory, ptr, total_bytes);
-        let current_offset = 0;
-        for (const item of data) {
-            current_offset = this.setObject(data_mem, item, size, current_offset);
-        }
-
-        return ptr;
     }
 
     allocPrimativeArray<T extends number | boolean>(data: T[], size: WasmPrimative): pointer {
@@ -269,26 +232,15 @@ export class WasmInterface {
         const data_mem = new DataView(this.memory, ptr, total_bytes);
         let current_offset = 0;
         const result_array: T[] = new Array(num_items);
-        if (isSimpleSize(size)) {
-            for (let index = 0; index < num_items; index += 1) {
-                const result: any = {};
-                for (const key in size) {
-                    const value = this.getPrimative(data_mem, size[key] as WasmPrimative, current_offset);
-                    result[key] = value;
-                    current_offset += sizeOfPrimative(size[key] as WasmPrimative);
-                }
-                result_array[index] = result;
+
+        for (let index = 0; index < num_items; index += 1) {
+            const result: any = {};
+            for (const key in size) {
+                const value = this.getPrimative(data_mem, size[key] as WasmPrimative, current_offset);
+                result[key] = value;
+                current_offset += sizeOfPrimative(size[key] as WasmPrimative);
             }
-        } else if (isComplexSize(size)) {
-            for (let index = 0; index < num_items; index += 1) {
-                const result: any = {};
-                for (const key in size) {
-                    const value = this.getObject(data_mem, size[key], current_offset);
-                    result[key] = value;
-                    current_offset += sizeOf(size[key]);
-                }
-                result_array[index] = result;
-            }
+            result_array[index] = result;
         }
 
         return result_array;
@@ -308,20 +260,9 @@ export class WasmInterface {
 
     setObject<T extends Allocatable>(mem: DataView, data: T, type: Sized<T>, offset = 0): number {
         let current_offset = offset;
-        if (isSimpleAlloc(data)) {
-            if (isSimpleSize(type)) {
-                for (const key in data) {
-                    this.setPrimative(mem, data[key], type[key], current_offset);
-                    current_offset += sizeOfPrimative(type[key]);
-                }
-            }
-        } else {
-            if (isComplexSize(type)) {
-                for (const key in data) {
-                    this.setObject(mem, data[key] as Allocatable, type[key], current_offset);
-                    current_offset += sizeOf(type[key]);
-                }
-            }
+        for (const key in data) {
+            this.setPrimative(mem, data[key], type[key], current_offset);
+            current_offset += sizeOfPrimative(type[key]);
         }
         return current_offset;
     }
@@ -329,19 +270,10 @@ export class WasmInterface {
     getObject<T extends Allocatable>(mem: DataView, type: Sized<T>, offset = 0): T {
         let result: any = {};
         let current_offset = offset;
-        if (isSimpleSize(type)) {
-            for (const key in type) {
-                const val = this.getPrimative(mem, type[key] as WasmPrimative, current_offset);
-                result[key] = val;
-                current_offset += sizeOfPrimative(type[key] as WasmPrimative);
-            }
-        }
-        if (isComplexSize(type)) {
-            for (const key in type) {
-                const val = this.getObject(mem, type[key], current_offset);
-                result[key] = val;
-                current_offset += sizeOf(type[key]);
-            }
+        for (const key in type) {
+            const val = this.getPrimative(mem, type[key] as WasmPrimative, current_offset);
+            result[key] = val;
+            current_offset += sizeOfPrimative(type[key] as WasmPrimative);
         }
         return result;
     }

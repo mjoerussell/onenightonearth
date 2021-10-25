@@ -85,66 +85,16 @@ export const sizedCanvasSettings: Sized<CanvasSettings> = {
  * A `SimpleAlloc` is a struct whose fields are just numbers. This means that it can
  * be allocated and read just using `getPrimative` and `setPrimative`.
  */
-export type SimpleAlloc = {
+export type Allocatable = {
     [key: string]: number | boolean;
 };
 
 /**
- * A `SimpleSize` is a size definition for `SimpleAlloc`.
- */
-export type SimpleSize<T extends SimpleAlloc> = {
-    [K in keyof T]: WasmPrimative;
-};
-
-/**
- * `ComplexAlloc` is a struct whose fields are structs. The fields can either be more `ComplexAlloc`'s, or
- * just `SimpleAlloc`'s.
- */
-export type ComplexAlloc = {
-    [key: string]: Allocatable;
-};
-
-/**
- * `ComplexSize` is a size definition for `ComplexAlloc`.
- */
-export type ComplexSize<T extends ComplexAlloc> = {
-    [K in keyof T]: Sized<T[K]>;
-};
-
-/**
- * `Allocatable` types are data types that can be automatically allocated regardless of their complexity.
- */
-export type Allocatable = SimpleAlloc | ComplexAlloc;
-/**
  * `Sized` types are companions to `Allocatable` types. For every type `T` that extends `Allocatable`, there must be an implementation
  * of `Sized<T>` which defines the size in bytes of every field on `T`.
  */
-export type Sized<T extends Allocatable> = T extends SimpleAlloc ? SimpleSize<T> : T extends ComplexAlloc ? ComplexSize<T> : never;
-
-export const isSimpleAlloc = (data: Allocatable): data is SimpleAlloc => {
-    for (const key in data) {
-        if (data.hasOwnProperty(key)) {
-            if (typeof data[key] !== 'number' && typeof data[key] !== 'boolean') {
-                return false;
-            }
-        }
-    }
-    return true;
-};
-
-export const isSimpleSize = (type: Sized<any>): type is SimpleSize<any> => {
-    for (const key in type) {
-        if (type.hasOwnProperty(key)) {
-            if (typeof type[key] !== 'number' && typeof type[key] !== 'boolean') {
-                return false;
-            }
-        }
-    }
-    return true;
-};
-
-export const isComplexSize = (type: Sized<any>): type is ComplexSize<any> => {
-    return !isSimpleSize(type);
+export type Sized<T extends Allocatable> = {
+    [K in keyof T]: WasmPrimative;
 };
 
 /**
@@ -179,17 +129,9 @@ export const sizeOfPrimative = (data: WasmPrimative): number => {
  */
 export const sizeOf = <T extends Allocatable>(type: Sized<T>): number => {
     let size = 0;
-    if (isSimpleSize(type)) {
-        for (const key in type) {
-            if (type.hasOwnProperty(key)) {
-                size += sizeOfPrimative(type[key] as WasmPrimative);
-            }
-        }
-    } else if (isComplexSize(type)) {
-        for (const key in type) {
-            if (type.hasOwnProperty(key)) {
-                size += sizeOf(type[key]);
-            }
+    for (const key in type) {
+        if (type.hasOwnProperty(key)) {
+            size += sizeOfPrimative(type[key] as WasmPrimative);
         }
     }
     return size;

@@ -229,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     controls.onSelectConstellation(const_index => {
         controls.constellation_name = `${constellations[const_index].name} - ${constellations[const_index].epithet}`;
-        const constellation_center = wasm_interface.getCosntellationCentroid(const_index);
+        const constellation_center = wasm_interface.getConstellationCentroid(const_index);
         if (constellation_center) {
             const new_coord = wasm_interface.getCoordForSkyCoord(constellation_center, BigInt(controls.date.valueOf()));
             if (new_coord) {
