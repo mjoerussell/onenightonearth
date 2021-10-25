@@ -9,7 +9,6 @@ import {
     sizedCanvasSettings,
     sizedSkyCoord,
     CanvasPoint,
-    sizedCanvasPoint,
     SkyCoord,
     Allocatable,
 } from './size';
@@ -24,18 +23,31 @@ interface WasmFns {
     resetImageData: () => void;
     projectStars: (observer_latitude: number, observer_longitude: number, observer_timestamp: BigInt) => void;
     projectConstellationGrids: (observer_latitude: number, observer_longitude: number, observer_timestamp: BigInt) => void;
-    getConstellationAtPoint: (point: pointer, observer_latitude: number, observer_longitude: number, observer_timestamp: BigInt) => number;
+    getConstellationAtPoint: (
+        x: number,
+        y: number,
+        observer_latitude: number,
+        observer_longitude: number,
+        observer_timestamp: BigInt
+    ) => number;
     getConstellationCentroid: (constellation_index: number) => pointer;
     dragAndMove: (drag_start_x: number, drag_start_y: number, drag_end_x: number, drag_end_y: number) => pointer;
     findWaypoints: (start_lat: number, start_long: number, end_lat: number, end_long: number) => pointer;
-    getCoordForSkyCoord: (sky_coord: pointer, observer_timestamp: BigInt) => pointer;
+    getCoordForSkyCoord: (right_ascension: number, declination: number, observer_timestamp: BigInt) => pointer;
     getSkyCoordForCanvasPoint: (
-        point: pointer,
+        x: number,
+        y: number,
         observer_latitude: number,
         observer_longitude: number,
         observer_timestamp: BigInt
     ) => pointer;
-    getCoordForCanvasPoint: (point: pointer, observer_latitude: number, observer_longitude: number, observer_timestamp: BigInt) => pointer;
+    getCoordForCanvasPoint: (
+        x: number,
+        y: number,
+        observer_latitude: number,
+        observer_longitude: number,
+        observer_timestamp: BigInt
+    ) => pointer;
 }
 
 export class WasmInterface {
@@ -75,8 +87,7 @@ export class WasmInterface {
     }
 
     getConstellationAtPoint(point: CanvasPoint, latitude: number, longitude: number, timestamp: BigInt): number {
-        const point_ptr = this.allocObject(point, sizedCanvasPoint);
-        const constellation_index = this.lib.getConstellationAtPoint(point_ptr, latitude, longitude, timestamp);
+        const constellation_index = this.lib.getConstellationAtPoint(point.x, point.y, latitude, longitude, timestamp);
         return constellation_index;
     }
 
@@ -102,10 +113,9 @@ export class WasmInterface {
         return new Uint8ClampedArray(this.memory, pixel_data_ptr, pixel_data_size);
     }
 
-    findWaypoints(start: Coord, end: Coord): Coord[] {
+    findWaypoints(start: Coord, end: Coord): Float32Array {
         const result_ptr = this.lib.findWaypoints(start.latitude, start.longitude, end.latitude, end.longitude);
-        const waypoints = this.readArray(result_ptr, 150, sizedCoord);
-        return waypoints;
+        return new Float32Array(this.memory.slice(result_ptr, result_ptr + 4 * 300));
     }
 
     dragAndMove(drag_start: Coord, drag_end: Coord): Coord {
@@ -116,8 +126,7 @@ export class WasmInterface {
     }
 
     getCoordForSkyCoord(sky_coord: SkyCoord, timestamp: BigInt): Coord {
-        const sky_coord_ptr = this.allocObject(sky_coord, sizedSkyCoord);
-        const coord_ptr = this.lib.getCoordForSkyCoord(sky_coord_ptr, timestamp);
+        const coord_ptr = this.lib.getCoordForSkyCoord(sky_coord.right_ascension, sky_coord.declination, timestamp);
         const coord = this.readObject(coord_ptr, sizedCoord);
         this.freeBytes(coord_ptr, sizeOf(sizedCoord));
         return coord;
@@ -129,8 +138,13 @@ export class WasmInterface {
         observer_longitude: number,
         observer_timestamp: BigInt
     ): SkyCoord | null {
-        const point_ptr = this.allocObject(point, sizedCanvasPoint);
-        const sky_coord_ptr = this.lib.getSkyCoordForCanvasPoint(point_ptr, observer_latitude, observer_longitude, observer_timestamp);
+        const sky_coord_ptr = this.lib.getSkyCoordForCanvasPoint(
+            point.x,
+            point.y,
+            observer_latitude,
+            observer_longitude,
+            observer_timestamp
+        );
         if (sky_coord_ptr === 0) {
             return null;
         } else {
@@ -146,8 +160,7 @@ export class WasmInterface {
         observer_longitude: number,
         observer_timestamp: BigInt
     ): Coord | null {
-        const point_ptr = this.allocObject(point, sizedCanvasPoint);
-        const coord_ptr = this.lib.getCoordForCanvasPoint(point_ptr, observer_latitude, observer_longitude, observer_timestamp);
+        const coord_ptr = this.lib.getCoordForCanvasPoint(point.x, point.y, observer_latitude, observer_longitude, observer_timestamp);
         if (coord_ptr === 0) {
             return null;
         } else {
@@ -163,7 +176,7 @@ export class WasmInterface {
     }
 
     getString(ptr: pointer, len: number): string {
-        const message_mem = this.readBytes(ptr, len);
+        const message_mem = this.memory.slice(ptr, ptr + len);
         const decoder = new TextDecoder();
         return decoder.decode(message_mem);
     }
@@ -214,42 +227,6 @@ export class WasmInterface {
         return result;
     }
 
-    allocPrimativeArray<T extends number | boolean>(data: T[], size: WasmPrimative): pointer {
-        const item_bytes = sizeOfPrimative(size);
-        const total_bytes = item_bytes * data.length;
-        const ptr = this.allocBytes(total_bytes);
-        const data_mem = new DataView(this.memory, ptr, total_bytes);
-        let current_offset = 0;
-        for (const item of data) {
-            this.setPrimative(data_mem, item, size, current_offset);
-            current_offset += item_bytes;
-        }
-        return ptr;
-    }
-
-    readArray<T extends Allocatable>(ptr: pointer, num_items: number, size: Sized<T>): T[] {
-        const total_bytes = sizeOf(size) * num_items;
-        const data_mem = new DataView(this.memory, ptr, total_bytes);
-        let current_offset = 0;
-        const result_array: T[] = new Array(num_items);
-
-        for (let index = 0; index < num_items; index += 1) {
-            const result: any = {};
-            for (const key in size) {
-                const value = this.getPrimative(data_mem, size[key] as WasmPrimative, current_offset);
-                result[key] = value;
-                current_offset += sizeOfPrimative(size[key] as WasmPrimative);
-            }
-            result_array[index] = result;
-        }
-
-        return result_array;
-    }
-
-    readBytes(location: pointer, num_bytes: number): ArrayBuffer {
-        return this.memory.slice(location, location + num_bytes);
-    }
-
     allocBytes(num_bytes: number): pointer {
         return (this.instance.exports as any)._wasm_alloc(num_bytes);
     }
@@ -265,17 +242,6 @@ export class WasmInterface {
             current_offset += sizeOfPrimative(type[key]);
         }
         return current_offset;
-    }
-
-    getObject<T extends Allocatable>(mem: DataView, type: Sized<T>, offset = 0): T {
-        let result: any = {};
-        let current_offset = offset;
-        for (const key in type) {
-            const val = this.getPrimative(mem, type[key] as WasmPrimative, current_offset);
-            result[key] = val;
-            current_offset += sizeOfPrimative(type[key] as WasmPrimative);
-        }
-        return result;
     }
 
     private setPrimative(mem: DataView, value: number | boolean, type: WasmPrimative, offset = 0) {

@@ -109,21 +109,6 @@ pub export fn initializeConstellations(data: [*]u8) void {
     }
 }
 
-// pub export fn initializeConstellations(constellation_grid_data: [*][*]SkyCoord, constellation_asterism_data: [*][*]SkyCoord, constellation_zodiac_data: [*]u8, grid_coord_lens: [*]u32, asterism_coord_lens: [*]u32, num_constellations: u32) void {
-//     constellations = allocator.alloc(Constellation, num_constellations) catch unreachable;
-
-//     defer allocator.free(grid_coord_lens[0..num_constellations]);
-//     defer allocator.free(asterism_coord_lens[0..num_constellations]);
-//     for (constellations) |*c, i| {
-//         c.* = Constellation{
-//             .asterism = constellation_asterism_data[i][0..asterism_coord_lens[i]],
-//             .boundaries = constellation_grid_data[i][0..grid_coord_lens[i]],
-//             .is_zodiac = constellation_zodiac_data[i] == 1,
-//         };
-//     }
-
-// }
-
 pub export fn updateCanvasSettings(settings: *ExternCanvasSettings) void {
     canvas.settings = settings.getCanvasSettings();
     allocator.destroy(settings);
@@ -164,11 +149,11 @@ pub export fn projectConstellationGrids(observer_latitude: f32, observer_longitu
     }
 }
 
-pub export fn getConstellationAtPoint(point: *Point, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) isize {
-    defer allocator.destroy(point);
+pub export fn getConstellationAtPoint(x: f32, y: f32, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) isize {
+    const point = Point{ .x = x, .y = y };
 
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
-    const index = star_math.getConstellationAtPoint(&canvas, point.*, constellations, pos);
+    const index = star_math.getConstellationAtPoint(&canvas, point, constellations, pos);
     if (index) |i| {
         if (canvas.settings.draw_constellation_grid) {
             star_math.projectConstellationGrid(&canvas, constellations[i], Pixel.rgb(255, 255, 255), 2, pos);
@@ -198,29 +183,27 @@ pub export fn findWaypoints(start_lat: f32, start_long: f32, end_lat: f32, end_l
     return waypoints.ptr;
 }
 
-pub export fn getCoordForSkyCoord(sky_coord: *SkyCoord, observer_timestamp: i64) *Coord {
-    defer allocator.destroy(sky_coord);
+pub export fn getCoordForSkyCoord(right_ascension: f32, declination: f32, observer_timestamp: i64) *Coord {
+    const sky_coord = SkyCoord{ .right_ascension = right_ascension, .declination = declination };
     const coord = sky_coord.getCoord(observer_timestamp);
     const coord_ptr = allocator.create(Coord) catch unreachable;
     coord_ptr.* = coord;
     return coord_ptr;
 }
 
-pub export fn getSkyCoordForCanvasPoint(point: *Point, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) ?*SkyCoord {
-    defer allocator.destroy(point);
-
+pub export fn getSkyCoordForCanvasPoint(x: f32, y: f32, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) ?*SkyCoord {
+    const point = Point{ .x = x, .y = y };
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
-    const sky_coord = canvas.pointToCoord(point.*, pos) orelse return null;
+    const sky_coord = canvas.pointToCoord(point, pos) orelse return null;
     const sky_coord_ptr = allocator.create(SkyCoord) catch unreachable;
     sky_coord_ptr.* = sky_coord;
     return sky_coord_ptr;
 }
 
-pub export fn getCoordForCanvasPoint(point: *Point, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) ?*Coord {
-    defer allocator.destroy(point);
-
+pub export fn getCoordForCanvasPoint(x: f32, y: f32, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) ?*Coord {
+    const point = Point{ .x = x, .y = y };
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
-    const sky_coord = canvas.pointToCoord(point.*, pos) orelse return null;
+    const sky_coord = canvas.pointToCoord(point, pos) orelse return null;
     const coord = sky_coord.getCoord(observer_timestamp);
     const coord_ptr = allocator.create(Coord) catch unreachable;
     coord_ptr.* = coord;

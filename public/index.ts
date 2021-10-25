@@ -124,12 +124,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let waypoint_index = 0;
         const runWaypointTravel = () => {
-            const waypoint = waypoints[waypoint_index];
-            controls.latitude = waypoint.latitude;
-            controls.longitude = waypoint.longitude;
+            // const waypoint = waypoints[waypoint_index];
+            controls.latitude = waypoints[waypoint_index];
+            controls.longitude = waypoints[waypoint_index + 1];
+            // controls.latitude = waypoint.latitude;
+            // controls.longitude = waypoint.longitude;
             controls.renderer.zoom_factor += zoom_step;
             renderStars(controls);
-            waypoint_index += 1;
+            waypoint_index += 2;
+            // waypoint_index += 1;
             if (waypoint_index < waypoints.length) {
                 window.requestAnimationFrame(runWaypointTravel);
             }

@@ -64,11 +64,6 @@ export type CanvasPoint = {
     y: number;
 };
 
-export const sizedCanvasPoint: Sized<CanvasPoint> = {
-    x: WasmPrimative.f32,
-    y: WasmPrimative.f32,
-};
-
 export const sizedCanvasSettings: Sized<CanvasSettings> = {
     width: WasmPrimative.u32,
     height: WasmPrimative.u32,
