@@ -207,6 +207,7 @@ const parseRightAscension = (ra: string): number => {
 
 const main = async () => {
     const star_bin = await readFile(path.join(__dirname, 'parse-data', 'star_data.bin'));
+    const const_bin = await readFile(path.join(__dirname, 'parse-data', 'const_data.bin'));
 
     const const_parse_start = performance.now();
     const constellations: Constellation[] = await readConstellationFiles();
@@ -232,6 +233,17 @@ const main = async () => {
     });
 
     app.get('/constellations', (req, res) => {
+        res.writeHead(200, {
+            'Content-Type': 'application/octet-stream',
+            'Content-Length': const_bin.buffer.byteLength,
+        });
+
+        res.write(const_bin);
+        res.end();
+        // res.send(constellations);
+    });
+
+    app.get('/constellations/meta', (req, res) => {
         res.send(constellations);
     });
 

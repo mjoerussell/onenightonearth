@@ -63,12 +63,14 @@ document.addEventListener('DOMContentLoaded', () => {
         },
     }).then(async wasm_result => {
         const stars: ArrayBuffer = await fetch('/stars').then(s => s.arrayBuffer());
-        constellations = await fetch('/constellations').then(c => c.json());
+        const constellation_bin: ArrayBuffer = await fetch('/constellations').then(s => s.arrayBuffer());
+        constellations = await fetch('/constellations/meta').then(c => c.json());
 
         controls.setConstellations(constellations);
 
         wasm_interface = new WasmInterface(wasm_result.instance);
-        wasm_interface.initialize(new Uint8Array(stars), constellations, controls.renderer.getCanvasSettings());
+        // wasm_interface.initialize(new Uint8Array(stars), constellations, controls.renderer.getCanvasSettings());
+        wasm_interface.initialize(new Uint8Array(stars), new Uint8Array(constellation_bin), controls.renderer.getCanvasSettings());
 
         drawUIElements(controls);
         renderStars(controls);
