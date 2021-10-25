@@ -33,19 +33,6 @@ export const sizedCoord: Sized<Coord> = {
     longitude: WasmPrimative.f32,
 };
 
-/**
- * The Spectral Type of a star indicates its temperature and its apparent color.
- */
-export enum SpectralType {
-    O = 0,
-    B = 1,
-    A = 2,
-    F = 3,
-    G = 4,
-    K = 5,
-    M = 6,
-}
-
 export type Constellation = {
     name: string;
     /**
@@ -53,16 +40,6 @@ export type Constellation = {
      * Aries is "The Ram".
      */
     epithet: string;
-    /**
-     * An Asterism is what is colloquially known as a constellation - it is the 'drawing' made by connecting stars
-     * in the sky.
-     */
-    asterism: SkyCoord[];
-    /**
-     * The boundaries of a constellation define its official location in the sky.
-     */
-    boundaries: SkyCoord[];
-    is_zodiac: boolean;
 };
 
 /**

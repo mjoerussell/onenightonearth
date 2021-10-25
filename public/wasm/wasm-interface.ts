@@ -11,7 +11,6 @@ import {
     sizeOf,
     sizeOfPrimative,
     sizedCanvasSettings,
-    Constellation,
     sizedSkyCoord,
     CanvasPoint,
     sizedCanvasPoint,
@@ -22,14 +21,6 @@ import { CanvasSettings } from '../renderer';
 interface WasmFns {
     initializeStars: (star_data: pointer, star_len: number) => void;
     initializeCanvas: (settings: pointer) => void;
-    // initializeConstellations: (
-    //     grid_data: pointer,
-    //     asterism_data: pointer,
-    //     zodiac_data: pointer,
-    //     grid_coord_lens: pointer,
-    //     asterism_coord_lens: pointer,
-    //     num_constellations: number
-    // ) => void;
     initializeConstellations: (constellation_data: pointer) => void;
     updateCanvasSettings: (settings: pointer) => void;
     getImageData: (size_in_bytes: pointer) => pointer;
@@ -57,38 +48,9 @@ export class WasmInterface {
         this.lib = this.instance.exports as any;
     }
 
-    // initialize(stars: Uint8Array, constellations: Constellation[], canvas_settings: CanvasSettings): void {
     initialize(stars: Uint8Array, constellation_data: Uint8Array, canvas_settings: CanvasSettings): void {
         const init_start = performance.now();
 
-        // const boundaries: pointer[] = [];
-        // const asterisms: pointer[] = [];
-        // const is_zodiac: boolean[] = [];
-        // for (const c of constellations) {
-        //     const bound_coords_ptr = this.allocArray(c.boundaries, sizedSkyCoord);
-        //     const aster_coords_ptr = this.allocArray(c.asterism, sizedSkyCoord);
-        //     boundaries.push(bound_coords_ptr);
-        //     asterisms.push(aster_coords_ptr);
-        //     is_zodiac.push(c.is_zodiac);
-        // }
-
-        // const boundaries_ptr = this.allocPrimativeArray(boundaries, WasmPrimative.u32);
-        // const asterisms_ptr = this.allocPrimativeArray(asterisms, WasmPrimative.u32);
-        // const is_zodiac_ptr = this.allocPrimativeArray(is_zodiac, WasmPrimative.bool);
-
-        // const boundary_lengths = constellations.map(c => c.boundaries.length);
-        // const bound_coord_lens_ptr = this.allocPrimativeArray(boundary_lengths, WasmPrimative.u32);
-        // const asterism_lengths = constellations.map(c => c.asterism.length);
-        // const aster_coord_lens_ptr = this.allocPrimativeArray(asterism_lengths, WasmPrimative.u32);
-
-        // this.lib.initializeConstellations(
-        //     boundaries_ptr,
-        //     asterisms_ptr,
-        //     is_zodiac_ptr,
-        //     bound_coord_lens_ptr,
-        //     aster_coord_lens_ptr,
-        //     constellations.length
-        // );
         const const_ptr = this.allocBytes(constellation_data.byteLength);
         const const_view = new Uint8Array(this.memory, const_ptr);
         const_view.set(constellation_data);

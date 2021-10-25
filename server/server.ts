@@ -5,37 +5,11 @@ import fs from 'fs';
 import path from 'path';
 import { performance } from 'perf_hooks';
 
-enum SpectralType {
-    O = 0,
-    B = 1,
-    A = 2,
-    F = 3,
-    G = 4,
-    K = 5,
-    M = 6,
-}
-
 type SkyFile = Record<string, string>;
-
-interface Star {
-    name: string;
-    right_ascension: number;
-    declination: number;
-    brightness: number;
-    spec_type: SpectralType;
-}
-
-interface SkyCoord {
-    right_ascension: number;
-    declination: number;
-}
 
 interface Constellation {
     name: string;
     epithet: string;
-    asterism: SkyCoord[];
-    boundaries: SkyCoord[];
-    is_zodiac: boolean;
 }
 
 const PORT = 8080;
@@ -133,76 +107,13 @@ const readConstellationFiles = async (): Promise<Constellation[]> => {
 
         console.log(const_name);
 
-        const stars = data['stars']
-            .split('\n')
-            .map(s => s.trim())
-            .filter(s => s != null && s !== '')
-            .map(star_data => {
-                const [name, ra_data, dec_data] = star_data.split(',').map(s => s.trim());
-                return {
-                    name,
-                    right_ascension: parseFloat(ra_data),
-                    declination: parseFloat(dec_data),
-                };
-            });
-        const asterism: SkyCoord[] = data['asterism']
-            ?.split('\n')
-            .map(s => s.trim())
-            .filter(s => s != null && s !== '')
-            .flatMap(aster_line => {
-                const star_names = aster_line.split(',').map(a => a.trim());
-                const [star_a, star_b] = star_names.map(name => stars.find(star => star.name === name));
-                if (star_a != null && star_b != null) {
-                    return [
-                        {
-                            right_ascension: star_a.right_ascension,
-                            declination: star_a.declination,
-                        },
-                        {
-                            right_ascension: star_b.right_ascension,
-                            declination: star_b.declination,
-                        },
-                    ];
-                } else {
-                    return null;
-                }
-            })
-            .filter(coord => coord != null) as SkyCoord[];
-        const boundaries: SkyCoord[] = data['boundaries']
-            .split('\n')
-            .map(s => s.trim())
-            .filter(s => s != null && s !== '')
-            .map(boundary_data => {
-                const [ra_data, dec_data] = boundary_data.split(',').map(b => b.trim());
-                return {
-                    right_ascension: parseRightAscension(ra_data),
-                    declination: parseFloat(dec_data),
-                };
-            });
-
         result.push({
             name: const_name,
             epithet: data['epithet'],
-            asterism,
-            boundaries,
-            is_zodiac: data['zodiac'] === 'true',
         });
     }
 
     return result;
-};
-
-const parseRightAscension = (ra: string): number => {
-    const parts = ra.split(' ');
-    const hours = parseInt(parts[0]);
-    const minutes = parseInt(parts[1]);
-    const seconds = parseFloat(parts[2]);
-
-    const hours_deg = hours * 15;
-    const minutes_deg = (minutes / 60) * 15;
-    const seconds_deg = (seconds / 3600) * 15;
-
-    return hours_deg + minutes_deg + seconds_deg;
 };
 
 const main = async () => {
@@ -225,7 +136,6 @@ const main = async () => {
             'Content-Length': star_bin.buffer.byteLength,
         });
 
-        console.log(`Content-Length is ${star_bin.buffer.byteLength / 1024} kB, or ${star_bin.buffer.byteLength / 13} stars`);
         res.write(star_bin);
         res.end();
         const response_end = performance.now();
@@ -240,7 +150,6 @@ const main = async () => {
 
         res.write(const_bin);
         res.end();
-        // res.send(constellations);
     });
 
     app.get('/constellations/meta', (req, res) => {

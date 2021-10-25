@@ -69,7 +69,6 @@ document.addEventListener('DOMContentLoaded', () => {
         controls.setConstellations(constellations);
 
         wasm_interface = new WasmInterface(wasm_result.instance);
-        // wasm_interface.initialize(new Uint8Array(stars), constellations, controls.renderer.getCanvasSettings());
         wasm_interface.initialize(new Uint8Array(stars), new Uint8Array(constellation_bin), controls.renderer.getCanvasSettings());
 
         drawUIElements(controls);

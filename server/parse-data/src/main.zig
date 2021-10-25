@@ -334,14 +334,8 @@ fn readConstellationFiles(allocator: *Allocator, constellation_dir_name: []const
 
         const bytes_read = try sky_file.readAll(read_buffer[0..]);
 
-
         const constellation = try Constellation.parseSkyFile(allocator, read_buffer[0..bytes_read]);
         try constellations.append(constellation);
-        
-        if (std.mem.eql(u8, entry.basename, "virgo.sky")) {
-            std.debug.print("{s}\n", .{read_buffer[0..bytes_read]});
-            std.debug.print("\n{} boundaries, {} asterism arms\n", .{constellation.boundaries.len, constellation.asterism.len});
-        }
     }
 
     return constellations.toOwnedSlice();
