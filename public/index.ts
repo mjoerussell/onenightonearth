@@ -145,30 +145,28 @@ document.addEventListener('DOMContentLoaded', () => {
             return current_value - new_value / controls.renderer.zoom_factor;
         };
 
-        if (new_coord != null) {
-            // The user crossed a pole if the new latitude is inside the bounds [-90, 90] but the new location
-            // would be outside that range
-            const crossed_pole =
-                (controls.latitude < 90.0 && directed_add(controls.latitude, new_coord.latitude) > 90.0) ||
-                (controls.latitude > -90.0 && directed_add(controls.latitude, new_coord.latitude) < -90.0);
+        // The user crossed a pole if the new latitude is inside the bounds [-90, 90] but the new location
+        // would be outside that range
+        const crossed_pole =
+            (controls.latitude < 90.0 && directed_add(controls.latitude, new_coord.latitude) > 90.0) ||
+            (controls.latitude > -90.0 && directed_add(controls.latitude, new_coord.latitude) < -90.0);
 
-            if (crossed_pole) {
-                // Add 180 degrees to the longitude because crossing a pole in a straight line would bring you to the other side
-                // of the world
-                controls.longitude += 180.0;
-                // Flip draw direction because if you were going south you're now going north and vice versa
-                controls.renderer.draw_north_up = !controls.renderer.draw_north_up;
-            }
+        if (crossed_pole) {
+            // Add 180 degrees to the longitude because crossing a pole in a straight line would bring you to the other side
+            // of the world
+            controls.longitude += 180.0;
+            // Flip draw direction because if you were going south you're now going north and vice versa
+            controls.renderer.draw_north_up = !controls.renderer.draw_north_up;
+        }
 
-            controls.latitude = directed_add(controls.latitude, new_coord.latitude);
-            controls.longitude = directed_add(controls.longitude, -new_coord.longitude);
+        controls.latitude = directed_add(controls.latitude, new_coord.latitude);
+        controls.longitude = directed_add(controls.longitude, -new_coord.longitude);
 
-            // Keep the longitude value in the range [-180, 180]
-            if (controls.longitude > 180.0) {
-                controls.longitude -= 360.0;
-            } else if (controls.longitude < -180.0) {
-                controls.longitude += 360.0;
-            }
+        // Keep the longitude value in the range [-180, 180]
+        if (controls.longitude > 180.0) {
+            controls.longitude -= 360.0;
+        } else if (controls.longitude < -180.0) {
+            controls.longitude += 360.0;
         }
 
         window.requestAnimationFrame(() => renderStars(controls));

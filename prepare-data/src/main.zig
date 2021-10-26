@@ -188,7 +188,7 @@ pub fn main() anyerror!void {
     var timer = std.time.Timer.start() catch unreachable;
 
     const start = timer.read();
-    const output_file = try readSaoCatalog("sao_catalog", "star_data.bin");
+    const output_file = try readSaoCatalog("sao_catalog", "../server/star_data.bin");
     defer output_file.close();
 
     const end = timer.read();
@@ -201,8 +201,6 @@ pub fn main() anyerror!void {
         allocator.free(constellations);
     }
 
-    std.debug.print("Got {} constellations\n", .{constellations.len});
-
     const num_constellations = @intCast(u32, constellations.len);
 
     var num_boundaries: u32 = 0;
@@ -214,7 +212,7 @@ pub fn main() anyerror!void {
     }
 
     const cwd = fs.cwd();
-    const constellation_out_file = try cwd.createFile("const_data.bin", .{});
+    const constellation_out_file = try cwd.createFile("../server/const_data.bin", .{});
     defer constellation_out_file.close();
 
     var const_out_buffered_writer = std.io.bufferedWriter(constellation_out_file.writer());
@@ -328,7 +326,6 @@ fn readConstellationFiles(allocator: *Allocator, constellation_dir_name: []const
         if (entry.kind != .File) continue;
         if (!std.mem.endsWith(u8, entry.basename, ".sky")) continue;
 
-        std.debug.print("{s}\n", .{entry.basename});
         var sky_file = try entry.dir.openFile(entry.basename, .{});
         defer sky_file.close();
 

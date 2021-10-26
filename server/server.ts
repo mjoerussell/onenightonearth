@@ -98,7 +98,7 @@ const parseSkyFile = (data: string): SkyFile => {
 };
 
 const readConstellationFiles = async (): Promise<Constellation[]> => {
-    const sky_files = await readDir(path.join(__dirname, 'parse-data', 'constellations', 'iau'));
+    const sky_files = await readDir(path.join(__dirname, '..', 'prepare-data', 'constellations', 'iau'));
     const result: Constellation[] = [];
     for (const filename of sky_files) {
         const file = await readFile(filename);
@@ -117,19 +117,19 @@ const readConstellationFiles = async (): Promise<Constellation[]> => {
 };
 
 const main = async () => {
-    const star_bin = await readFile(path.join(__dirname, 'parse-data', 'star_data.bin'));
-    const const_bin = await readFile(path.join(__dirname, 'parse-data', 'const_data.bin'));
+    const star_bin = await readFile(path.join(__dirname, 'star_data.bin'));
+    const const_bin = await readFile(path.join(__dirname, 'const_data.bin'));
 
     const const_parse_start = performance.now();
     const constellations: Constellation[] = await readConstellationFiles();
     const const_parse_end = performance.now();
 
     console.log(`Constellation parsing took ${const_parse_end - const_parse_start} ms`);
-    app.get('/', (req, res) => {
+    app.get('/', async (req, res) => {
         res.sendFile(path.join(__dirname, 'index.html'));
     });
 
-    app.get('/stars', (req, res) => {
+    app.get('/stars', async (req, res) => {
         const response_start = performance.now();
         res.writeHead(200, {
             'Content-Type': 'application/octet-stream',
