@@ -135,8 +135,9 @@ const main = async () => {
         const star_bin_stream = fs.createReadStream(star_path, { highWaterMark: 13 * 100 });
         res.writeHead(200, {
             'Content-Type': 'application/octet-stream',
-            'Content-Length': star_stat.size,
             'Transfer-Encoding': 'chunked',
+            'Content-Length': star_stat.size,
+            'X-Content-Length': star_stat.size,
         });
 
         star_bin_stream.on('data', chunk => {

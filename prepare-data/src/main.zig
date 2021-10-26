@@ -180,10 +180,10 @@ pub const Star = packed struct {
 };
 
 pub fn main() anyerror!void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
 
-    const allocator = &gpa.allocator;
+    const allocator = &arena.allocator;
 
     var args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
@@ -196,22 +196,20 @@ pub fn main() anyerror!void {
     const star_out_filename = args[1];
     const const_out_filename = args[2];
 
-    for (args) |arg| {
-        std.debug.print("{s}\n", .{arg});
-    }
-
-    const cwd = fs.cwd();
-    std.debug.print("cwd: {s}\n", .{try cwd.realpathAlloc(allocator, ".")});
-
     var timer = std.time.Timer.start() catch unreachable;
-
     const start = timer.read();
-    const output_file = try readSaoCatalog("sao_catalog", star_out_filename);
-    defer output_file.close();
+
+    var stars = try readSaoCatalog(allocator, "sao_catalog");
 
     const end = timer.read();
-
     std.debug.print("Parsing took {d:.4} ms\n", .{(end - start) / 1_000_000});
+
+    var shuffle_count: usize = 0;
+    while (shuffle_count < 1000) : (shuffle_count += 1) {
+        shuffleStars(stars);
+    }
+
+    try writeStarData(stars, star_out_filename);
 
     const constellations = try readConstellationFiles(allocator, "constellations/iau");
     defer {
@@ -219,70 +217,21 @@ pub fn main() anyerror!void {
         allocator.free(constellations);
     }
 
-    const num_constellations = @intCast(u32, constellations.len);
-
-    var num_boundaries: u32 = 0;
-    var num_asterisms: u32 = 0;
-
-    for (constellations) |constellation| {
-        num_boundaries += @intCast(u32, constellation.boundaries.len);
-        num_asterisms += @intCast(u32, constellation.asterism.len);
-    }
-
-
-    const constellation_out_file = try cwd.createFile(const_out_filename, .{});
-    defer constellation_out_file.close();
-
-    var const_out_buffered_writer = std.io.bufferedWriter(constellation_out_file.writer());
-    var const_out_writer = const_out_buffered_writer.writer();
-
-    try const_out_writer.writeAll(std.mem.toBytes(num_constellations)[0..]);
-    try const_out_writer.writeAll(std.mem.toBytes(num_boundaries)[0..]);
-    try const_out_writer.writeAll(std.mem.toBytes(num_asterisms)[0..]);
-
-    for (constellations) |constellation| {
-        try const_out_writer.writeAll(std.mem.toBytes(@intCast(u32, constellation.boundaries.len))[0..]);
-        try const_out_writer.writeAll(std.mem.toBytes(@intCast(u32, constellation.asterism.len))[0..]);
-
-        const is_zodiac: u8 = if (constellation.is_zodiac) 1 else 0;
-        try const_out_writer.writeAll(std.mem.toBytes(is_zodiac)[0..]);
-    }
-
-    for (constellations) |constellation| {
-        for (constellation.boundaries) |boundary_coord| {
-            try const_out_writer.writeAll(std.mem.toBytes(boundary_coord)[0..]);
-        }
-    }
-    
-    for (constellations) |constellation| {
-        for (constellation.asterism) |asterism_coord| {
-            try const_out_writer.writeAll(std.mem.toBytes(asterism_coord)[0..]);
-        }
-    }
-
-    try const_out_buffered_writer.flush();
+    try writeConstellationData(constellations, const_out_filename);
 }
 
-fn readSaoCatalog(catalog_filename: []const u8, out_filename: []const u8) !fs.File {
+fn readSaoCatalog(allocator: *Allocator, catalog_filename: []const u8) ![]Star {
     const cwd = fs.cwd();
     const sao_catalog = try cwd.openFile(catalog_filename, .{});
     defer sao_catalog.close();
 
-    const output_file = try cwd.createFile(out_filename, .{});
-    errdefer {
-        output_file.close();
-        cwd.deleteFile(out_filename) catch {};
-    }
-
-    var output_buffered_writer = std.io.bufferedWriter(output_file.writer());
-    var output_writer = output_buffered_writer.writer();
+    var star_list = try std.ArrayList(Star).initCapacity(allocator, 75000);
+    errdefer star_list.deinit();
 
     var read_buffer: [std.mem.page_size]u8 = undefined;
     var read_start_index: usize = 0;
     var line_start_index: usize = 0;
     var line_end_index: usize = 0;
-
-    var star_count: u64 = 0;
 
     read_loop: while (sao_catalog.readAll(read_buffer[read_start_index..])) |bytes_read| {
         if (bytes_read == 0) break;
@@ -306,8 +255,7 @@ fn readSaoCatalog(catalog_filename: []const u8, out_filename: []const u8) !fs.Fi
             if (std.mem.startsWith(u8, line, "SAO")) {
                 if (Star.parse(line)) |star| {
                     if (star.brightness >= 0.3) {
-                        star_count += 1;
-                        try output_writer.writeAll(std.mem.toBytes(star)[0..]);
+                        star_list.appendAssumeCapacity(star);
                     }
                 } else |_| {}
             }
@@ -321,10 +269,24 @@ fn readSaoCatalog(catalog_filename: []const u8, out_filename: []const u8) !fs.Fi
         read_start_index = 0;
     } else |err| return err;
 
-    try output_buffered_writer.flush();
+    std.debug.print("Wrote {} stars\n", .{star_list.items.len});
+    return star_list.toOwnedSlice();
+}
 
-    std.debug.print("Wrote {} stars\n", .{star_count});
-    return output_file;
+fn writeStarData(stars: []Star, out_filename: []const u8) !void {
+    const cwd = fs.cwd();
+
+    const output_file = try cwd.createFile(out_filename, .{});
+    defer output_file.close();
+
+    var output_buffered_writer = std.io.bufferedWriter(output_file.writer());
+    var output_writer = output_buffered_writer.writer();
+
+    for (stars) |star| {
+        try output_writer.writeAll(std.mem.toBytes(star)[0..]);
+    }
+
+    try output_buffered_writer.flush();
 }
 
 fn readConstellationFiles(allocator: *Allocator, constellation_dir_name: []const u8) ![]Constellation {
@@ -354,4 +316,84 @@ fn readConstellationFiles(allocator: *Allocator, constellation_dir_name: []const
     }
 
     return constellations.toOwnedSlice();
+}
+
+fn writeConstellationData(constellations: []Constellation, const_out_filename: []const u8) !void {
+    const cwd = fs.cwd();
+    const constellation_out_file = try cwd.createFile(const_out_filename, .{});
+    defer constellation_out_file.close();
+
+    var const_out_buffered_writer = std.io.bufferedWriter(constellation_out_file.writer());
+    var const_out_writer = const_out_buffered_writer.writer();
+    
+    var num_boundaries: u32 = 0;
+    var num_asterisms: u32 = 0;
+    for (constellations) |constellation| {
+        num_boundaries += @intCast(u32, constellation.boundaries.len);
+        num_asterisms += @intCast(u32, constellation.asterism.len);
+    }
+
+
+    try const_out_writer.writeAll(std.mem.toBytes(@intCast(u32, constellations.len))[0..]);
+    try const_out_writer.writeAll(std.mem.toBytes(num_boundaries)[0..]);
+    try const_out_writer.writeAll(std.mem.toBytes(num_asterisms)[0..]);
+
+    for (constellations) |constellation| {
+        try const_out_writer.writeAll(std.mem.toBytes(@intCast(u32, constellation.boundaries.len))[0..]);
+        try const_out_writer.writeAll(std.mem.toBytes(@intCast(u32, constellation.asterism.len))[0..]);
+
+        const is_zodiac: u8 = if (constellation.is_zodiac) 1 else 0;
+        try const_out_writer.writeAll(std.mem.toBytes(is_zodiac)[0..]);
+    }
+
+    for (constellations) |constellation| {
+        for (constellation.boundaries) |boundary_coord| {
+            try const_out_writer.writeAll(std.mem.toBytes(boundary_coord)[0..]);
+        }
+    }
+    
+    for (constellations) |constellation| {
+        for (constellation.asterism) |asterism_coord| {
+            try const_out_writer.writeAll(std.mem.toBytes(asterism_coord)[0..]);
+        }
+    }
+
+    try const_out_buffered_writer.flush();
+}
+
+fn shuffleStars(stars: []Star) void {
+    const timer = std.time.Timer.start() catch unreachable;
+    var rand = std.rand.DefaultPrng.init(timer.read());
+
+    const fold_range_size = stars.len / 6;
+
+    const fold_low_start = rand.random.intRangeAtMost(usize, 0, stars.len / 2);
+    const fold_high_start = rand.random.intRangeAtMost(usize, stars.len / 2, stars.len - fold_range_size);
+
+    var fold_index: usize = 0;
+    while (fold_index <= fold_range_size) : (fold_index += 1) {
+        const fold_low_index = fold_low_start + fold_index;
+        const fold_high_index = fold_high_start + fold_index;
+        std.mem.swap(Star, &stars[fold_low_index], &stars[fold_high_index]);
+    }
+
+    var low_index: usize = 0;
+    var high_index: usize = stars.len - 1;
+    while (low_index < high_index) : ({ low_index += 1; high_index -= 1; }) {
+        const low_bias: isize = rand.random.intRangeLessThan(isize, -5, 5);
+        const high_bias: isize = rand.random.intRangeLessThan(isize, -5, 5);
+
+        const low_swap_index = if (@intCast(isize, low_index) + low_bias < 0) 
+            low_index
+        else
+            @intCast(usize, @intCast(isize, low_index) + low_bias);
+
+        const high_swap_index = if (@intCast(isize, high_index) + high_bias >= stars.len) 
+            high_index
+        else
+            @intCast(usize, @intCast(isize, high_index) + high_bias);
+
+        std.mem.swap(Star, &stars[low_swap_index], &stars[high_swap_index]);
+    }
+
 }

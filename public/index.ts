@@ -49,7 +49,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const constellation_bin: ArrayBuffer = await fetch('/constellations').then(s => s.arrayBuffer());
 
         const star_response = await fetch('/stars');
-        const total_length: number = parseInt(star_response.headers.get('Content-Length') ?? '0', 10);
+        const content_length = star_response.headers.get('Content-Length') ?? star_response.headers.get('X-Content-Length') ?? '0';
+        const total_length: number = parseInt(content_length, 10);
         wasm_interface.initialize(total_length / 13, new Uint8Array(constellation_bin), controls.renderer.getCanvasSettings());
 
         const response_reader = star_response.body?.getReader();
