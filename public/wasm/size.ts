@@ -28,11 +28,6 @@ export type Coord = {
     longitude: number;
 };
 
-export const sizedCoord: Sized<Coord> = {
-    latitude: WasmPrimative.f32,
-    longitude: WasmPrimative.f32,
-};
-
 export type Constellation = {
     name: string;
     /**
@@ -49,11 +44,6 @@ export type Constellation = {
 export type SkyCoord = {
     right_ascension: number;
     declination: number;
-};
-
-export const sizedSkyCoord: Sized<SkyCoord> = {
-    right_ascension: WasmPrimative.f32,
-    declination: WasmPrimative.f32,
 };
 
 /**

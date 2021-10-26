@@ -25,23 +25,6 @@ const renderStars = (controls: Controls, date?: Date) => {
     wasm_interface.resetImageData();
 };
 
-const drawUIElements = (controls: Controls) => {
-    const backgroundCanvas = document.getElementById('backdrop-canvas') as HTMLCanvasElement;
-    const bgCtx = backgroundCanvas?.getContext('2d');
-
-    const center_x = controls.renderer.width / 2;
-    const center_y = controls.renderer.height / 2;
-
-    if (bgCtx) {
-        bgCtx.canvas.width = controls.renderer.width;
-        bgCtx.canvas.height = controls.renderer.height;
-
-        bgCtx.fillStyle = '#030b1c';
-        bgCtx.arc(center_x, center_y, controls.renderer.background_radius, 0, Math.PI * 2);
-        bgCtx.fill();
-    }
-};
-
 document.addEventListener('DOMContentLoaded', () => {
     const controls = new Controls();
     controls.date = new Date();
@@ -71,7 +54,6 @@ document.addEventListener('DOMContentLoaded', () => {
         wasm_interface = new WasmInterface(wasm_result.instance);
         wasm_interface.initialize(new Uint8Array(stars), new Uint8Array(constellation_bin), controls.renderer.getCanvasSettings());
 
-        drawUIElements(controls);
         renderStars(controls);
     });
 
@@ -221,9 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
             controls.longitude,
             BigInt(controls.date.valueOf())
         );
-        if (new_coord != null) {
-            updateLocation(new_coord, 2.5);
-        }
+        updateLocation(new_coord, 2.5);
     });
 
     controls.onSelectConstellation(const_index => {
@@ -231,9 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const constellation_center = wasm_interface.getConstellationCentroid(const_index);
         if (constellation_center) {
             const new_coord = wasm_interface.getCoordForSkyCoord(constellation_center, BigInt(controls.date.valueOf()));
-            if (new_coord) {
-                updateLocation(new_coord, 2.5);
-            }
+            updateLocation(new_coord, 2.5);
         }
     });
 });

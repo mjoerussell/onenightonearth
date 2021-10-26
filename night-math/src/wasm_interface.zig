@@ -28,6 +28,8 @@ const num_waypoints = 150;
 
 var constellations: []Constellation = undefined;
 
+var result_data: []u8 = undefined;
+
 const ExternCanvasSettings = packed struct {
     width: u32,
     height: u32,
@@ -111,7 +113,6 @@ pub export fn initializeConstellations(data: [*]u8) void {
 
 pub export fn updateCanvasSettings(settings: *ExternCanvasSettings) void {
     canvas.settings = settings.getCanvasSettings();
-    allocator.destroy(settings);
 }
 
 pub export fn getImageData(size_in_bytes: *u32) [*]Pixel {
@@ -165,11 +166,14 @@ pub export fn getConstellationAtPoint(x: f32, y: f32, observer_latitude: f32, ob
     } else return -1;
 }
 
-pub export fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_end_y: f32) *Coord {
+pub export fn initializeResultData() [*]u8 {
+    result_data = allocator.alloc(u8, 8) catch unreachable;
+    return result_data.ptr;
+}
+
+pub export fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_end_y: f32) void {
     const coord = star_math.dragAndMove(drag_start_x, drag_start_y, drag_end_x, drag_end_y, canvas.settings.drag_speed);
-    const coord_ptr = allocator.create(Coord) catch unreachable;
-    coord_ptr.* = coord;
-    return coord_ptr;
+    setResult(coord.latitude, coord.longitude);
 }
 
 pub export fn findWaypoints(start_lat: f32, start_long: f32, end_lat: f32, end_long: f32) [*]Coord {
@@ -183,39 +187,34 @@ pub export fn findWaypoints(start_lat: f32, start_long: f32, end_lat: f32, end_l
     return waypoints.ptr;
 }
 
-pub export fn getCoordForSkyCoord(right_ascension: f32, declination: f32, observer_timestamp: i64) *Coord {
+pub export fn getCoordForSkyCoord(right_ascension: f32, declination: f32, observer_timestamp: i64) void {
     const sky_coord = SkyCoord{ .right_ascension = right_ascension, .declination = declination };
     const coord = sky_coord.getCoord(observer_timestamp);
-    const coord_ptr = allocator.create(Coord) catch unreachable;
-    coord_ptr.* = coord;
-    return coord_ptr;
+    setResult(coord.latitude, coord.longitude);
 }
 
-pub export fn getSkyCoordForCanvasPoint(x: f32, y: f32, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) ?*SkyCoord {
+pub export fn getSkyCoordForCanvasPoint(x: f32, y: f32, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
     const point = Point{ .x = x, .y = y };
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
-    const sky_coord = canvas.pointToCoord(point, pos) orelse return null;
-    const sky_coord_ptr = allocator.create(SkyCoord) catch unreachable;
-    sky_coord_ptr.* = sky_coord;
-    return sky_coord_ptr;
+    const sky_coord = canvas.pointToCoord(point, pos) orelse SkyCoord{};
+    setResult(sky_coord.right_ascension, sky_coord.declination);
 }
 
-pub export fn getCoordForCanvasPoint(x: f32, y: f32, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) ?*Coord {
+pub export fn getCoordForCanvasPoint(x: f32, y: f32, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
     const point = Point{ .x = x, .y = y };
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
-    const sky_coord = canvas.pointToCoord(point, pos) orelse return null;
-    const coord = sky_coord.getCoord(observer_timestamp);
-    const coord_ptr = allocator.create(Coord) catch unreachable;
-    coord_ptr.* = coord;
-    return coord_ptr;
+    const sky_coord = canvas.pointToCoord(point, pos) orelse SkyCoord{};
+    setResult(sky_coord.right_ascension, sky_coord.declination);
 }
 
-pub export fn getConstellationCentroid(constellation_index: usize) ?*SkyCoord {
-    if (constellation_index > constellations.len) return null;
+pub export fn getConstellationCentroid(constellation_index: usize) void {
+    const centroid = if (constellation_index > constellations.len) SkyCoord{} else constellations[constellation_index].centroid();
+    setResult(centroid.right_ascension, centroid.declination);
+}
 
-    const coord_ptr = allocator.create(SkyCoord) catch unreachable;
-    coord_ptr.* = constellations[constellation_index].centroid();
-    return coord_ptr;
+fn setResult(a: f32, b: f32) void {
+    std.mem.copy(u8, @ptrCast([*]u8, result_data)[0..4], std.mem.toBytes(a)[0..]);
+    std.mem.copy(u8, @ptrCast([*]u8, result_data)[4..8], std.mem.toBytes(b)[0..]);
 }
 
 pub export fn _wasm_alloc(byte_len: u32) ?[*]u8 {
