@@ -1,10 +1,8 @@
 FROM alpine:3.13 AS zig
+ARG ZIG_VERSION=0.9.0-dev.1444+e2a2e6c14
+ARG ZIG_URL=https://ziglang.org/builds/zig-linux-x86_64-${ZIG_VERSION}.tar.xz
+ARG ZIG_SHA=c9a901c2df0661eede242a0860cddc30bbdb34d33f329ddae3e5cbdaed27306c
 
-ARG ZIG_VERSION=0.8.0
-ARG ZIG_URL=https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz
-ARG ZIG_SHA=502625d3da3ae595c5f44a809a87714320b7a40e6dff4a895b5fa7df3391d01e
-
-# Download Zig@ZIG_VERSION from official site
 WORKDIR /usr/src
 
 RUN apk add --no-cache curl \
@@ -18,11 +16,32 @@ RUN apk add --no-cache tar xz \
 
 RUN rm zig.tar.xz
 
+RUN mkdir -p /usr/src/bin
+
 RUN chmod +x /usr/local/bin/zig/zig-linux-x86_64-${ZIG_VERSION}/zig
+RUN cp -R /usr/local/bin/zig/zig-linux-x86_64-${ZIG_VERSION}/. /usr/src/bin/
+
+FROM alpine:3.13 AS night-math
+
+WORKDIR /usr/src
 
 # Build WASM Module
+COPY --from=zig /usr/src/bin /usr/src/bin
 COPY ./night-math .
-RUN /usr/local/bin/zig/zig-linux-x86_64-${ZIG_VERSION}/zig build -Drelease-small
+
+RUN /usr/src/bin/zig build -Drelease-small
+
+# Prepare the star and constellation data
+FROM alpine:3.13 AS prepare-data
+
+WORKDIR /usr/src
+
+COPY --from=zig /usr/src/bin /usr/src/bin
+
+RUN mkdir -p prepare-data
+COPY ./prepare-data .
+
+RUN /usr/src/bin/zig build run -Drelease-fast -- star_data.bin const_data.bin 
 
 FROM node:15-alpine AS build
 
@@ -58,19 +77,19 @@ WORKDIR /usr/src
 
 RUN mkdir public
 RUN mkdir server
+RUN mkdir prepare-data
 
 # Copy over necessary files from build images
-COPY ./server/sao_catalog ./server
-COPY ./server/constellations ./server/constellations
+COPY ./prepare-data/constellations ./prepare-data/constellations
 COPY ./public/assets/favicon.ico ./public/assets/favicon.ico
 COPY --from=build /usr/src/public/styles ./public/styles
 COPY --from=build /usr/src/public/index.html ./public/index.html
 COPY --from=build /usr/src/server/server.js ./server/server.js
 COPY --from=build /usr/src/public/dist ./public/dist
-COPY --from=zig /usr/public/dist/wasm ./public/dist/wasm
+COPY --from=night-math /usr/public/dist/wasm ./public/dist/wasm
+COPY --from=prepare-data /usr/src/star_data.bin ./server/star_data.bin
+COPY --from=prepare-data /usr/src/const_data.bin ./server/const_data.bin
 
 COPY --from=build /usr/src/server/node_modules ./server/node_modules 
-
-# RUN cd /usr/src/server
 
 ENTRYPOINT [ "node", "/usr/src/server/server.js" ]

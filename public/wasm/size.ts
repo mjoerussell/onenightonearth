@@ -28,50 +28,6 @@ export type Coord = {
     longitude: number;
 };
 
-export const sizedCoord: Sized<Coord> = {
-    latitude: WasmPrimative.f32,
-    longitude: WasmPrimative.f32,
-};
-
-/**
- * The Spectral Type of a star indicates its temperature and its apparent color.
- */
-export enum SpectralType {
-    O = 0,
-    B = 1,
-    A = 2,
-    F = 3,
-    G = 4,
-    K = 5,
-    M = 6,
-}
-
-export type Star = {
-    name: string;
-    right_ascension: number;
-    declination: number;
-    brightness: number;
-    spec_type: SpectralType;
-};
-
-/**
- * Simple variation of a `Star` that does not include a 'name' field.
- * Used to pass to WASM functions.
- */
-export type WasmStar = {
-    right_ascension: number;
-    declination: number;
-    brightness: number;
-    spec_type: SpectralType;
-};
-
-export const sizedWasmStar: Sized<WasmStar> = {
-    right_ascension: WasmPrimative.f32,
-    declination: WasmPrimative.f32,
-    brightness: WasmPrimative.f32,
-    spec_type: WasmPrimative.u8,
-};
-
 export type Constellation = {
     name: string;
     /**
@@ -79,16 +35,6 @@ export type Constellation = {
      * Aries is "The Ram".
      */
     epithet: string;
-    /**
-     * An Asterism is what is colloquially known as a constellation - it is the 'drawing' made by connecting stars
-     * in the sky.
-     */
-    asterism: SkyCoord[];
-    /**
-     * The boundaries of a constellation define its official location in the sky.
-     */
-    boundaries: SkyCoord[];
-    is_zodiac: boolean;
 };
 
 /**
@@ -100,22 +46,12 @@ export type SkyCoord = {
     declination: number;
 };
 
-export const sizedSkyCoord: Sized<SkyCoord> = {
-    right_ascension: WasmPrimative.f32,
-    declination: WasmPrimative.f32,
-};
-
 /**
  * A location on the drawing canvas. (0, 0) is the top-left corner.
  */
 export type CanvasPoint = {
     x: number;
     y: number;
-};
-
-export const sizedCanvasPoint: Sized<CanvasPoint> = {
-    x: WasmPrimative.f32,
-    y: WasmPrimative.f32,
 };
 
 export const sizedCanvasSettings: Sized<CanvasSettings> = {
@@ -134,66 +70,16 @@ export const sizedCanvasSettings: Sized<CanvasSettings> = {
  * A `SimpleAlloc` is a struct whose fields are just numbers. This means that it can
  * be allocated and read just using `getPrimative` and `setPrimative`.
  */
-export type SimpleAlloc = {
+export type Allocatable = {
     [key: string]: number | boolean;
 };
 
 /**
- * A `SimpleSize` is a size definition for `SimpleAlloc`.
- */
-export type SimpleSize<T extends SimpleAlloc> = {
-    [K in keyof T]: WasmPrimative;
-};
-
-/**
- * `ComplexAlloc` is a struct whose fields are structs. The fields can either be more `ComplexAlloc`'s, or
- * just `SimpleAlloc`'s.
- */
-export type ComplexAlloc = {
-    [key: string]: Allocatable;
-};
-
-/**
- * `ComplexSize` is a size definition for `ComplexAlloc`.
- */
-export type ComplexSize<T extends ComplexAlloc> = {
-    [K in keyof T]: Sized<T[K]>;
-};
-
-/**
- * `Allocatable` types are data types that can be automatically allocated regardless of their complexity.
- */
-export type Allocatable = SimpleAlloc | ComplexAlloc;
-/**
  * `Sized` types are companions to `Allocatable` types. For every type `T` that extends `Allocatable`, there must be an implementation
  * of `Sized<T>` which defines the size in bytes of every field on `T`.
  */
-export type Sized<T extends Allocatable> = T extends SimpleAlloc ? SimpleSize<T> : T extends ComplexAlloc ? ComplexSize<T> : never;
-
-export const isSimpleAlloc = (data: Allocatable): data is SimpleAlloc => {
-    for (const key in data) {
-        if (data.hasOwnProperty(key)) {
-            if (typeof data[key] !== 'number' && typeof data[key] !== 'boolean') {
-                return false;
-            }
-        }
-    }
-    return true;
-};
-
-export const isSimpleSize = (type: Sized<any>): type is SimpleSize<any> => {
-    for (const key in type) {
-        if (type.hasOwnProperty(key)) {
-            if (typeof type[key] !== 'number' && typeof type[key] !== 'boolean') {
-                return false;
-            }
-        }
-    }
-    return true;
-};
-
-export const isComplexSize = (type: Sized<any>): type is ComplexSize<any> => {
-    return !isSimpleSize(type);
+export type Sized<T extends Allocatable> = {
+    [K in keyof T]: WasmPrimative;
 };
 
 /**
@@ -228,17 +114,9 @@ export const sizeOfPrimative = (data: WasmPrimative): number => {
  */
 export const sizeOf = <T extends Allocatable>(type: Sized<T>): number => {
     let size = 0;
-    if (isSimpleSize(type)) {
-        for (const key in type) {
-            if (type.hasOwnProperty(key)) {
-                size += sizeOfPrimative(type[key] as WasmPrimative);
-            }
-        }
-    } else if (isComplexSize(type)) {
-        for (const key in type) {
-            if (type.hasOwnProperty(key)) {
-                size += sizeOf(type[key]);
-            }
+    for (const key in type) {
+        if (type.hasOwnProperty(key)) {
+            size += sizeOfPrimative(type[key] as WasmPrimative);
         }
     }
     return size;

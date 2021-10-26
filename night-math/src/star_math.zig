@@ -17,8 +17,8 @@ pub const Coord = packed struct {
 };
 
 pub const SkyCoord = packed struct {
-    right_ascension: f32,
-    declination: f32,
+    right_ascension: f32 = 0,
+    declination: f32 = 0,
 
     pub fn getCoord(sky_coord: SkyCoord, observer_timestamp: i64) Coord {
         const j2000_offset_millis = 949_428_000_000;

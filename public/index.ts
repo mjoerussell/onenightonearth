@@ -1,5 +1,5 @@
 import { Controls } from './controls';
-import { Constellation, Coord, Star } from './wasm/size';
+import { Constellation, Coord } from './wasm/size';
 import { WasmInterface } from './wasm/wasm-interface';
 
 let constellations: Constellation[] = [];
@@ -25,23 +25,6 @@ const renderStars = (controls: Controls, date?: Date) => {
     wasm_interface.resetImageData();
 };
 
-const drawUIElements = (controls: Controls) => {
-    const backgroundCanvas = document.getElementById('backdrop-canvas') as HTMLCanvasElement;
-    const bgCtx = backgroundCanvas?.getContext('2d');
-
-    const center_x = controls.renderer.width / 2;
-    const center_y = controls.renderer.height / 2;
-
-    if (bgCtx) {
-        bgCtx.canvas.width = controls.renderer.width;
-        bgCtx.canvas.height = controls.renderer.height;
-
-        bgCtx.fillStyle = '#030b1c';
-        bgCtx.arc(center_x, center_y, controls.renderer.background_radius, 0, Math.PI * 2);
-        bgCtx.fill();
-    }
-};
-
 document.addEventListener('DOMContentLoaded', () => {
     const controls = new Controls();
     controls.date = new Date();
@@ -62,15 +45,15 @@ document.addEventListener('DOMContentLoaded', () => {
             },
         },
     }).then(async wasm_result => {
-        const stars: Star[] = await fetch('/stars').then(s => s.json());
-        constellations = await fetch('/constellations').then(c => c.json());
+        const stars: ArrayBuffer = await fetch('/stars').then(s => s.arrayBuffer());
+        const constellation_bin: ArrayBuffer = await fetch('/constellations').then(s => s.arrayBuffer());
+        constellations = await fetch('/constellations/meta').then(c => c.json());
 
         controls.setConstellations(constellations);
 
         wasm_interface = new WasmInterface(wasm_result.instance);
-        wasm_interface.initialize(stars, constellations, controls.renderer.getCanvasSettings());
+        wasm_interface.initialize(new Uint8Array(stars), new Uint8Array(constellation_bin), controls.renderer.getCanvasSettings());
 
-        drawUIElements(controls);
         renderStars(controls);
     });
 
@@ -123,12 +106,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let waypoint_index = 0;
         const runWaypointTravel = () => {
-            const waypoint = waypoints[waypoint_index];
-            controls.latitude = waypoint.latitude;
-            controls.longitude = waypoint.longitude;
+            controls.latitude = waypoints[waypoint_index];
+            controls.longitude = waypoints[waypoint_index + 1];
             controls.renderer.zoom_factor += zoom_step;
             renderStars(controls);
-            waypoint_index += 1;
+            waypoint_index += 2;
             if (waypoint_index < waypoints.length) {
                 window.requestAnimationFrame(runWaypointTravel);
             }
@@ -163,30 +145,28 @@ document.addEventListener('DOMContentLoaded', () => {
             return current_value - new_value / controls.renderer.zoom_factor;
         };
 
-        if (new_coord != null) {
-            // The user crossed a pole if the new latitude is inside the bounds [-90, 90] but the new location
-            // would be outside that range
-            const crossed_pole =
-                (controls.latitude < 90.0 && directed_add(controls.latitude, new_coord.latitude) > 90.0) ||
-                (controls.latitude > -90.0 && directed_add(controls.latitude, new_coord.latitude) < -90.0);
+        // The user crossed a pole if the new latitude is inside the bounds [-90, 90] but the new location
+        // would be outside that range
+        const crossed_pole =
+            (controls.latitude < 90.0 && directed_add(controls.latitude, new_coord.latitude) > 90.0) ||
+            (controls.latitude > -90.0 && directed_add(controls.latitude, new_coord.latitude) < -90.0);
 
-            if (crossed_pole) {
-                // Add 180 degrees to the longitude because crossing a pole in a straight line would bring you to the other side
-                // of the world
-                controls.longitude += 180.0;
-                // Flip draw direction because if you were going south you're now going north and vice versa
-                controls.renderer.draw_north_up = !controls.renderer.draw_north_up;
-            }
+        if (crossed_pole) {
+            // Add 180 degrees to the longitude because crossing a pole in a straight line would bring you to the other side
+            // of the world
+            controls.longitude += 180.0;
+            // Flip draw direction because if you were going south you're now going north and vice versa
+            controls.renderer.draw_north_up = !controls.renderer.draw_north_up;
+        }
 
-            controls.latitude = directed_add(controls.latitude, new_coord.latitude);
-            controls.longitude = directed_add(controls.longitude, -new_coord.longitude);
+        controls.latitude = directed_add(controls.latitude, new_coord.latitude);
+        controls.longitude = directed_add(controls.longitude, -new_coord.longitude);
 
-            // Keep the longitude value in the range [-180, 180]
-            if (controls.longitude > 180.0) {
-                controls.longitude -= 360.0;
-            } else if (controls.longitude < -180.0) {
-                controls.longitude += 360.0;
-            }
+        // Keep the longitude value in the range [-180, 180]
+        if (controls.longitude > 180.0) {
+            controls.longitude -= 360.0;
+        } else if (controls.longitude < -180.0) {
+            controls.longitude += 360.0;
         }
 
         window.requestAnimationFrame(() => renderStars(controls));
@@ -221,19 +201,15 @@ document.addEventListener('DOMContentLoaded', () => {
             controls.longitude,
             BigInt(controls.date.valueOf())
         );
-        if (new_coord != null) {
-            updateLocation(new_coord, 2.5);
-        }
+        updateLocation(new_coord, 2.5);
     });
 
     controls.onSelectConstellation(const_index => {
         controls.constellation_name = `${constellations[const_index].name} - ${constellations[const_index].epithet}`;
-        const constellation_center = wasm_interface.getCosntellationCentroid(const_index);
+        const constellation_center = wasm_interface.getConstellationCentroid(const_index);
         if (constellation_center) {
             const new_coord = wasm_interface.getCoordForSkyCoord(constellation_center, BigInt(controls.date.valueOf()));
-            if (new_coord) {
-                updateLocation(new_coord, 2.5);
-            }
+            updateLocation(new_coord, 2.5);
         }
     });
 });

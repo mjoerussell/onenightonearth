@@ -224,37 +224,8 @@ div.constellation-info.mobile {
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-}
-
-.canvas-container #loading-icon-container {
-    display: inline;
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    width: 100px;
-    height: 100px;
-}
-
-.canvas-container #loading-icon-container > .loading-icon {
-    display: inline;
-    position: absolute;
-    border-radius: 50%;
-}
-
-.canvas-container #loading-icon-container > .loading-icon:first-of-type {
-    width: 100%;
-    height: 100%;
-    z-index: 0;
-    background-color: #01020f;
-    animation: 2s ease-in-out infinite alternate;
-    animation-name: loading-background;
-}
-
-@keyframes loading-background {
-    100% {
-        transform: scale(150%, 150%);
-    }
+    width: 850px;
+    height: 850px;
 }
 
 .canvas-container canvas.moving {
@@ -263,6 +234,18 @@ div.constellation-info.mobile {
 
 .canvas-container canvas#backdrop-canvas {
     z-index: 0;
+}
+
+.test-backdrop-canvas {
+    background-color: #030b1c;
+    width: calc(850px * 0.9);
+    height: calc(850px * 0.9);
+    border-radius: 50%;
+    display: inline;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
 }
 
 @media (max-width: 1550px) {
