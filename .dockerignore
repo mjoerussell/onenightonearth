@@ -4,3 +4,4 @@ zig-out
 dist
 .vscode
 .github
+*.bin

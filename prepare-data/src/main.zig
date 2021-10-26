@@ -185,17 +185,35 @@ pub fn main() anyerror!void {
 
     const allocator = &gpa.allocator;
 
+    var args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, args);
+
+    if (args.len != 3) {
+        std.log.err("Must provide an output file name for both outputs", .{});
+        return error.InvalidArgs;
+    }
+
+    const star_out_filename = args[1];
+    const const_out_filename = args[2];
+
+    for (args) |arg| {
+        std.debug.print("{s}\n", .{arg});
+    }
+
+    const cwd = fs.cwd();
+    std.debug.print("cwd: {s}\n", .{try cwd.realpathAlloc(allocator, ".")});
+
     var timer = std.time.Timer.start() catch unreachable;
 
     const start = timer.read();
-    const output_file = try readSaoCatalog("sao_catalog", "../server/star_data.bin");
+    const output_file = try readSaoCatalog("prepare-data/sao_catalog", star_out_filename);
     defer output_file.close();
 
     const end = timer.read();
 
     std.debug.print("Parsing took {d:.4} ms\n", .{(end - start) / 1_000_000});
 
-    const constellations = try readConstellationFiles(allocator, "constellations/iau");
+    const constellations = try readConstellationFiles(allocator, "prepare-data/constellations/iau");
     defer {
         for (constellations) |*c| c.deinit(allocator);
         allocator.free(constellations);
@@ -211,8 +229,8 @@ pub fn main() anyerror!void {
         num_asterisms += @intCast(u32, constellation.asterism.len);
     }
 
-    const cwd = fs.cwd();
-    const constellation_out_file = try cwd.createFile("../server/const_data.bin", .{});
+
+    const constellation_out_file = try cwd.createFile(const_out_filename, .{});
     defer constellation_out_file.close();
 
     var const_out_buffered_writer = std.io.bufferedWriter(constellation_out_file.writer());
