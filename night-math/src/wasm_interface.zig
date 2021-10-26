@@ -56,9 +56,10 @@ const ExternCanvasSettings = packed struct {
     }
 };
 
-pub export fn initializeStars(star_data: [*]Star, star_len: u32) void {
-    stars = star_data[0..star_len];
+pub export fn allocateStars(num_stars: u32) [*]Star {
+    stars = allocator.alloc(Star, @intCast(usize, num_stars)) catch unreachable;
     waypoints = allocator.alloc(Coord, num_waypoints) catch unreachable;
+    return stars.ptr;
 }
 
 pub export fn initializeCanvas(settings: *ExternCanvasSettings) void {

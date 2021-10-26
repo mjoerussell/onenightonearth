@@ -45,16 +45,26 @@ document.addEventListener('DOMContentLoaded', () => {
             },
         },
     }).then(async wasm_result => {
-        const stars: ArrayBuffer = await fetch('/stars').then(s => s.arrayBuffer());
-        const constellation_bin: ArrayBuffer = await fetch('/constellations').then(s => s.arrayBuffer());
-        constellations = await fetch('/constellations/meta').then(c => c.json());
-
-        controls.setConstellations(constellations);
-
         wasm_interface = new WasmInterface(wasm_result.instance);
-        wasm_interface.initialize(new Uint8Array(stars), new Uint8Array(constellation_bin), controls.renderer.getCanvasSettings());
+        const constellation_bin: ArrayBuffer = await fetch('/constellations').then(s => s.arrayBuffer());
 
-        renderStars(controls);
+        const star_response = await fetch('/stars');
+        const total_length: number = parseInt(star_response.headers.get('Content-Length') ?? '0', 10);
+        wasm_interface.initialize(total_length / 13, new Uint8Array(constellation_bin), controls.renderer.getCanvasSettings());
+
+        const response_reader = star_response.body?.getReader();
+        while (true) {
+            const chunk = await response_reader?.read();
+            if (chunk == null || chunk.done) {
+                break;
+            }
+
+            wasm_interface.addStars(chunk.value);
+            renderStars(controls);
+        }
+
+        constellations = await fetch('/constellations/meta').then(c => c.json());
+        controls.setConstellations(constellations);
     });
 
     controls.onDateChange(_ => {

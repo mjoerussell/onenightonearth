@@ -117,7 +117,6 @@ const readConstellationFiles = async (): Promise<Constellation[]> => {
 };
 
 const main = async () => {
-    const star_bin = await readFile(path.join(__dirname, 'star_data.bin'));
     const const_bin = await readFile(path.join(__dirname, 'const_data.bin'));
 
     const const_parse_start = performance.now();
@@ -131,15 +130,24 @@ const main = async () => {
 
     app.get('/stars', async (req, res) => {
         const response_start = performance.now();
+        const star_path = path.join(__dirname, 'star_data.bin');
+        const star_stat = await stat(star_path);
+        const star_bin_stream = fs.createReadStream(star_path, { highWaterMark: 13 * 100 });
         res.writeHead(200, {
             'Content-Type': 'application/octet-stream',
-            'Content-Length': star_bin.buffer.byteLength,
+            'Content-Length': star_stat.size,
+            'Transfer-Encoding': 'chunked',
         });
 
-        res.write(star_bin);
-        res.end();
-        const response_end = performance.now();
-        console.log(`Sending stars took ${response_end - response_start} ms`);
+        star_bin_stream.on('data', chunk => {
+            res.write(chunk);
+        });
+
+        star_bin_stream.on('end', () => {
+            res.end();
+            const response_end = performance.now();
+            console.log(`Sending stars took ${response_end - response_start} ms`);
+        });
     });
 
     app.get('/constellations', (req, res) => {
