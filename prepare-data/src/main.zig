@@ -206,14 +206,14 @@ pub fn main() anyerror!void {
     var timer = std.time.Timer.start() catch unreachable;
 
     const start = timer.read();
-    const output_file = try readSaoCatalog("prepare-data/sao_catalog", star_out_filename);
+    const output_file = try readSaoCatalog("sao_catalog", star_out_filename);
     defer output_file.close();
 
     const end = timer.read();
 
     std.debug.print("Parsing took {d:.4} ms\n", .{(end - start) / 1_000_000});
 
-    const constellations = try readConstellationFiles(allocator, "prepare-data/constellations/iau");
+    const constellations = try readConstellationFiles(allocator, "constellations/iau");
     defer {
         for (constellations) |*c| c.deinit(allocator);
         allocator.free(constellations);
