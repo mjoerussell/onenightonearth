@@ -19,7 +19,6 @@ const renderStars = (controls: Controls, date?: Date) => {
     }
 
     const draw_start = performance.now();
-    // wasm_interface.projectStars(controls.latitude * (Math.PI / 180), controls.longitude * (Math.PI / 180), BigInt(timestamp));
     wasm_interface.projectStars(controls.latitude, controls.longitude, BigInt(timestamp));
     wasm_interface.projectConstellationGrids(controls.latitude, controls.longitude, BigInt(timestamp));
     const data = wasm_interface.getImageData();
