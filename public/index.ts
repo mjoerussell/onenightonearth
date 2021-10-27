@@ -137,8 +137,12 @@ document.addEventListener('DOMContentLoaded', () => {
         window.requestAnimationFrame(runWaypointTravel);
     };
 
-    controls.onLocationUpdate(new_coord => updateLocation(new_coord, controls.renderer.zoom_factor));
-    controls.onUseCurrentPosition(new_coord => updateLocation(new_coord, 1));
+    controls.onLocationUpdate(new_coord => {
+        updateLocation(new_coord, controls.renderer.zoom_factor);
+    });
+    controls.onUseCurrentPosition(new_coord => {
+        updateLocation(new_coord, 1);
+    });
 
     controls.onTimelapse(current_date => {
         const days_per_frame = 0.15;

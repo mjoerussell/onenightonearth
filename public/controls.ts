@@ -177,7 +177,10 @@ export class Controls {
                     new_longitude = 0;
                 }
 
-                handler({ latitude: new_latitude, longitude: new_longitude });
+                const new_lat_rad = new_latitude * (Math.PI / 180);
+                const new_long_rad = new_longitude < 0 ? (new_longitude + 360) * (Math.PI / 180) : new_longitude * (Math.PI / 180);
+
+                handler({ latitude: new_lat_rad, longitude: new_long_rad });
 
                 this.user_changed_location = false;
             }
@@ -192,7 +195,12 @@ export class Controls {
         this.current_position_button?.addEventListener('click', () => {
             if ('geolocation' in navigator) {
                 navigator.geolocation.getCurrentPosition(position => {
-                    handler({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+                    const lat_rad = position.coords.latitude * (Math.PI / 180);
+                    const long_rad =
+                        position.coords.longitude < 0
+                            ? (position.coords.longitude + 360) * (Math.PI / 180)
+                            : position.coords.longitude * (Math.PI / 180);
+                    handler({ latitude: lat_rad, longitude: long_rad });
                 });
             }
         });
@@ -426,7 +434,8 @@ export class Controls {
         this.current_latitude = value;
         if (this.location_input) {
             const longitude = this.location_input.value.split(',')[1];
-            this.location_input.value = `${value.toPrecision(6)}, ${longitude}`;
+            const lat_degrees = value * (180 / Math.PI);
+            this.location_input.value = `${lat_degrees.toPrecision(6)}, ${longitude}`;
         }
     }
 
@@ -438,7 +447,8 @@ export class Controls {
         this.current_longitude = value;
         if (this.location_input) {
             const [latitude] = this.location_input.value.split(',');
-            this.location_input.value = `${latitude}, ${value.toPrecision(6)}`;
+            const long_degrees = value > Math.PI ? (value - 2 * Math.PI) * (180 / Math.PI) : value * (180 / Math.PI);
+            this.location_input.value = `${latitude}, ${long_degrees.toPrecision(6)}`;
         }
     }
 
