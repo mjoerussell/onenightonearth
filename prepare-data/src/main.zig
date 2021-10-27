@@ -2,6 +2,16 @@ const std = @import("std");
 const fs = std.fs;
 const Allocator = std.mem.Allocator;
 
+/// A standard degree-to-radian conversion function.
+pub fn degToRad(degrees: anytype) @TypeOf(degrees) {
+    return degrees * (std.math.pi / 180.0);
+}
+
+pub fn degToRadLong(degrees: anytype) @TypeOf(degrees) {
+    const norm_deg = if (degrees < 0) degrees + 360 else degrees;
+    return degToRad(norm_deg);
+}
+
 pub const SpectralType = enum(u8) {
     O,
     B,
@@ -96,10 +106,13 @@ pub const Constellation = struct {
                         const right_ascension = std.mem.trim(u8, parts.next().?, " ");
                         const declination = std.mem.trim(u8, parts.next().?, " ");
 
-                        const star_coord = SkyCoord{ 
+                        var star_coord = SkyCoord{ 
                             .right_ascension = try std.fmt.parseFloat(f32, right_ascension), 
                             .declination = try std.fmt.parseFloat(f32, declination)
                         };
+
+                        star_coord.right_ascension = degToRad(star_coord.right_ascension);
+                        star_coord.declination = degToRad(star_coord.declination);
 
                         try stars.put(star_name, star_coord);
                     },
@@ -127,10 +140,13 @@ pub const Constellation = struct {
 
                         const right_ascension = @intToFloat(f32, ra_hours * 15) + ((@intToFloat(f32, ra_minutes) / 60) * 15) + ((ra_seconds / 3600) * 15);
 
-                        const boundary_coord = SkyCoord{
+                        var boundary_coord = SkyCoord{
                             .right_ascension = right_ascension,
                             .declination = try std.fmt.parseFloat(f32, std.mem.trim(u8, declination, " ")),
                         };
+
+                        boundary_coord.right_ascension = degToRad(boundary_coord.right_ascension);
+                        boundary_coord.declination = degToRad(boundary_coord.declination);
 
                         try boundary_list.append(boundary_coord);
                     },
@@ -189,6 +205,9 @@ pub const Star = packed struct {
                 else => {},
             }
         }
+
+        star.right_ascension = degToRad(star.right_ascension);
+        star.declination = degToRad(star.declination);
 
         return star;
     }

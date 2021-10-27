@@ -77,13 +77,16 @@ pub const Canvas = struct {
     pub fn coordToPoint(canvas: Canvas, sky_coord: SkyCoord, local_sidereal_time: f64, sin_latitude: f32, cos_latitude: f32, filter_below_horizon: bool) ?Point {
         const two_pi = comptime math.pi * 2.0;
 
-        const hour_angle = local_sidereal_time - @as(f64, sky_coord.right_ascension);
-        const hour_angle_rad = math_utils.floatMod(math_utils.degToRad(hour_angle), two_pi);
+        const hour_angle_rad = local_sidereal_time - @as(f64, sky_coord.right_ascension);
+        // const hour_angle_rad = math_utils.floatMod(math_utils.degToRad(hour_angle), two_pi);
+        // const hour_angle_rad = math_utils.floatMod(hour_angle, two_pi);
 
-        const declination_rad = @floatCast(f64, math_utils.degToRad(sky_coord.declination));
-        const sin_dec = math.sin(declination_rad);
+        // const declination_rad = @floatCast(f64, math_utils.degToRad(sky_coord.declination));
+        // const sin_dec = math.sin(declination_rad);
+        const sin_dec = math.sin(sky_coord.declination);
         
-        const sin_alt = sin_dec * sin_latitude + math.cos(declination_rad) * cos_latitude * math.cos(hour_angle_rad);
+        // const sin_alt = sin_dec * sin_latitude + math.cos(declination_rad) * cos_latitude * math.cos(hour_angle_rad);
+        const sin_alt = sin_dec * sin_latitude + math.cos(sky_coord.declination) * cos_latitude * math.cos(hour_angle_rad);
         const altitude = math.asin(sin_alt);
         if (filter_below_horizon and altitude < 0) {
             return null;
@@ -119,9 +122,11 @@ pub const Canvas = struct {
         const s = math.sqrt(math.pow(f32, raw_point.x, 2.0) + math.pow(f32, raw_point.y, 2.0));
         const altitude = (math.pi * (1 - s)) / 2;
 
-        const observer_lat_rad = math_utils.degToRad(observer_pos.latitude);
-        const sin_lat = math.sin(observer_lat_rad);
-        const cos_lat = math.cos(observer_lat_rad);
+        const sin_lat = math.sin(observer_pos.latitude);
+        const cos_lat = math.cos(observer_pos.latitude);
+        // const observer_lat_rad = math_utils.degToRad(observer_pos.latitude);
+        // const sin_lat = math.sin(observer_lat_rad);
+        // const cos_lat = math.cos(observer_lat_rad);
 
         const declination = math.asin(((raw_point.y / s) * math.cos(altitude) * cos_lat) + (math.sin(altitude) * sin_lat));
 
@@ -129,13 +134,15 @@ pub const Canvas = struct {
 
         hour_angle_rad = if (raw_point.x < 0) -hour_angle_rad else hour_angle_rad;
 
-        const hour_angle = math_utils.radToDeg(hour_angle_rad);
+        // const hour_angle = math_utils.radToDeg(hour_angle_rad);
         const lst = observer_pos.localSiderealTime();
-        const right_ascension = math_utils.floatMod(lst - hour_angle, 360);
+        // const right_ascension = math_utils.floatMod(lst - hour_angle, 360);
+        const right_ascension = math_utils.floatMod(lst - hour_angle_rad, 2 * math.pi);
 
         return SkyCoord{
             .right_ascension = @floatCast(f32, right_ascension),
-            .declination = math_utils.radToDeg(declination)
+            // .declination = math_utils.radToDeg(declination)
+            .declination = declination
         };
     }
 

@@ -80,31 +80,31 @@ pub const Line = struct {
     }
 };
 
-pub fn radToDegLong(radian: anytype) @TypeOf(radian) {
-    const deg = radToDeg(radian);
-    if (deg > 180.0) {
-        return deg - 360.0;
-    } else if (deg < -180.0) {
-        return deg + 360.0;
-    } else {
-        return deg;
-    }
-}
+// pub fn radToDegLong(radian: anytype) @TypeOf(radian) {
+//     const deg = radToDeg(radian);
+//     if (deg > 180.0) {
+//         return deg - 360.0;
+//     } else if (deg < -180.0) {
+//         return deg + 360.0;
+//     } else {
+//         return deg;
+//     }
+// }
 
-/// A standard radian-to-degree conversion function.
-pub fn radToDeg(radian: anytype) @TypeOf(radian) {
-    return radian * rad_to_deg_constant;
-}
+// /// A standard radian-to-degree conversion function.
+// pub fn radToDeg(radian: anytype) @TypeOf(radian) {
+//     return radian * rad_to_deg_constant;
+// }
 
-/// A standard degree-to-radian conversion function.
-pub fn degToRad(degrees: anytype) @TypeOf(degrees) {
-    return degrees * deg_to_rad_constant;
-}
+// /// A standard degree-to-radian conversion function.
+// pub fn degToRad(degrees: anytype) @TypeOf(degrees) {
+//     return degrees * deg_to_rad_constant;
+// }
 
-pub fn degToRadLong(degrees: anytype) @TypeOf(degrees) {
-    const norm_deg = if (degrees < 0) degrees + 360 else degrees;
-    return degToRad(norm_deg);
-}
+// pub fn degToRadLong(degrees: anytype) @TypeOf(degrees) {
+//     const norm_deg = if (degrees < 0) degrees + 360 else degrees;
+//     return degToRad(norm_deg);
+// }
 
 
 pub const OperationError = error{NaN};
@@ -157,18 +157,18 @@ pub fn floatEq(a: anytype, b: @TypeOf(a), epsilon: f32) bool {
     return -epsilon <= a - b and a - b <= epsilon;
 }
 
-test "degree to radian conversion" {
-    const epsilon = 0.001;
-    const degree = 45.0;
-    const radian = degToRad(degree);
-    std.testing.expectWithinEpsilon(math.pi / 4.0, radian, epsilon);
-}
+// test "degree to radian conversion" {
+//     const epsilon = 0.001;
+//     const degree = 45.0;
+//     const radian = degToRad(degree);
+//     std.testing.expectWithinEpsilon(math.pi / 4.0, radian, epsilon);
+// }
 
-test "radian to degree conversion" {
-    const epsilon = 0.001;
-    const degree = comptime radToDeg(math.pi / 4.0);
-    std.testing.expectWithinEpsilon(45.0, degree, epsilon);
-}
+// test "radian to degree conversion" {
+//     const epsilon = 0.001;
+//     const degree = comptime radToDeg(math.pi / 4.0);
+//     std.testing.expectWithinEpsilon(45.0, degree, epsilon);
+// }
 
 test "custom float modulus" {
     const margin = 0.0001;
@@ -179,13 +179,13 @@ test "custom float modulus" {
     std.testing.expectWithinMargin(-1.3467, comptime floatMod(-74.17405, 14.56547), margin);
 }
 
-test "longitude back and forth conversion - negative" {
-    const epsilon = 0.001;
-    const degLong = -75.0;
-    const radLong = comptime degToRad(degLong);
-    const backDegLong = comptime radToDegLong(radLong);
-    std.testing.expectWithinEpsilon(-degLong, -backDegLong, epsilon);
-}
+// test "longitude back and forth conversion - negative" {
+//     const epsilon = 0.001;
+//     const degLong = -75.0;
+//     const radLong = comptime degToRad(degLong);
+//     const backDegLong = comptime radToDegLong(radLong);
+//     std.testing.expectWithinEpsilon(-degLong, -backDegLong, epsilon);
+// }
 
 test "line intersection" {
     const line_a = Line{

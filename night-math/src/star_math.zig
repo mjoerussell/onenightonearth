@@ -46,7 +46,7 @@ pub const ObserverPosition = struct {
     pub fn localSiderealTime(pos: ObserverPosition) f64 {
         const j2000_offset_millis = 949_428_000_000;
         const days_since_j2000 = @intToFloat(f64, pos.timestamp - j2000_offset_millis) / 86_400_000.0;
-        return 100.46 + (0.985647 * days_since_j2000) + @floatCast(f64, pos.longitude) + @intToFloat(f64, 15 * pos.timestamp);
+        return ((100.46 + (0.985647 * days_since_j2000) + @intToFloat(f64, 15 * pos.timestamp)) * (math.pi / 180.0)) + @floatCast(f64, pos.longitude);
     }
 
     // pub fn localSiderealTime(pos: ObserverPosition) f64 {
@@ -155,29 +155,34 @@ pub fn GreatCircle(comptime num_waypoints: usize) type {
         waypoints: [num_waypoints]Coord = undefined,
 
         pub fn init(start: Coord, end: Coord) Self {
-            const start_radians = Coord{
-                .latitude = math_utils.degToRad(start.latitude),
-                .longitude = math_utils.degToRadLong(start.longitude)
-            };
-            const end_radians = Coord{
-                .latitude = math_utils.degToRad(end.latitude),
-                .longitude = math_utils.degToRadLong(end.longitude)
-            };
+            // const start_radians = Coord{
+            //     .latitude = math_utils.degToRad(start.latitude),
+            //     .longitude = math_utils.degToRadLong(start.longitude)
+            // };
+            // const end_radians = Coord{
+            //     .latitude = math_utils.degToRad(end.latitude),
+            //     .longitude = math_utils.degToRadLong(end.longitude)
+            // };
 
             const distance = blk: {
-                const long_diff = end_radians.longitude - start_radians.longitude;
-                const cos_d = math.sin(start_radians.latitude) * math.sin(end_radians.latitude) + math.cos(start_radians.latitude) * math.cos(end_radians.latitude) * math.cos(long_diff);
+                const long_diff = end.longitude - start.longitude;
+                const cos_d = math.sin(start.latitude) * math.sin(end.latitude) + math.cos(start.latitude) * math.cos(end.latitude) * math.cos(long_diff);
+                // const long_diff = end_radians.longitude - start_radians.longitude;
+                // const cos_d = math.sin(start_radians.latitude) * math.sin(end_radians.latitude) + math.cos(start_radians.latitude) * math.cos(end_radians.latitude) * math.cos(long_diff);
                 break :blk math_utils.boundedACos(cos_d) catch 0;    
             };
 
             const course_angle = blk: {
-                var cos_c = (math.sin(end_radians.latitude) - math.sin(start_radians.latitude) * math.cos(distance)) / (math.cos(start_radians.latitude) * math.sin(distance));
+                var cos_c = (math.sin(end.latitude) - math.sin(start.latitude) * math.cos(distance)) / (math.cos(start.latitude) * math.sin(distance));
+                // var cos_c = (math.sin(end_radians.latitude) - math.sin(start_radians.latitude) * math.cos(distance)) / (math.cos(start_radians.latitude) * math.sin(distance));
                 break :blk math_utils.boundedACos(cos_c) catch 0;
             };
 
             var great_circle = Self{ 
-                .start = start_radians,
-                .end = end_radians,
+                // .start = start_radians,
+                // .end = end_radians,
+                .start = start,
+                .end = end,
                 .distance = distance, 
                 .course_angle = course_angle,
             };
@@ -201,8 +206,10 @@ pub fn GreatCircle(comptime num_waypoints: usize) type {
                 const long = if (negative_dir) great_circle.start.longitude - rel_long else great_circle.start.longitude + rel_long;
 
                 waypoint.* = Coord{ 
-                    .latitude = math_utils.radToDeg(lat), 
-                    .longitude = math_utils.radToDegLong(long) 
+                    // .latitude = math_utils.radToDeg(lat), 
+                    // .longitude = math_utils.radToDegLong(long) 
+                    .latitude = lat, 
+                    .longitude = long 
                 };
             }
 
@@ -347,7 +354,8 @@ pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_e
 
     // drag_distance is the angular distance between the starting location and the result location after a single drag
     // Higher = move more with smaller cursor movements, and vice versa
-    const drag_distance: f32 = math_utils.degToRad(drag_speed);
+    // const drag_distance: f32 = math_utils.degToRad(drag_speed);
+    const drag_distance: f32 = drag_speed * (math.pi / 180.0);
 
     // Calculate asin(new_latitude), and clamp the result between [-1, 1]
     var sin_lat_x = math.sin(drag_distance) * math.cos(dist_phi);
@@ -367,11 +375,13 @@ pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_e
         cos_long_x = -1.0;
     }
 
-    var new_relative_longitude = math_utils.radToDegLong(math.acos(cos_long_x));
-    new_relative_longitude = if (dist_phi < 0.0) -new_relative_longitude else new_relative_longitude;
+    // var new_relative_longitude = math_utils.radToDegLong(math.acos(cos_long_x));
+    // new_relative_longitude = if (dist_phi < 0.0) -new_relative_longitude else new_relative_longitude;
+    const new_relative_longitude = if (dist_phi < 0.0) -math.acos(cos_long_x) else math.acos(cos_long_x);
 
     return .{
-        .latitude = math_utils.radToDeg(new_latitude),
+        // .latitude = math_utils.radToDeg(new_latitude),
+        .latitude = new_latitude,
         .longitude = new_relative_longitude,
     };
 }

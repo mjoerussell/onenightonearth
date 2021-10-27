@@ -129,9 +129,11 @@ pub export fn resetImageData() void {
 pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
     const local_sidereal_time = pos.localSiderealTime();
-    const lat_rad = math_utils.degToRad(observer_latitude);
-    const sin_lat = std.math.sin(lat_rad);
-    const cos_lat = std.math.cos(lat_rad);
+    // const lat_rad = math_utils.degToRad(observer_latitude);
+    // const sin_lat = std.math.sin(lat_rad);
+    // const cos_lat = std.math.cos(lat_rad);
+    const sin_lat = std.math.sin(observer_latitude);
+    const cos_lat = std.math.cos(observer_latitude);
     for (stars) |star| {
         star_math.projectStar(&canvas, star, local_sidereal_time, sin_lat, cos_lat);
     }
@@ -140,9 +142,11 @@ pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, obse
 pub export fn projectConstellationGrids(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
     const local_sidereal_time = pos.localSiderealTime();
-    const lat_rad = math_utils.degToRad(observer_latitude);
-    const sin_lat = std.math.sin(lat_rad);
-    const cos_lat = std.math.cos(lat_rad);
+    const sin_lat = std.math.sin(observer_latitude);
+    const cos_lat = std.math.cos(observer_latitude);
+    // const lat_rad = math_utils.degToRad(observer_latitude);
+    // const sin_lat = std.math.sin(lat_rad);
+    // const cos_lat = std.math.cos(lat_rad);
     if (canvas.settings.draw_constellation_grid or canvas.settings.draw_asterisms) {
         for (constellations) |constellation| {
             if (canvas.settings.zodiac_only and !constellation.is_zodiac) continue;
@@ -162,9 +166,11 @@ pub export fn getConstellationAtPoint(x: f32, y: f32, observer_latitude: f32, ob
 
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
     const local_sidereal_time = pos.localSiderealTime();
-    const lat_rad = math_utils.degToRad(observer_latitude);
-    const sin_lat = std.math.sin(lat_rad);
-    const cos_lat = std.math.cos(lat_rad);
+    const sin_lat = std.math.sin(observer_latitude);
+    const cos_lat = std.math.cos(observer_latitude);
+    // const lat_rad = math_utils.degToRad(observer_latitude);
+    // const sin_lat = std.math.sin(lat_rad);
+    // const cos_lat = std.math.cos(lat_rad);
 
     const index = star_math.getConstellationAtPoint(&canvas, point, constellations, local_sidereal_time, sin_lat, cos_lat);
     if (index) |i| {
