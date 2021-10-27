@@ -17,14 +17,28 @@ pub const SkyCoord = packed struct {
     declination: f32,
 };
 
+pub const ConstellationInfo = packed struct {
+    num_boundaries: u32,
+    num_asterisms: u32,
+    is_zodiac: u8,
+};
+
 pub const Constellation = struct {
     boundaries: []SkyCoord,
     asterism: []SkyCoord,
-    is_zodiac: bool,
+    is_zodiac: bool = false,
 
     pub fn deinit(self: *Constellation, allocator: *Allocator) void {
         allocator.free(self.boundaries);
         allocator.free(self.asterism);
+    }
+
+    pub fn getInfo(self: Constellation) ConstellationInfo {
+        return .{
+            .num_boundaries = @intCast(u32, self.boundaries.len),
+            .num_asterisms = @intCast(u32, self.asterism.len),
+            .is_zodiac = if (self.is_zodiac) @as(u8, 1) else @as(u8, 0)
+        };
     }
 
     pub fn parseSkyFile(allocator: *Allocator, data: []const u8) !Constellation {
@@ -52,7 +66,8 @@ pub const Constellation = struct {
         while (line_iter.next()) |line| {
             if (std.mem.trim(u8, line, " ").len == 0) continue;
 
-            if (std.mem.endsWith(u8, line, "zodiac")) {
+            if (std.mem.indexOf(u8, line, "#zodiac")) |_| {
+                std.debug.print("Is zodiac\n", .{});
                 result.is_zodiac = true;
                 continue;
             }
@@ -339,11 +354,8 @@ fn writeConstellationData(constellations: []Constellation, const_out_filename: [
     try const_out_writer.writeAll(std.mem.toBytes(num_asterisms)[0..]);
 
     for (constellations) |constellation| {
-        try const_out_writer.writeAll(std.mem.toBytes(@intCast(u32, constellation.boundaries.len))[0..]);
-        try const_out_writer.writeAll(std.mem.toBytes(@intCast(u32, constellation.asterism.len))[0..]);
-
-        const is_zodiac: u8 = if (constellation.is_zodiac) 1 else 0;
-        try const_out_writer.writeAll(std.mem.toBytes(is_zodiac)[0..]);
+        const info = constellation.getInfo();
+        try const_out_writer.writeAll(std.mem.toBytes(info)[0..]);
     }
 
     for (constellations) |constellation| {

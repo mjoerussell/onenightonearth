@@ -1,6 +1,4 @@
 const std = @import("std");
-const ArrayList = std.ArrayList;
-const parseFloat = std.fmt.parseFloat;
 
 const log = @import("./log.zig").log;
 
@@ -102,13 +100,16 @@ pub export fn initializeConstellations(data: [*]u8) void {
     var c_bound_start: usize = 0;
     var c_ast_start: usize = 0;
     for (constellations) |*c, c_index| {
+        log(.Debug, "Is Zodiac? {}", .{constellation_data[c_index].is_zodiac});
         c.* = Constellation{
-            .is_zodiac = constellation_data[c_index].is_zodiac != 0,
+            .is_zodiac = constellation_data[c_index].is_zodiac == 1,
             .boundaries = boundary_data[c_bound_start..c_bound_start + constellation_data[c_index].num_boundaries],
             .asterism = asterism_data[c_ast_start..c_ast_start + constellation_data[c_index].num_asterisms],
         };
         c_bound_start += constellation_data[c_index].num_boundaries;
         c_ast_start += constellation_data[c_index].num_asterisms;
+
+        
     }
 }
 
@@ -116,36 +117,41 @@ pub export fn updateCanvasSettings(settings: *ExternCanvasSettings) void {
     canvas.settings = settings.getCanvasSettings();
 }
 
-pub export fn getImageData(size_in_bytes: *u32) [*]Pixel {
-    size_in_bytes.* = @intCast(u32, canvas.data.len * @sizeOf(Pixel));
+pub export fn getImageData() [*]Pixel {
+    setResult(@as(u32, canvas.data.len) * 4, 0);
     return canvas.data.ptr;
 }
 
 pub export fn resetImageData() void {
-    for (canvas.data) |*p| {
-        p.* = Pixel{};
-    }   
+    canvas.resetImageData();
 }
 
 pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
+    const local_sidereal_time = pos.localSiderealTime();
+    const lat_rad = math_utils.degToRad(observer_latitude);
+    const sin_lat = std.math.sin(lat_rad);
+    const cos_lat = std.math.cos(lat_rad);
     for (stars) |star| {
-        star_math.projectStar(&canvas, star, pos);
+        star_math.projectStar(&canvas, star, local_sidereal_time, sin_lat, cos_lat);
     }
 }
 
 pub export fn projectConstellationGrids(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
-
+    const local_sidereal_time = pos.localSiderealTime();
+    const lat_rad = math_utils.degToRad(observer_latitude);
+    const sin_lat = std.math.sin(lat_rad);
+    const cos_lat = std.math.cos(lat_rad);
     if (canvas.settings.draw_constellation_grid or canvas.settings.draw_asterisms) {
         for (constellations) |constellation| {
             if (canvas.settings.zodiac_only and !constellation.is_zodiac) continue;
             
             if (canvas.settings.draw_constellation_grid) {
-                star_math.projectConstellationGrid(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, pos);
+                star_math.projectConstellationGrid(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, local_sidereal_time, sin_lat, cos_lat);
             }
             if (canvas.settings.draw_asterisms) {
-                star_math.projectConstellationAsterism(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, pos);
+                star_math.projectConstellationAsterism(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, local_sidereal_time, sin_lat, cos_lat);
             }
         }
     }
@@ -155,13 +161,18 @@ pub export fn getConstellationAtPoint(x: f32, y: f32, observer_latitude: f32, ob
     const point = Point{ .x = x, .y = y };
 
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
-    const index = star_math.getConstellationAtPoint(&canvas, point, constellations, pos);
+    const local_sidereal_time = pos.localSiderealTime();
+    const lat_rad = math_utils.degToRad(observer_latitude);
+    const sin_lat = std.math.sin(lat_rad);
+    const cos_lat = std.math.cos(lat_rad);
+
+    const index = star_math.getConstellationAtPoint(&canvas, point, constellations, local_sidereal_time, sin_lat, cos_lat);
     if (index) |i| {
         if (canvas.settings.draw_constellation_grid) {
-            star_math.projectConstellationGrid(&canvas, constellations[i], Pixel.rgb(255, 255, 255), 2, pos);
+            star_math.projectConstellationGrid(&canvas, constellations[i], Pixel.rgb(255, 255, 255), 2, local_sidereal_time, sin_lat, cos_lat);
         }
         if (canvas.settings.draw_asterisms) {
-            star_math.projectConstellationAsterism(&canvas, constellations[i], Pixel.rgb(255, 255, 255), 2, pos);
+            star_math.projectConstellationAsterism(&canvas, constellations[i], Pixel.rgb(255, 255, 255), 2, local_sidereal_time, sin_lat, cos_lat);
         }
         return @intCast(isize, i);
     } else return -1;
@@ -213,7 +224,8 @@ pub export fn getConstellationCentroid(constellation_index: usize) void {
     setResult(centroid.right_ascension, centroid.declination);
 }
 
-fn setResult(a: f32, b: f32) void {
+fn setResult(a: anytype, b: @TypeOf(a)) void {
+    comptime if (@sizeOf(@TypeOf(a)) != 4) @compileError("Result data must be exactly 4 bytes each");
     std.mem.copy(u8, @ptrCast([*]u8, result_data)[0..4], std.mem.toBytes(a)[0..]);
     std.mem.copy(u8, @ptrCast([*]u8, result_data)[4..8], std.mem.toBytes(b)[0..]);
 }

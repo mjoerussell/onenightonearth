@@ -18,7 +18,7 @@ interface WasmFns {
     initializeConstellations: (constellation_data: pointer) => void;
     initializeResultData: () => pointer;
     updateCanvasSettings: (settings: pointer) => void;
-    getImageData: (size_in_bytes: pointer) => pointer;
+    getImageData: () => pointer;
     resetImageData: () => void;
     projectStars: (observer_latitude: number, observer_longitude: number, observer_timestamp: BigInt) => void;
     projectConstellationGrids: (observer_latitude: number, observer_longitude: number, observer_timestamp: BigInt) => void;
@@ -117,11 +117,9 @@ export class WasmInterface {
     }
 
     getImageData(): Uint8ClampedArray {
-        const size_ptr = this.allocBytes(4);
-        const pixel_data_ptr = this.lib.getImageData(size_ptr);
-        const pixel_data_size = new DataView(this.memory, size_ptr, 4).getUint32(0, true);
-        this.freeBytes(size_ptr, 4);
-        return new Uint8ClampedArray(this.memory, pixel_data_ptr, pixel_data_size);
+        const pixel_data_ptr = this.lib.getImageData();
+        const result_data = new Uint32Array(this.memory, this.result_ptr, 2);
+        return new Uint8ClampedArray(this.memory, pixel_data_ptr, result_data[0]);
     }
 
     findWaypoints(start: Coord, end: Coord): Float32Array {

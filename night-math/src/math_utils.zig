@@ -12,7 +12,9 @@ pub const Point = packed struct {
     y: f32,
 
     pub fn getDist(self: Point, other: Point) f32 {
-        return std.math.sqrt(std.math.pow(f32, self.x - other.x, 2.0) + std.math.pow(f32, self.y - other.y, 2.0));
+        const x_diff_sq = (self.x - other.x) * (self.x - other.x);
+        const y_diff_sq = (self.y - other.y) * (self.y - other.y);
+        return std.math.sqrt(x_diff_sq + y_diff_sq);
     }
 };
 
@@ -22,10 +24,6 @@ pub const Line = struct {
 
     pub fn getSlope(self: Line) f32 {
         return (self.b.y - self.a.y) / (self.b.x - self.a.x);
-    }
-
-    pub fn getYIntercept(self: Line) f32 {
-        return self.a.y - (self.getSlope() * self.a.x);
     }
 
     /// Return `true` if the given point lies on the line defined by the points `a` and `b`.

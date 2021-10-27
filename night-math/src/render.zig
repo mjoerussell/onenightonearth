@@ -53,6 +53,10 @@ pub const Canvas = struct {
         return canvas;
     }
 
+    pub fn resetImageData(canvas: *Canvas) void {
+        @memset(@ptrCast([*]u8, canvas.data.ptr), 0, canvas.data.len * @sizeOf(Pixel));
+    }
+
     pub fn setPixelAt(self: *Canvas, point: Point, new_pixel: Pixel) void {
         if (std.math.isNan(point.x) or std.math.isNan(point.y)) {
             return;
@@ -70,27 +74,22 @@ pub const Canvas = struct {
         self.data[p_index] = new_pixel;
     }
 
-    pub fn coordToPoint(canvas: Canvas, sky_coord: SkyCoord, observer_pos: ObserverPosition, filter_below_horizon: bool) ?Point {
+    pub fn coordToPoint(canvas: Canvas, sky_coord: SkyCoord, local_sidereal_time: f64, sin_latitude: f32, cos_latitude: f32, filter_below_horizon: bool) ?Point {
         const two_pi = comptime math.pi * 2.0;
 
-        const local_sidereal_time = observer_pos.localSiderealTime();
         const hour_angle = local_sidereal_time - @as(f64, sky_coord.right_ascension);
         const hour_angle_rad = math_utils.floatMod(math_utils.degToRad(hour_angle), two_pi);
 
         const declination_rad = @floatCast(f64, math_utils.degToRad(sky_coord.declination));
         const sin_dec = math.sin(declination_rad);
         
-        const lat_rad = math_utils.degToRad(observer_pos.latitude);
-        const sin_lat = math.sin(lat_rad);
-        const cos_lat = math.cos(lat_rad);
-
-        const sin_alt = sin_dec * sin_lat + math.cos(declination_rad) * cos_lat * math.cos(hour_angle_rad);
-        const altitude = math_utils.boundedASin(sin_alt) catch return null;
+        const sin_alt = sin_dec * sin_latitude + math.cos(declination_rad) * cos_latitude * math.cos(hour_angle_rad);
+        const altitude = math.asin(sin_alt);
         if (filter_below_horizon and altitude < 0) {
             return null;
         }
 
-        const cos_azi = (sin_dec - math.sin(altitude) * sin_lat) / (math.cos(altitude) * cos_lat);
+        const cos_azi = (sin_dec - math.sin(altitude) * sin_latitude) / (math.cos(altitude) * cos_latitude);
         const azi = math.acos(cos_azi);
         const azimuth = if (math.sin(hour_angle_rad) < 0) azi else two_pi - azi;
 
@@ -124,15 +123,9 @@ pub const Canvas = struct {
         const sin_lat = math.sin(observer_lat_rad);
         const cos_lat = math.cos(observer_lat_rad);
 
-        const declination = math_utils.boundedASin(((raw_point.y / s) * math.cos(altitude) * cos_lat) + (math.sin(altitude) * sin_lat)) catch {
-            log(.Error, "Error computing declination", .{});
-            return null;
-        };
+        const declination = math.asin(((raw_point.y / s) * math.cos(altitude) * cos_lat) + (math.sin(altitude) * sin_lat));
 
-        var hour_angle_rad = math_utils.boundedACos((math.sin(altitude) - (math.sin(declination) * sin_lat)) / (math.cos(declination) * cos_lat)) catch {
-            log(.Error, "Error computing hour angle. Declination was {d:.3}", .{declination});
-            return null;
-        };
+        var hour_angle_rad = math.acos((math.sin(altitude) - (math.sin(declination) * sin_lat)) / (math.cos(declination) * cos_lat));
 
         hour_angle_rad = if (raw_point.x < 0) -hour_angle_rad else hour_angle_rad;
 

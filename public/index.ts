@@ -18,10 +18,17 @@ const renderStars = (controls: Controls, date?: Date) => {
         wasm_interface.updateSettings(controls.renderer.getCanvasSettings());
     }
 
+    const draw_start = performance.now();
     wasm_interface.projectStars(controls.latitude, controls.longitude, BigInt(timestamp));
     wasm_interface.projectConstellationGrids(controls.latitude, controls.longitude, BigInt(timestamp));
     const data = wasm_interface.getImageData();
     controls.renderer.drawData(data);
+    const draw_end = performance.now();
+
+    const diff = draw_end - draw_start;
+
+    // 60frame/sec 1sec/1000ms ~= 16.6 ms per frame
+    console.log(`Took ${diff} ms to update`);
     wasm_interface.resetImageData();
 };
 

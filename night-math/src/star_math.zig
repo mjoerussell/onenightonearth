@@ -49,6 +49,13 @@ pub const ObserverPosition = struct {
         return 100.46 + (0.985647 * days_since_j2000) + @floatCast(f64, pos.longitude) + @intToFloat(f64, 15 * pos.timestamp);
     }
 
+    // pub fn localSiderealTime(pos: ObserverPosition) f64 {
+    //     const M = 0.985647 / 86_400_000.0;
+    //     const j2000_offset_millis = 949_428_000_000 * M;
+    //     const timestamp_offset = 15 * M * @intToFloat(f64, pos.timestamp);
+    //     return 100.46 + timestamp_offset - j2000_offset_millis + @floatCast(f64, pos.longitude);
+    // }
+
 };
 
 pub const Star = packed struct {
@@ -242,10 +249,12 @@ pub const SpectralType = enum(u8) {
     }
 };
 
-pub fn projectStar(canvas: *Canvas, star: Star, observer_pos: ObserverPosition) void {
+pub fn projectStar(canvas: *Canvas, star: Star, local_sidereal_time: f64, sin_latitude: f32, cos_latitude: f32) void {
     const point = canvas.coordToPoint(
         SkyCoord{ .right_ascension = star.right_ascension, .declination = star.declination }, 
-        observer_pos,
+        local_sidereal_time,
+        sin_latitude,
+        cos_latitude,
         true
     ) orelse return;
 
@@ -254,66 +263,28 @@ pub fn projectStar(canvas: *Canvas, star: Star, observer_pos: ObserverPosition) 
     }
 }
 
-pub fn projectConstellationGrid(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, observer_pos: ObserverPosition) void {
+pub fn projectConstellationGrid(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, local_sidereal_time: f64, sin_latitude: f32, cos_latitude: f32) void {
+
     var iter = constellation.boundary_iter();
     while (iter.next()) |bound| {
-        const point_a = canvas.coordToPoint(bound[0], observer_pos, false) orelse continue;
-        const point_b = canvas.coordToPoint(bound[1], observer_pos, false) orelse continue;
+        const point_a = canvas.coordToPoint(bound[0], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
+        const point_b = canvas.coordToPoint(bound[1], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
         
         canvas.drawLine(Line{ .a = point_a, .b = point_b }, color, line_width);
     }
 }
 
-pub fn projectConstellationAsterism(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, observer_pos: ObserverPosition) void {
+pub fn projectConstellationAsterism(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, local_sidereal_time: f64, sin_latitude: f32, cos_latitude: f32) void {
     var branch_index: usize = 0;
     while (branch_index < constellation.asterism.len - 1) : (branch_index += 2) {
-        const point_a = canvas.coordToPoint(constellation.asterism[branch_index], observer_pos, false) orelse continue;
-        const point_b = canvas.coordToPoint(constellation.asterism[branch_index + 1], observer_pos, false) orelse continue;
+        const point_a = canvas.coordToPoint(constellation.asterism[branch_index], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
+        const point_b = canvas.coordToPoint(constellation.asterism[branch_index + 1], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
         
         canvas.drawLine(Line{ .a = point_a, .b = point_b }, color, line_width);
     }
 }
 
-pub fn drawSkyGrid(canvas: Canvas, observer_pos: ObserverPosition) void {
-    const grid_color = Pixel.rgba(91, 101, 117, 180);
-    const grid_zero_color = Pixel.rgba(176, 98, 65, 225);
-    var base_right_ascension: f32 = 0;
-
-    while (base_right_ascension < 360) : (base_right_ascension += 15) {
-        var declination: f32 = -90;
-        while (declination <= 90) : (declination += 0.1) {
-            const point = canvas.coordToPoint(.{ .right_ascension = base_right_ascension, .declination = declination }, observer_pos, true);
-            if (point) |p| {
-                if (canvas.isInsideCircle(p)) {
-                    if (base_right_ascension == 0) {
-                        canvas.setPixelAt(p, grid_zero_color);
-                    } else {
-                        canvas.setPixelAt(p, grid_color);
-                    }
-                }
-            }
-        }
-    }
-
-    var base_declination: f32 = -90;
-    while (base_declination <= 90) : (base_declination += 15) {
-        var right_ascension: f32 = 0;
-        while (right_ascension <= 360) : (right_ascension += 0.1) {
-            const point = canvas.coordToPoint(.{ .right_ascension = right_ascension, .declination = base_declination }, observer_pos, true);
-            if (point) |p| {
-                if (canvas.isInsideCircle(p)) {
-                    if (base_declination == 0) {
-                        canvas.setPixelAt(p, grid_zero_color);
-                    } else {
-                        canvas.setPixelAt(p, grid_color);
-                    }
-                }
-            }
-        }
-    }
-}
-
-pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []Constellation, observer_pos: ObserverPosition) ?usize {
+pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []Constellation, local_sidereal_time: f64, sin_latitude: f32, cos_latitude: f32) ?usize {
     if (!canvas.isInsideCircle(point)) return null;
 
     // Get a ray projected from the point to the right side of the canvas
@@ -330,7 +301,6 @@ pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []
     for (constellations) |c, constellation_index| {
         if (canvas.settings.zodiac_only and !c.is_zodiac) continue;
         
-        // var b_index: usize = 0;
         var num_intersections_right: u32 = 0;
         var num_intersections_left: u32 = 0;
 
@@ -338,8 +308,8 @@ pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []
         // If they intersect inside the canvas circle, then add that to the left or right intersection counter
         var iter = c.boundary_iter();
         while (iter.next()) |bound| {
-            const b_a = canvas.coordToPoint(bound[0], observer_pos, false) orelse continue;
-            const b_b = canvas.coordToPoint(bound[1], observer_pos, false) orelse continue;
+            const b_a = canvas.coordToPoint(bound[0], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
+            const b_b = canvas.coordToPoint(bound[1], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
 
             const bound_line = Line{ .a = b_a, .b = b_b };
             if (point_ray_right.segmentIntersection(bound_line)) |inter_point| {
