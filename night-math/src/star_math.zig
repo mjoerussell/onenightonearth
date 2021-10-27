@@ -43,10 +43,12 @@ pub const ObserverPosition = struct {
     longitude: f32,
     timestamp: i64,
 
-    pub fn localSiderealTime(pos: ObserverPosition) f64 {
+    pub fn localSiderealTime(pos: ObserverPosition) f32 {
         const j2000_offset_millis = 949_428_000_000;
         const days_since_j2000 = @intToFloat(f64, pos.timestamp - j2000_offset_millis) / 86_400_000.0;
-        return ((100.46 + (0.985647 * days_since_j2000) + @intToFloat(f64, 15 * pos.timestamp)) * (math.pi / 180.0)) + @floatCast(f64, pos.longitude);
+        const lst = ((100.46 + (0.985647 * days_since_j2000) + @intToFloat(f64, 15 * pos.timestamp)) * (math.pi / 180.0)) + @floatCast(f64, pos.longitude);
+        const mod_lst = math_utils.floatMod(lst, 2 * math.pi);
+        return @floatCast(f32, mod_lst);
     }
 };
 
@@ -232,7 +234,7 @@ pub const SpectralType = enum(u8) {
     }
 };
 
-pub fn projectStar(canvas: *Canvas, star: Star, local_sidereal_time: f64, sin_latitude: f32, cos_latitude: f32) void {
+pub fn projectStar(canvas: *Canvas, star: Star, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
     const point = canvas.coordToPoint(
         SkyCoord{ .right_ascension = star.right_ascension, .declination = star.declination }, 
         local_sidereal_time,
@@ -246,7 +248,7 @@ pub fn projectStar(canvas: *Canvas, star: Star, local_sidereal_time: f64, sin_la
     }
 }
 
-pub fn projectConstellationGrid(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, local_sidereal_time: f64, sin_latitude: f32, cos_latitude: f32) void {
+pub fn projectConstellationGrid(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
 
     var iter = constellation.boundary_iter();
     while (iter.next()) |bound| {
@@ -257,7 +259,7 @@ pub fn projectConstellationGrid(canvas: *Canvas, constellation: Constellation, c
     }
 }
 
-pub fn projectConstellationAsterism(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, local_sidereal_time: f64, sin_latitude: f32, cos_latitude: f32) void {
+pub fn projectConstellationAsterism(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
     var branch_index: usize = 0;
     while (branch_index < constellation.asterism.len - 1) : (branch_index += 2) {
         const point_a = canvas.coordToPoint(constellation.asterism[branch_index], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
@@ -267,7 +269,7 @@ pub fn projectConstellationAsterism(canvas: *Canvas, constellation: Constellatio
     }
 }
 
-pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []Constellation, local_sidereal_time: f64, sin_latitude: f32, cos_latitude: f32) ?usize {
+pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []Constellation, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) ?usize {
     if (!canvas.isInsideCircle(point)) return null;
 
     // Get a ray projected from the point to the right side of the canvas

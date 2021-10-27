@@ -154,8 +154,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     controls.onMapDrag((current_state, new_state) => {
-        console.log('Current drag state is ', current_state);
-        console.log('Next drag state is ', new_state);
         const new_coord = wasm_interface.dragAndMove(
             { latitude: current_state.x, longitude: current_state.y },
             { latitude: new_state.x, longitude: new_state.y }

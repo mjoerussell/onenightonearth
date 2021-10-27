@@ -74,10 +74,11 @@ pub const Canvas = struct {
         self.data[p_index] = new_pixel;
     }
 
-    pub fn coordToPoint(canvas: Canvas, sky_coord: SkyCoord, local_sidereal_time: f64, sin_latitude: f32, cos_latitude: f32, filter_below_horizon: bool) ?Point {
+    pub fn coordToPoint(canvas: Canvas, sky_coord: SkyCoord, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32, filter_below_horizon: bool) ?Point {
         const two_pi = comptime math.pi * 2.0;
 
-        const hour_angle_rad = local_sidereal_time - @as(f64, sky_coord.right_ascension);
+        // const hour_angle_rad = local_sidereal_time - @as(f64, sky_coord.right_ascension);
+        const hour_angle_rad = local_sidereal_time - sky_coord.right_ascension;
         const sin_dec = math.sin(sky_coord.declination);
         
         const sin_alt = sin_dec * sin_latitude + math.cos(sky_coord.declination) * cos_latitude * math.cos(hour_angle_rad);
@@ -100,8 +101,8 @@ pub const Canvas = struct {
             break :blk Point{ 
                 // @note without negating x here, the whole chart is rendered backwards. Not sure if this is where the negations
                 // is SUPPOSED to go, or if I messed up a negation somewhere else and this is just a hack that makes it work
-                .x = -@floatCast(f32, s * math.sin(azimuth)), 
-                .y = @floatCast(f32, s * math.cos(azimuth))
+                .x = -s * math.sin(azimuth), 
+                .y = s * math.cos(azimuth)
             };
         };
 

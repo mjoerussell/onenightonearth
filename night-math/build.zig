@@ -9,7 +9,11 @@ pub fn build(b: *Builder) !void {
 
     const lib = b.addSharedLibrary("night-math", "src/main.zig", b.version(0, 0, 0));
     lib.setBuildMode(mode);
-    lib.setTarget(.{ .cpu_arch = .wasm32, .os_tag = .freestanding });
+    const target = try std.zig.CrossTarget.parse(.{
+        .arch_os_abi = "wasm32-freestanding",
+        .cpu_features = "generic+simd128"
+    });
+    lib.setTarget(target);
     lib.setOutputDir("../public/dist/wasm/bin");
     lib.install();
 
