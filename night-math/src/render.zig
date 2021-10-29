@@ -77,7 +77,6 @@ pub const Canvas = struct {
     pub fn coordToPoint(canvas: Canvas, sky_coord: SkyCoord, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32, filter_below_horizon: bool) ?Point {
         const two_pi = comptime math.pi * 2.0;
 
-        // const hour_angle_rad = local_sidereal_time - @as(f64, sky_coord.right_ascension);
         const hour_angle_rad = local_sidereal_time - sky_coord.right_ascension;
         const sin_dec = math.sin(sky_coord.declination);
         
@@ -114,7 +113,7 @@ pub const Canvas = struct {
 
         const raw_point = canvas.untranslatePoint(point);
         // Distance from raw_point to the center of the sky circle
-        const s = math.sqrt(math.pow(f32, raw_point.x, 2.0) + math.pow(f32, raw_point.y, 2.0));
+        const s = math.sqrt((raw_point.x * raw_point.x) + (raw_point.y * raw_point.y));
         const altitude = (math.pi * (1 - s)) / 2;
 
         const sin_lat = math.sin(observer_pos.latitude);
@@ -124,13 +123,11 @@ pub const Canvas = struct {
 
         var hour_angle_rad = math.acos((math.sin(altitude) - (math.sin(declination) * sin_lat)) / (math.cos(declination) * cos_lat));
 
-        hour_angle_rad = if (raw_point.x < 0) -hour_angle_rad else hour_angle_rad;
-
         const lst = observer_pos.localSiderealTime();
-        const right_ascension = math_utils.floatMod(lst - hour_angle_rad, 2 * math.pi);
+        const right_ascension = lst - hour_angle_rad;
 
         return SkyCoord{
-            .right_ascension = @floatCast(f32, right_ascension),
+            .right_ascension = right_ascension,
             .declination = declination
         };
     }
@@ -216,6 +213,8 @@ test "translate point" {
         .zoom_factor = 1.0,
         .draw_asterisms = false,
         .draw_constellation_grid = false,
+        .drag_speed = 0,
+        .zodiac_only = false,
     };
 
     var canvas = try Canvas.init(std.testing.allocator, canvas_settings);
@@ -229,7 +228,40 @@ test "translate point" {
     const translated_point = canvas.translatePoint(point);
     const untranslated_point = canvas.untranslatePoint(translated_point);
 
-    std.testing.expectWithinMargin(untranslated_point.x, point.x, 0.005);
-    std.testing.expectWithinMargin(untranslated_point.y, point.y, 0.005);
+    try std.testing.expectApproxEqAbs(untranslated_point.x, point.x, 0.005);
+    try std.testing.expectApproxEqAbs(untranslated_point.y, point.y, 0.005);
+}
+
+test "coord to point conversion" {
+    const canvas_settings = Canvas.Settings{
+        .width = 700,
+        .height = 700,
+        .draw_north_up = true,
+        .background_radius = 0.45 * 700.0,
+        .zoom_factor = 1.0,
+        .draw_asterisms = false,
+        .draw_constellation_grid = false,
+        .drag_speed = 0,
+        .zodiac_only = false,
+    };
+
+    var canvas = try Canvas.init(std.testing.allocator, canvas_settings);
+    defer std.testing.allocator.free(canvas.data);
+
+    const original_sky_coord = SkyCoord{
+        .right_ascension = 125.07948333 * (math.pi / 180.0),
+        .declination = -87.72806111 * (math.pi / 180.0),
+    };
+
+    const original_coord = ObserverPosition{
+        .latitude = 56.5 * (math.pi / 180.0),
+        .longitude = -127.23 * (math.pi / 180.0),
+        .timestamp = 1635524865511,
+    };
+
+    const coord_to_point = canvas.coordToPoint(original_sky_coord, original_coord.localSiderealTime(), math.sin(original_coord.latitude), math.cos(original_coord.latitude), false).?;
+    const point_to_coord = canvas.pointToCoord(coord_to_point, original_coord).?;
+
+    try std.testing.expectEqual(original_sky_coord, point_to_coord);
 
 }

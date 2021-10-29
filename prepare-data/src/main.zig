@@ -77,7 +77,6 @@ pub const Constellation = struct {
             if (std.mem.trim(u8, line, " ").len == 0) continue;
 
             if (std.mem.indexOf(u8, line, "#zodiac")) |_| {
-                std.debug.print("Is zodiac\n", .{});
                 result.is_zodiac = true;
                 continue;
             }
@@ -160,8 +159,6 @@ pub const Constellation = struct {
         return result;
     }
 };
-
-
 
 pub const Star = packed struct {
     right_ascension: f32,

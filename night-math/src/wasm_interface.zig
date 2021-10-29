@@ -125,30 +125,25 @@ pub export fn resetImageData() void {
     canvas.resetImageData();
 }
 
-pub export fn projectStars(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
+pub export fn projectStarsAndConstellations(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
     const local_sidereal_time = pos.localSiderealTime();
-    const sin_lat = std.math.sin(observer_latitude);
-    const cos_lat = std.math.cos(observer_latitude);
+    const sin_latitude = std.math.sin(observer_latitude);
+    const cos_latitude = std.math.cos(observer_latitude);
+    
     for (stars) |star| {
-        star_math.projectStar(&canvas, star, local_sidereal_time, sin_lat, cos_lat);
+        star_math.projectStar(&canvas, star, local_sidereal_time, sin_latitude, cos_latitude);
     }
-}
 
-pub export fn projectConstellationGrids(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
-    const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
-    const local_sidereal_time = pos.localSiderealTime();
-    const sin_lat = std.math.sin(observer_latitude);
-    const cos_lat = std.math.cos(observer_latitude);
     if (canvas.settings.draw_constellation_grid or canvas.settings.draw_asterisms) {
         for (constellations) |constellation| {
             if (canvas.settings.zodiac_only and !constellation.is_zodiac) continue;
             
             if (canvas.settings.draw_constellation_grid) {
-                star_math.projectConstellationGrid(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, local_sidereal_time, sin_lat, cos_lat);
+                star_math.projectConstellationGrid(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, local_sidereal_time, sin_latitude, cos_latitude);
             }
             if (canvas.settings.draw_asterisms) {
-                star_math.projectConstellationAsterism(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, local_sidereal_time, sin_lat, cos_lat);
+                star_math.projectConstellationAsterism(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, local_sidereal_time, sin_latitude, cos_latitude);
             }
         }
     }

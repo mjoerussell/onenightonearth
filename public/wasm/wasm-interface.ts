@@ -20,8 +20,7 @@ interface WasmFns {
     updateCanvasSettings: (settings: pointer) => void;
     getImageData: () => pointer;
     resetImageData: () => void;
-    projectStars: (observer_latitude: number, observer_longitude: number, observer_timestamp: BigInt) => void;
-    projectConstellationGrids: (observer_latitude: number, observer_longitude: number, observer_timestamp: BigInt) => void;
+    projectStarsAndConstellations: (observer_latitude: number, observer_longitude: number, observer_timestamp: BigInt) => void;
     getConstellationAtPoint: (
         x: number,
         y: number,
@@ -70,7 +69,6 @@ export class WasmInterface {
         const_view.set(constellation_data);
         this.lib.initializeConstellations(const_ptr);
 
-        console.log(`Allocating space for ${num_stars} stars`);
         this.star_ptr = this.lib.allocateStars(num_stars);
 
         this.settings_ptr = this.allocObject(canvas_settings, sizedCanvasSettings);
@@ -84,18 +82,13 @@ export class WasmInterface {
 
     addStars(star_data: Uint8Array): void {
         const num_stars = star_data.byteLength / 13;
-        console.log(`Adding ${num_stars} stars`);
         const view = new Uint8Array(this.memory, this.star_ptr + this.num_stars_seen * 13, star_data.byteLength);
         view.set(star_data);
         this.num_stars_seen += num_stars;
     }
 
-    projectStars(latitude: number, longitude: number, timestamp: BigInt): void {
-        this.lib.projectStars(latitude, longitude, timestamp);
-    }
-
-    projectConstellationGrids(latitude: number, longitude: number, timestamp: BigInt): void {
-        this.lib.projectConstellationGrids(latitude, longitude, timestamp);
+    projectStarsAndConstellations(latitude: number, longitude: number, timestamp: BigInt): void {
+        this.lib.projectStarsAndConstellations(latitude, longitude, timestamp);
     }
 
     getConstellationAtPoint(point: CanvasPoint, latitude: number, longitude: number, timestamp: BigInt): number {

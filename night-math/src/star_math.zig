@@ -109,13 +109,9 @@ pub const Constellation = struct {
         var z: f32 = 0;
 
         for (constellation.boundaries) |b| {
-            // convert to radians
-            const ra_rad = b.right_ascension * (math.pi / 180.0);
-            const dec_rad = b.declination * (math.pi / 180.0);
-
-            x += math.cos(dec_rad) * math.cos(ra_rad);
-            y += math.cos(dec_rad) * math.sin(ra_rad);
-            z += math.sin(dec_rad);
+            x += math.cos(b.declination) * math.cos(b.right_ascension);
+            y += math.cos(b.declination) * math.sin(b.right_ascension);
+            z += math.sin(b.declination);
         }
 
         x /= @intToFloat(f32, constellation.boundaries.len);
@@ -127,8 +123,8 @@ pub const Constellation = struct {
         const central_lat = math.atan2(f32, z, central_sqrt);
 
         return SkyCoord{
-            .right_ascension = central_long * (180.0 / math.pi),
-            .declination = central_lat * (180.0 / math.pi)
+            .right_ascension = central_long,
+            .declination = central_lat
         };
     }
 };
@@ -141,30 +137,35 @@ pub fn GreatCircle(comptime num_waypoints: usize) type {
     return struct {
         const Self = @This();
 
-        start: Coord,
-        end: Coord,
-        distance: f32,
-        course_angle: f32,
+        start: Coord = .{ .latitude = 0, .longitude = 0},
+        end: Coord = .{ .latitude = 0, .longitude = 0},
+        distance: f32 = 0,
+        course_angle: f32 = 0,
 
         waypoints: [num_waypoints]Coord = undefined,
 
         pub fn init(start: Coord, end: Coord) Self {
-            const distance = blk: {
-                const long_diff = end.longitude - start.longitude;
-                const cos_d = math.sin(start.latitude) * math.sin(end.latitude) + math.cos(start.latitude) * math.cos(end.latitude) * math.cos(long_diff);
+            var great_circle = Self{
+                .start = start,
+                .end = end,
+            };
+
+            if (great_circle.start.longitude > math.pi) {
+                great_circle.start.longitude -= 2 * math.pi;
+            }
+            if (great_circle.end.longitude > math.pi) {
+                great_circle.end.longitude -= 2 * math.pi;
+            }
+
+            great_circle.distance = blk: {
+                const long_diff = great_circle.end.longitude - great_circle.start.longitude;
+                const cos_d = math.sin(great_circle.start.latitude) * math.sin(great_circle.end.latitude) + math.cos(great_circle.start.latitude) * math.cos(great_circle.end.latitude) * math.cos(long_diff);
                 break :blk math_utils.boundedACos(cos_d) catch 0;    
             };
 
-            const course_angle = blk: {
-                var cos_c = (math.sin(end.latitude) - math.sin(start.latitude) * math.cos(distance)) / (math.cos(start.latitude) * math.sin(distance));
+            great_circle.course_angle = blk: {
+                var cos_c = (math.sin(great_circle.end.latitude) - math.sin(great_circle.start.latitude) * math.cos(great_circle.distance)) / (math.cos(great_circle.start.latitude) * math.sin(great_circle.distance));
                 break :blk math_utils.boundedACos(cos_c) catch 0;
-            };
-
-            var great_circle = Self{ 
-                .start = start,
-                .end = end,
-                .distance = distance, 
-                .course_angle = course_angle,
             };
 
             const negative_dir = great_circle.end.longitude < great_circle.start.longitude and great_circle.end.longitude > (great_circle.start.longitude - math.pi);

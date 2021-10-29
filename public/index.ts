@@ -19,8 +19,7 @@ const renderStars = (controls: Controls, date?: Date) => {
     }
 
     const draw_start = performance.now();
-    wasm_interface.projectStars(controls.latitude, controls.longitude, BigInt(timestamp));
-    wasm_interface.projectConstellationGrids(controls.latitude, controls.longitude, BigInt(timestamp));
+    wasm_interface.projectStarsAndConstellations(controls.latitude, controls.longitude, BigInt(timestamp));
     const data = wasm_interface.getImageData();
     controls.renderer.drawData(data);
     const draw_end = performance.now();
@@ -28,7 +27,7 @@ const renderStars = (controls: Controls, date?: Date) => {
     const diff = draw_end - draw_start;
 
     // 60frame/sec 1sec/1000ms ~= 16.6 ms per frame
-    console.log(`Took ${diff} ms to update`);
+    console.log(`Took ${1 / (diff / 1000)} ms to update`);
     wasm_interface.resetImageData();
 };
 
@@ -116,6 +115,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        console.log('Waypoints ', waypoints);
+
         let zoom_step = 0;
         if (controls.renderer.zoom_factor !== end_zoom_factor) {
             const zoom_diff = end_zoom_factor - controls.renderer.zoom_factor;
@@ -173,14 +174,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const crossed_pole =
             (controls.latitude < pole_location && directed_add(controls.latitude, new_coord.latitude) > pole_location) ||
             (controls.latitude > -pole_location && directed_add(controls.latitude, new_coord.latitude) < -pole_location);
-        // const crossed_pole =
-        //     (controls.latitude < 90.0 && directed_add(controls.latitude, new_coord.latitude) > 90.0) ||
-        //     (controls.latitude > -90.0 && directed_add(controls.latitude, new_coord.latitude) < -90.0);
 
         if (crossed_pole) {
             // Add 180 degrees to the longitude because crossing a pole in a straight line would bring you to the other side
             // of the world
-            // controls.longitude += 180.0;
             controls.longitude += Math.PI;
             // Flip draw direction because if you were going south you're now going north and vice versa
             controls.renderer.draw_north_up = !controls.renderer.draw_north_up;
@@ -195,11 +192,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (controls.longitude < -Math.PI) {
             controls.longitude += Math.PI * 2;
         }
-        // if (controls.longitude > 180.0) {
-        //     controls.longitude -= 360.0;
-        // } else if (controls.longitude < -180.0) {
-        //     controls.longitude += 360.0;
-        // }
 
         window.requestAnimationFrame(() => renderStars(controls));
     });
@@ -233,6 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
             controls.longitude,
             BigInt(controls.date.valueOf())
         );
+
         updateLocation(new_coord, 2.5);
     });
 

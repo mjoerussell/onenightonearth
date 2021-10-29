@@ -11,7 +11,7 @@ export type CanvasSettings = {
 };
 
 export class Renderer {
-    public static readonly DefaultDragSpeed = 1.5;
+    public static readonly DefaultDragSpeed = 1.15;
     public static readonly DefaultMobileDragSpeed = 3;
     /**
      * The main canvas is the one that's shown to the user. It's only drawn to in single batches, once the workers

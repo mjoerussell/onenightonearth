@@ -132,11 +132,11 @@ pub fn floatEq(a: anytype, b: @TypeOf(a), epsilon: f32) bool {
 
 test "custom float modulus" {
     const margin = 0.0001;
-    std.testing.expectEqual(1.0, comptime floatMod(4.0, 1.5));
-    std.testing.expectWithinMargin(1.3467, comptime floatMod(74.17405, 14.56547), margin);
-    std.testing.expectWithinMargin(1.3467, comptime floatMod(74.17405, -14.56547), margin);
-    std.testing.expectWithinMargin(-1.3467, comptime floatMod(-74.17405, -14.56547), margin);
-    std.testing.expectWithinMargin(-1.3467, comptime floatMod(-74.17405, 14.56547), margin);
+    try std.testing.expectEqual(1.0, comptime floatMod(4.0, 1.5));
+    try std.testing.expectApproxEqAbs(@as(f32, 1.3467),  floatMod(@as(f32, 74.17405), 14.56547), margin);
+    try std.testing.expectApproxEqAbs(@as(f32, 1.3467),  floatMod(@as(f32, 74.17405), -14.56547), margin);
+    try std.testing.expectApproxEqAbs(@as(f32, -1.3467), floatMod(@as(f32, -74.17405), -14.56547), margin);
+    try std.testing.expectApproxEqAbs(@as(f32, -1.3467), floatMod(@as(f32, -74.17405), 14.56547), margin);
 }
 
 test "line intersection" {
@@ -150,13 +150,13 @@ test "line intersection" {
     };
 
     const inter_point = line_a.intersection(line_b);
-    std.testing.expectWithinMargin(@as(f32, 186.05), inter_point.?.x, 0.01);
-    std.testing.expectWithinMargin(@as(f32, -1.02), inter_point.?.y, 0.01);
-    std.testing.expect(line_a.containsPoint(inter_point.?));
-    std.testing.expect(line_b.containsPoint(inter_point.?));
+    try std.testing.expectApproxEqAbs(@as(f32, 186.05), inter_point.?.x, 0.01);
+    try std.testing.expectApproxEqAbs(@as(f32, -1.02), inter_point.?.y, 0.01);
+    try std.testing.expect(line_a.containsPoint(inter_point.?));
+    try std.testing.expect(line_b.containsPoint(inter_point.?));
 
     const seg_inter = line_a.segmentIntersection(line_b);
-    std.testing.expect(seg_inter == null);
+    try std.testing.expect(seg_inter == null);
 }
 
 test "segment intersect" {
@@ -170,10 +170,10 @@ test "segment intersect" {
     };
 
     const inter_point = line_a.intersection(line_b);
-    std.testing.expectWithinMargin(@as(f32, 253.14), inter_point.?.x, 0.01);
-    std.testing.expectWithinMargin(@as(f32, 180.9), inter_point.?.y, 0.01);
+    try std.testing.expectApproxEqAbs(@as(f32, 253.14), inter_point.?.x, 0.01);
+    try std.testing.expectApproxEqAbs(@as(f32, 180.9), inter_point.?.y, 0.01);
 
     const seg_inter_point = line_a.segmentIntersection(line_b);
-    std.testing.expectWithinMargin(@as(f32, 253.14), seg_inter_point.?.x, 0.01);
-    std.testing.expectWithinMargin(@as(f32, 180.9), seg_inter_point.?.y, 0.01);
+    try std.testing.expectApproxEqAbs(@as(f32, 253.14), seg_inter_point.?.x, 0.01);
+    try std.testing.expectApproxEqAbs(@as(f32, 180.9), seg_inter_point.?.y, 0.01);
 }
