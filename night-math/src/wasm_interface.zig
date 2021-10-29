@@ -160,10 +160,10 @@ pub export fn getConstellationAtPoint(x: f32, y: f32, observer_latitude: f32, ob
     const index = star_math.getConstellationAtPoint(&canvas, point, constellations, local_sidereal_time, sin_lat, cos_lat);
     if (index) |i| {
         if (canvas.settings.draw_constellation_grid) {
-            star_math.projectConstellationGrid(&canvas, constellations[i], Pixel.rgb(255, 255, 255), 2, local_sidereal_time, sin_lat, cos_lat);
+            star_math.projectConstellationGrid(&canvas, constellations[i], Pixel.rgb(255, 255, 255), 3, local_sidereal_time, sin_lat, cos_lat);
         }
         if (canvas.settings.draw_asterisms) {
-            star_math.projectConstellationAsterism(&canvas, constellations[i], Pixel.rgb(255, 255, 255), 2, local_sidereal_time, sin_lat, cos_lat);
+            star_math.projectConstellationAsterism(&canvas, constellations[i], Pixel.rgb(255, 255, 255), 3, local_sidereal_time, sin_lat, cos_lat);
         }
         return @intCast(isize, i);
     } else return -1;
@@ -196,18 +196,12 @@ pub export fn getCoordForSkyCoord(right_ascension: f32, declination: f32, observ
     setResult(coord.latitude, coord.longitude);
 }
 
-pub export fn getSkyCoordForCanvasPoint(x: f32, y: f32, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
-    const point = Point{ .x = x, .y = y };
-    const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
-    const sky_coord = canvas.pointToCoord(point, pos) orelse SkyCoord{};
-    setResult(sky_coord.right_ascension, sky_coord.declination);
-}
-
 pub export fn getCoordForCanvasPoint(x: f32, y: f32, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
     const point = Point{ .x = x, .y = y };
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
     const sky_coord = canvas.pointToCoord(point, pos) orelse SkyCoord{};
-    setResult(sky_coord.right_ascension, sky_coord.declination);
+    const coord = sky_coord.getCoord(observer_timestamp);
+    setResult(coord.latitude, coord.longitude);
 }
 
 pub export fn getConstellationCentroid(constellation_index: usize) void {

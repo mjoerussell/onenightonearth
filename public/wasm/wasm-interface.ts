@@ -32,13 +32,6 @@ interface WasmFns {
     dragAndMove: (drag_start_x: number, drag_start_y: number, drag_end_x: number, drag_end_y: number) => void;
     findWaypoints: (start_lat: number, start_long: number, end_lat: number, end_long: number) => pointer;
     getCoordForSkyCoord: (right_ascension: number, declination: number, observer_timestamp: BigInt) => void;
-    getSkyCoordForCanvasPoint: (
-        x: number,
-        y: number,
-        observer_latitude: number,
-        observer_longitude: number,
-        observer_timestamp: BigInt
-    ) => void;
     getCoordForCanvasPoint: (
         x: number,
         y: number,
@@ -135,20 +128,6 @@ export class WasmInterface {
         return {
             latitude: result_data[0],
             longitude: result_data[1],
-        };
-    }
-
-    getSkyCoordForCanvasPoint(
-        point: CanvasPoint,
-        observer_latitude: number,
-        observer_longitude: number,
-        observer_timestamp: BigInt
-    ): SkyCoord | null {
-        this.lib.getSkyCoordForCanvasPoint(point.x, point.y, observer_latitude, observer_longitude, observer_timestamp);
-        const result_data = new Float32Array(this.memory, this.result_ptr, 2);
-        return {
-            right_ascension: result_data[0],
-            declination: result_data[1],
         };
     }
 

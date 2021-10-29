@@ -77,10 +77,10 @@ pub const Canvas = struct {
     pub fn coordToPoint(canvas: Canvas, sky_coord: SkyCoord, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32, filter_below_horizon: bool) ?Point {
         const two_pi = comptime math.pi * 2.0;
 
-        const hour_angle_rad = local_sidereal_time - sky_coord.right_ascension;
+        const hour_angle = local_sidereal_time - sky_coord.right_ascension;
         const sin_dec = math.sin(sky_coord.declination);
         
-        const sin_alt = sin_dec * sin_latitude + math.cos(sky_coord.declination) * cos_latitude * math.cos(hour_angle_rad);
+        const sin_alt = sin_dec * sin_latitude + math.cos(sky_coord.declination) * cos_latitude * math.cos(hour_angle);
         const altitude = math.asin(sin_alt);
         if (filter_below_horizon and altitude < 0) {
             return null;
@@ -88,7 +88,7 @@ pub const Canvas = struct {
 
         const cos_azi = (sin_dec - math.sin(altitude) * sin_latitude) / (math.cos(altitude) * cos_latitude);
         const azi = math.acos(cos_azi);
-        const azimuth = if (math.sin(hour_angle_rad) < 0) azi else two_pi - azi;
+        const azimuth = if (math.sin(hour_angle) < 0) azi else two_pi - azi;
 
         const canvas_point = blk: {
             const radius = comptime 2.0 / math.pi;
@@ -121,10 +121,10 @@ pub const Canvas = struct {
 
         const declination = math.asin(((raw_point.y / s) * math.cos(altitude) * cos_lat) + (math.sin(altitude) * sin_lat));
 
-        var hour_angle_rad = math.acos((math.sin(altitude) - (math.sin(declination) * sin_lat)) / (math.cos(declination) * cos_lat));
+        const hour_angle = math.acos((math.sin(altitude) - (math.sin(declination) * sin_lat)) / (math.cos(declination) * cos_lat));
 
         const lst = observer_pos.localSiderealTime();
-        const right_ascension = lst - hour_angle_rad;
+        const right_ascension = lst - hour_angle;
 
         return SkyCoord{
             .right_ascension = right_ascension,
@@ -174,9 +174,8 @@ pub const Canvas = struct {
 
     pub fn drawLine(self: *Canvas, line: Line, color: Pixel, thickness: u32) void {
         const num_points = @floatToInt(u32, 75 * self.settings.zoom_factor);
-        const is_a_inside_circle = self.isInsideCircle(line.a);
-        const start = if (is_a_inside_circle) line.a else line.b;
-        const end = if (is_a_inside_circle) line.b else line.a;
+        const start = line.a;
+        const end = line.b;
 
         const expand_x = line.getSlope() > 1.5;
 
@@ -201,7 +200,6 @@ pub const Canvas = struct {
             }
         }
     }
-
 };
 
 test "translate point" {

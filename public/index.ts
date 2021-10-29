@@ -115,8 +115,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        console.log('Waypoints ', waypoints);
-
         let zoom_step = 0;
         if (controls.renderer.zoom_factor !== end_zoom_factor) {
             const zoom_diff = end_zoom_factor - controls.renderer.zoom_factor;

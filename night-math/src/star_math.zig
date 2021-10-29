@@ -21,19 +21,17 @@ pub const SkyCoord = packed struct {
     declination: f32 = 0,
 
     pub fn getCoord(sky_coord: SkyCoord, observer_timestamp: i64) Coord {
-        const j2000_offset_millis = 949_428_000_000;
-        const days_since_j2000 = @intToFloat(f64, observer_timestamp - j2000_offset_millis) / 86400000.0;
-        var longitude = sky_coord.right_ascension - ((100.46 + (0.985647 * days_since_j2000) + @intToFloat(f64, 15 * observer_timestamp)) * (math.pi / 180.0));
-        longitude = math_utils.floatMod(longitude, 2 * math.pi);
-        if (longitude < -math.pi) {
-            longitude += 2 * math.pi;
-        } else if (longitude > math.pi) {
-            longitude -= 2 * math.pi;
-        }
+        const partial_lst = getPartialLocalSiderealTime(observer_timestamp);
+        var longitude = sky_coord.right_ascension - partial_lst;
+        // if (longitude < -math.pi) {
+        //     longitude += 2 * math.pi;
+        // } else if (longitude > math.pi) {
+        //     longitude -= 2 * math.pi;
+        // }
 
         return Coord{
             .latitude = sky_coord.declination,
-            .longitude = @floatCast(f32, longitude)
+            .longitude = longitude
         };
     }
 };
@@ -44,13 +42,16 @@ pub const ObserverPosition = struct {
     timestamp: i64,
 
     pub fn localSiderealTime(pos: ObserverPosition) f32 {
-        const j2000_offset_millis = 949_428_000_000;
-        const days_since_j2000 = @intToFloat(f64, pos.timestamp - j2000_offset_millis) / 86_400_000.0;
-        const lst = ((100.46 + (0.985647 * days_since_j2000) + @intToFloat(f64, 15 * pos.timestamp)) * (math.pi / 180.0)) + @floatCast(f64, pos.longitude);
-        const mod_lst = math_utils.floatMod(lst, 2 * math.pi);
-        return @floatCast(f32, mod_lst);
+        return getPartialLocalSiderealTime(pos.timestamp) + pos.longitude;
     }
 };
+
+fn getPartialLocalSiderealTime(timestamp: i64) f32 {
+    const j2000_offset_millis = 949_428_000_000;
+    const days_since_j2000 = @intToFloat(f64, timestamp - j2000_offset_millis) / 86_400_000.0;
+    const lst = ((100.46 + (0.985647 * days_since_j2000) + @intToFloat(f64, 15 * timestamp)) * (math.pi / 180.0));
+    return @floatCast(f32, math_utils.floatMod(lst, 2 * math.pi));
+}
 
 pub const Star = packed struct {
     right_ascension: f32,
@@ -250,7 +251,6 @@ pub fn projectStar(canvas: *Canvas, star: Star, local_sidereal_time: f32, sin_la
 }
 
 pub fn projectConstellationGrid(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
-
     var iter = constellation.boundary_iter();
     while (iter.next()) |bound| {
         const point_a = canvas.coordToPoint(bound[0], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
