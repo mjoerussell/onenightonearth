@@ -23,12 +23,12 @@ pub const SkyCoord = packed struct {
     pub fn getCoord(sky_coord: SkyCoord, observer_timestamp: i64) Coord {
         const j2000_offset_millis = 949_428_000_000;
         const days_since_j2000 = @intToFloat(f64, observer_timestamp - j2000_offset_millis) / 86400000.0;
-        var longitude = sky_coord.right_ascension - (100.46 + (0.985647 * days_since_j2000) + @intToFloat(f64, 15 * observer_timestamp));
-        longitude = math_utils.floatMod(longitude, 360);
-        if (longitude < -180) {
-            longitude += 360;
-        } else if (longitude > 180) {
-            longitude -= 360;
+        var longitude = sky_coord.right_ascension - ((100.46 + (0.985647 * days_since_j2000) + @intToFloat(f64, 15 * observer_timestamp)) * (math.pi / 180.0));
+        longitude = math_utils.floatMod(longitude, 2 * math.pi);
+        if (longitude < -math.pi) {
+            longitude += 2 * math.pi;
+        } else if (longitude > math.pi) {
+            longitude -= 2 * math.pi;
         }
 
         return Coord{
