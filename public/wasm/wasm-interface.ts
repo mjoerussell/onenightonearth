@@ -131,15 +131,6 @@ export class WasmInterface {
         };
     }
 
-    getCoordForCanvasPoint(point: CanvasPoint, observer_latitude: number, observer_longitude: number, observer_timestamp: BigInt): Coord {
-        this.lib.getCoordForCanvasPoint(point.x, point.y, observer_latitude, observer_longitude, observer_timestamp);
-        const result_data = new Float32Array(this.memory, this.result_ptr, 2);
-        return {
-            latitude: result_data[0],
-            longitude: result_data[1],
-        };
-    }
-
     updateSettings(settings: CanvasSettings): void {
         this.setObject(new DataView(this.memory, this.settings_ptr), settings, sizedCanvasSettings);
         this.lib.updateCanvasSettings(this.settings_ptr);

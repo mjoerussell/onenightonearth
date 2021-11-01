@@ -108,30 +108,6 @@ pub const Canvas = struct {
         return canvas.translatePoint(canvas_point);
     }
 
-    pub fn pointToCoord(canvas: Canvas, point: Point, observer_pos: ObserverPosition) ?SkyCoord {
-        if (!canvas.isInsideCircle(point)) return null;
-
-        const raw_point = canvas.untranslatePoint(point);
-        // Distance from raw_point to the center of the sky circle
-        const s = math.sqrt((raw_point.x * raw_point.x) + (raw_point.y * raw_point.y));
-        const altitude = (math.pi * (1 - s)) / 2;
-
-        const sin_lat = math.sin(observer_pos.latitude);
-        const cos_lat = math.cos(observer_pos.latitude);
-
-        const declination = math.asin(((raw_point.y / s) * math.cos(altitude) * cos_lat) + (math.sin(altitude) * sin_lat));
-
-        const hour_angle = math.acos((math.sin(altitude) - (math.sin(declination) * sin_lat)) / (math.cos(declination) * cos_lat));
-
-        const lst = observer_pos.localSiderealTime();
-        const right_ascension = lst - hour_angle;
-
-        return SkyCoord{
-            .right_ascension = right_ascension,
-            .declination = declination
-        };
-    }
-
     pub fn translatePoint(self: Canvas, pt: Point) Point {
         const center = Point{
             .x = @intToFloat(f32, self.settings.width) / 2.0,
@@ -146,20 +122,6 @@ pub const Canvas = struct {
         return Point{
             .x = center.x + (translate_factor * pt.x),
             .y = center.y - (translate_factor * pt.y)
-        };
-    }
-
-    pub fn untranslatePoint(self: Canvas, pt: Point) Point {
-        const center = Point{
-            .x = @intToFloat(f32, self.settings.width) / 2.0,
-            .y = @intToFloat(f32, self.settings.height) / 2.0
-        };
-        const direction_modifier: f32 = if (self.settings.draw_north_up) 1.0 else -1.0;
-        const translate_factor: f32 = direction_modifier * self.settings.background_radius * self.settings.zoom_factor;
-
-        return Point{
-            .x = (pt.x - center.x) / translate_factor,
-            .y = (pt.y - center.y) / -translate_factor
         };
     }
 
@@ -201,34 +163,6 @@ pub const Canvas = struct {
         }
     }
 };
-
-test "translate point" {
-    const canvas_settings = Canvas.Settings{
-        .width = 700,
-        .height = 700,
-        .draw_north_up = true,
-        .background_radius = 0.45 * 700.0,
-        .zoom_factor = 1.0,
-        .draw_asterisms = false,
-        .draw_constellation_grid = false,
-        .drag_speed = 0,
-        .zodiac_only = false,
-    };
-
-    var canvas = try Canvas.init(std.testing.allocator, canvas_settings);
-    defer std.testing.allocator.free(canvas.data);
-    
-    const point = Point{
-        .x = 0.5,
-        .y = -0.3
-    };
-
-    const translated_point = canvas.translatePoint(point);
-    const untranslated_point = canvas.untranslatePoint(translated_point);
-
-    try std.testing.expectApproxEqAbs(untranslated_point.x, point.x, 0.005);
-    try std.testing.expectApproxEqAbs(untranslated_point.y, point.y, 0.005);
-}
 
 test "coord to point conversion" {
     const canvas_settings = Canvas.Settings{

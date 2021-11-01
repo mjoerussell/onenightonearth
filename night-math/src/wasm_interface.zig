@@ -210,24 +210,20 @@ pub export fn getCoordForSkyCoord(right_ascension: f32, declination: f32, observ
     setResult(coord.latitude, coord.longitude);
 }
 
-/// Given a point on the canvas, compute the Earth coordinate that that point currently represents (based on what Earth coordinate is currently set).
-pub export fn getCoordForCanvasPoint(x: f32, y: f32, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
-    const point = Point{ .x = x, .y = y };
-    const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
-    const sky_coord = canvas.pointToCoord(point, pos) orelse SkyCoord{};
-    const coord = sky_coord.getCoord(observer_timestamp);
-    setResult(coord.latitude, coord.longitude);
-}
-
+/// Get the central point of a given constellation. This point may be outside of the boundaries of a constellation if the constellation is
+/// irregularly shaped. The point is selected to make the constellation centered in the canvas.
 pub export fn getConstellationCentroid(constellation_index: usize) void {
     const centroid = if (constellation_index > constellations.len) SkyCoord{} else constellations[constellation_index].centroid();
     setResult(centroid.right_ascension, centroid.declination);
 }
 
+/// Set data in the result buffer so that it can be read in the JS side. Both values must be exactly 4 bytes long.
 fn setResult(a: anytype, b: @TypeOf(a)) void {
-    comptime if (@sizeOf(@TypeOf(a)) != 4) @compileError("Result data must be exactly 4 bytes each");
-    std.mem.copy(u8, @ptrCast([*]u8, result_data)[0..4], std.mem.toBytes(a)[0..]);
-    std.mem.copy(u8, @ptrCast([*]u8, result_data)[4..8], std.mem.toBytes(b)[0..]);
+    const A = @TypeOf(a);
+    comptime if (@sizeOf(A) != 4) @compileError("Result data must be exactly 4 bytes each");
+    const result_ptr = @ptrCast([*]A, @alignCast(@alignOf(A), result_data.ptr));
+    result_ptr[0] = a;
+    result_ptr[1] = b;
 }
 
 pub export fn _wasm_alloc(byte_len: u32) ?[*]u8 {

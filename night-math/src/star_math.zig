@@ -23,11 +23,6 @@ pub const SkyCoord = packed struct {
     pub fn getCoord(sky_coord: SkyCoord, observer_timestamp: i64) Coord {
         const partial_lst = getPartialLocalSiderealTime(observer_timestamp);
         var longitude = sky_coord.right_ascension - partial_lst;
-        // if (longitude < -math.pi) {
-        //     longitude += 2 * math.pi;
-        // } else if (longitude > math.pi) {
-        //     longitude -= 2 * math.pi;
-        // }
 
         return Coord{
             .latitude = sky_coord.declination,
@@ -250,6 +245,7 @@ pub fn projectStar(canvas: *Canvas, star: Star, local_sidereal_time: f32, sin_la
     }
 }
 
+/// Draw the boundaries of a constellation.
 pub fn projectConstellationGrid(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
     var iter = constellation.boundary_iter();
     while (iter.next()) |bound| {
@@ -260,6 +256,7 @@ pub fn projectConstellationGrid(canvas: *Canvas, constellation: Constellation, c
     }
 }
 
+/// Draw the asterism (pattern) of a constellation.
 pub fn projectConstellationAsterism(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
     var branch_index: usize = 0;
     while (branch_index < constellation.asterism.len - 1) : (branch_index += 2) {

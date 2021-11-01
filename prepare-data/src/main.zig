@@ -7,6 +7,9 @@ pub fn degToRad(degrees: anytype) @TypeOf(degrees) {
     return degrees * (std.math.pi / 180.0);
 }
 
+/// Convert longitude values from degrees to radians. This differs from a normal degree-to-radian conversion
+/// because longitude values are written in the range [-180, 180], but the resulting radian values should be
+/// between [0, 2pi].
 pub fn degToRadLong(degrees: anytype) @TypeOf(degrees) {
     const norm_deg = if (degrees < 0) degrees + 360 else degrees;
     return degToRad(norm_deg);
@@ -320,6 +323,7 @@ fn writeStarData(stars: []Star, out_filename: []const u8) !void {
     try output_buffered_writer.flush();
 }
 
+/// Read and parse all of the constellation files in a given directory.
 fn readConstellationFiles(allocator: *Allocator, constellation_dir_name: []const u8) ![]Constellation {
     var constellations = std.ArrayList(Constellation).init(allocator);
     errdefer constellations.deinit();
@@ -390,6 +394,8 @@ fn writeConstellationData(constellations: []Constellation, const_out_filename: [
     try const_out_buffered_writer.flush();
 }
 
+/// Randomize the order of the stars. This is so that, when the star data starts streaming in when the page begins loading, the
+/// stars populate in the sky in a natural-feeling way. Without this, stars would fill the canvas in a roughly bottom-up way.
 fn shuffleStars(stars: []Star) void {
     const timer = std.time.Timer.start() catch unreachable;
     var rand = std.rand.DefaultPrng.init(timer.read());

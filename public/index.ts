@@ -216,17 +216,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    controls.onMapDoubleClick(point => {
-        const new_coord = wasm_interface.getCoordForCanvasPoint(
-            point,
-            controls.latitude,
-            controls.longitude,
-            BigInt(controls.date.valueOf())
-        );
-
-        updateLocation(new_coord, 2.5);
-    });
-
     controls.onSelectConstellation(const_index => {
         controls.constellation_name = `${constellations[const_index].name} - ${constellations[const_index].epithet}`;
         const constellation_center = wasm_interface.getConstellationCentroid(const_index);

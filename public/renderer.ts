@@ -10,6 +10,12 @@ export type CanvasSettings = {
     zodiac_only: boolean;
 };
 
+interface Canvas {
+    id: string;
+    canvas: HTMLCanvasElement;
+    context: CanvasRenderingContext2D;
+}
+
 export class Renderer {
     public static readonly DefaultDragSpeed = 1.3;
     public static readonly DefaultMobileDragSpeed = 3;
@@ -17,21 +23,26 @@ export class Renderer {
      * The main canvas is the one that's shown to the user. It's only drawn to in single batches, once the workers
      * have finished drawing everything to the offscreen buffer.
      */
-    private main_canvas: HTMLCanvasElement;
-    private main_ctx: CanvasRenderingContext2D;
+    private main_canvas: Canvas;
 
     private settings: CanvasSettings;
 
     private _settings_did_change = true;
 
-    constructor(canvas_id: string) {
-        this.main_canvas = document.getElementById(canvas_id) as HTMLCanvasElement;
-        this.main_ctx = this.main_canvas.getContext('2d')!;
+    constructor(main_canvas_id: string) {
+        const main_canvas = document.getElementById(main_canvas_id) as HTMLCanvasElement;
+        const main_canvas_context = main_canvas.getContext('2d')!;
+
+        this.main_canvas = {
+            id: main_canvas_id,
+            canvas: main_canvas,
+            context: main_canvas_context,
+        };
 
         this.settings = {
-            width: this.main_canvas.width,
-            height: this.main_canvas.height,
-            background_radius: 0.45 * Math.min(this.main_canvas.width, this.main_canvas.height),
+            width: this.main_canvas.canvas.width,
+            height: this.main_canvas.canvas.height,
+            background_radius: 0.45 * Math.min(this.main_canvas.canvas.width, this.main_canvas.canvas.height),
             zoom_factor: 1.0,
             drag_speed: Renderer.DefaultDragSpeed,
             draw_north_up: true,
@@ -40,16 +51,16 @@ export class Renderer {
             zodiac_only: false,
         };
 
-        this.main_canvas.addEventListener('resize', _ => {
-            this.width = this.main_canvas.width;
-            this.height = this.main_canvas.height;
+        this.main_canvas.canvas.addEventListener('resize', _ => {
+            this.width = this.main_canvas.canvas.width;
+            this.height = this.main_canvas.canvas.height;
         });
     }
 
     drawData(data: Uint8ClampedArray): void {
         try {
-            const image_data = new ImageData(data, this.main_canvas.width, this.main_canvas.height);
-            this.main_ctx.putImageData(image_data, 0, 0);
+            const image_data = new ImageData(data, this.main_canvas.canvas.width, this.main_canvas.canvas.height);
+            this.main_canvas.context.putImageData(image_data, 0, 0);
         } catch (error) {
             if (error instanceof DOMException) {
                 console.error('DOMException in drawPoint: ', error);
@@ -63,7 +74,7 @@ export class Renderer {
      * @param event_handler
      */
     addEventListener<K extends keyof DocumentEventMap>(event_name: K, event_handler: (e: DocumentEventMap[K]) => void): void {
-        this.main_canvas.addEventListener(event_name, (event: any) => {
+        this.main_canvas.canvas.addEventListener(event_name, (event: any) => {
             event_handler(event);
         });
     }
@@ -132,11 +143,11 @@ export class Renderer {
      * The user-facing canvas.
      */
     get canvas() {
-        return this.main_canvas;
+        return this.main_canvas.canvas;
     }
 
     get context() {
-        return this.main_ctx;
+        return this.main_canvas.context;
     }
 
     set draw_constellation_grid(value: boolean) {

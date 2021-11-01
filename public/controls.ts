@@ -352,25 +352,6 @@ export class Controls {
         });
     }
 
-    onMapDoubleClick(handler: (_: CanvasPoint) => void): void {
-        this.renderer.addEventListener('dblclick', event => {
-            event.preventDefault();
-            handler({
-                x: event.offsetX,
-                y: event.offsetY,
-            });
-        });
-        this.touch_handler.onDoubleClick(touch => {
-            const canvas_rect = this.renderer.canvas.getBoundingClientRect();
-            const offset_x = touch.client_x - canvas_rect.x;
-            const offset_y = touch.client_y - canvas_rect.y;
-            handler({
-                x: offset_x,
-                y: offset_y,
-            });
-        });
-    }
-
     onChangeConstellationView(handler: () => void): void {
         const handleAllInputs = () => {
             this.renderer.draw_asterisms = this.show_asterism_input?.checked ?? false;

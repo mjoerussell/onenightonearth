@@ -232,12 +232,8 @@ div.constellation-info.mobile {
     cursor: grabbing;
 }
 
-.canvas-container canvas#backdrop-canvas {
-    z-index: 0;
-}
-
-.test-backdrop-canvas {
-    background-color: #030b1c;
+.backdrop {
+    background-color: #00091d;
     width: calc(850px * 0.9);
     height: calc(850px * 0.9);
     border-radius: 50%;
