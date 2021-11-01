@@ -65,7 +65,6 @@ export class Controls {
         this.update_location_button = document.getElementById('locationUpdate') as HTMLButtonElement;
         this.current_position_button = document.getElementById('currentPosition') as HTMLButtonElement;
 
-        // this.show_constellations_input = document.getElementById('showConstellations') as HTMLInputElement;
         this.show_asterism_input = document.getElementById('showAsterism') as HTMLInputElement;
         this.show_constellation_grid_input = document.getElementById('showGrid') as HTMLInputElement;
         this.show_only_zodiac_input = document.getElementById('onlyZodiac') as HTMLInputElement;

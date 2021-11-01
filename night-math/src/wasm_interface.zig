@@ -53,12 +53,14 @@ const ExternCanvasSettings = packed struct {
     }
 };
 
+/// Allocate memory for the stars and waypoints. Returns a pointer to the start of the star slice.
 pub export fn allocateStars(num_stars: u32) [*]Star {
     stars = allocator.alloc(Star, @intCast(usize, num_stars)) catch unreachable;
     waypoints = allocator.alloc(Coord, num_waypoints) catch unreachable;
     return stars.ptr;
 }
 
+/// Initialize the canvas pixel data, and set the initial settings.
 pub export fn initializeCanvas(settings: *ExternCanvasSettings) void {
     canvas = Canvas.init(allocator, settings.getCanvasSettings()) catch {
         const num_pixels = canvas.settings.width * canvas.settings.height;
@@ -67,13 +69,20 @@ pub export fn initializeCanvas(settings: *ExternCanvasSettings) void {
     };
 }
 
-// Format:
-// num_constellations | num_boundary_coords | num_asterism_coords | ...constellations | ...constellation_boundaries | ...constellation asterisms
-// constellations size = num_constellations * { f32 f32 u8 }
-// constellation_boundaries size = num_boundary_coords * { f32 f32 }
-// constellation_asterisms size = num_asterism_coords * { f32 f32 }
+/// Initialize the result data slice - this will be used to "return" multiple results at once in functions like `getCoordForSkyCoord`.
+pub export fn initializeResultData() [*]u8 {
+    result_data = allocator.alloc(u8, 8) catch unreachable;
+    return result_data.ptr;
+}
 
+/// Initialize the constellation boundaries, asterisms, and zodiac flags. Because each constellation has a variable number of boundaries and
+/// asterisms, the data layout is slightly complicated.
 pub export fn initializeConstellations(data: [*]u8) void {
+    // Constellation data layout:
+    // num_constellations | num_boundary_coords | num_asterism_coords | ...constellations | ...constellation_boundaries | ...constellation asterisms
+    // constellations size = num_constellations * { u32 u32 u8 } (num boundaries, num asterisms, is_zodiac)
+    // constellation_boundaries size = num_boundary_coords * { f32 f32 }
+    // constellation_asterisms size = num_asterism_coords * { f32 f32 }
     const ConstellationInfo = packed struct {
         num_boundaries: u32,
         num_asterisms: u32,
@@ -99,7 +108,6 @@ pub export fn initializeConstellations(data: [*]u8) void {
     var c_bound_start: usize = 0;
     var c_ast_start: usize = 0;
     for (constellations) |*c, c_index| {
-        log(.Debug, "Is Zodiac? {}", .{constellation_data[c_index].is_zodiac});
         c.* = Constellation{
             .is_zodiac = constellation_data[c_index].is_zodiac == 1,
             .boundaries = boundary_data[c_bound_start..c_bound_start + constellation_data[c_index].num_boundaries],
@@ -107,8 +115,6 @@ pub export fn initializeConstellations(data: [*]u8) void {
         };
         c_bound_start += constellation_data[c_index].num_boundaries;
         c_ast_start += constellation_data[c_index].num_asterisms;
-
-        
     }
 }
 
@@ -116,15 +122,19 @@ pub export fn updateCanvasSettings(settings: *ExternCanvasSettings) void {
     canvas.settings = settings.getCanvasSettings();
 }
 
+/// Returns a pointer to the pixel data so that it can be rendered on the canvas. Also sets the length of this buffer into the first slot
+/// of result_data.
 pub export fn getImageData() [*]Pixel {
     setResult(@as(u32, canvas.data.len) * 4, 0);
     return canvas.data.ptr;
 }
 
+/// Clear the canvas pixel data.
 pub export fn resetImageData() void {
     canvas.resetImageData();
 }
 
+/// The main rendering function. This will render all of the stars and, if turned on, the constellation asterisms and/or boundaries.
 pub export fn projectStarsAndConstellations(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
     const local_sidereal_time = pos.localSiderealTime();
@@ -149,6 +159,9 @@ pub export fn projectStarsAndConstellations(observer_latitude: f32, observer_lon
     }
 }
 
+/// Given a point on the canvas, determine which constellation (if any (but there should always be one)) is currently at that point. Once
+/// the constellation is found, draw a thicker line over that constellation's boundary and/or asterism to highlight it.
+/// Finally, return the index of the constellation so that the JS part of the frontend can show the constellation info.
 pub export fn getConstellationAtPoint(x: f32, y: f32, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) isize {
     const point = Point{ .x = x, .y = y };
 
@@ -169,16 +182,15 @@ pub export fn getConstellationAtPoint(x: f32, y: f32, observer_latitude: f32, ob
     } else return -1;
 }
 
-pub export fn initializeResultData() [*]u8 {
-    result_data = allocator.alloc(u8, 8) catch unreachable;
-    return result_data.ptr;
-}
-
+/// Compute a new coordiate based on the mouse drag state. Sets the latitude and longitude of the new coordinate into the respective slots of
+/// `result_data`.
 pub export fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_end_y: f32) void {
     const coord = star_math.dragAndMove(drag_start_x, drag_start_y, drag_end_x, drag_end_y, canvas.settings.drag_speed);
     setResult(coord.latitude, coord.longitude);
 }
 
+/// Compute waypoints between two coordinates. Returns a pointer to the waypoints, but does not allocate any
+/// new memory.
 pub export fn findWaypoints(start_lat: f32, start_long: f32, end_lat: f32, end_long: f32) [*]Coord {
     const start = Coord{ .latitude = start_lat, .longitude = start_long };
     const end = Coord{ .latitude = end_lat, .longitude = end_long };
@@ -190,12 +202,15 @@ pub export fn findWaypoints(start_lat: f32, start_long: f32, end_lat: f32, end_l
     return waypoints.ptr;
 }
 
+/// Given a sky coordinate and a timestamp, compute the Earth coordinate currently "below" that position. Puts the latitude and
+/// longitude into the result_data buffer.
 pub export fn getCoordForSkyCoord(right_ascension: f32, declination: f32, observer_timestamp: i64) void {
     const sky_coord = SkyCoord{ .right_ascension = right_ascension, .declination = declination };
     const coord = sky_coord.getCoord(observer_timestamp);
     setResult(coord.latitude, coord.longitude);
 }
 
+/// Given a point on the canvas, compute the Earth coordinate that that point currently represents (based on what Earth coordinate is currently set).
 pub export fn getCoordForCanvasPoint(x: f32, y: f32, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
     const point = Point{ .x = x, .y = y };
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };

@@ -58,8 +58,6 @@ pub const Constellation = struct {
             boundaries,
         };
 
-        var result: Constellation = undefined;
-
         var stars = std.StringHashMap(SkyCoord).init(allocator);
         defer stars.deinit();
 
@@ -69,6 +67,8 @@ pub const Constellation = struct {
         var asterism_list = std.ArrayList(SkyCoord).init(allocator);
         errdefer asterism_list.deinit();
 
+        var is_zodiac = false;
+
         var line_iter = std.mem.split(u8, data, "\r\n");
 
         var parse_state: ParseState = .stars;
@@ -77,7 +77,7 @@ pub const Constellation = struct {
             if (std.mem.trim(u8, line, " ").len == 0) continue;
 
             if (std.mem.indexOf(u8, line, "#zodiac")) |_| {
-                result.is_zodiac = true;
+                is_zodiac = true;
                 continue;
             }
 
@@ -97,7 +97,6 @@ pub const Constellation = struct {
             }
 
             if (!std.mem.startsWith(u8, line, "@")) {
-                // std.debug.print("Line: {s}\n", .{line});
                 switch (parse_state) {
                     .stars => {
                         var parts = std.mem.split(u8, line, ",");
@@ -153,10 +152,11 @@ pub const Constellation = struct {
             }
         }
 
-        result.boundaries = boundary_list.toOwnedSlice();
-        result.asterism = asterism_list.toOwnedSlice();
-
-        return result;
+        return Constellation{
+            .boundaries = boundary_list.toOwnedSlice(),
+            .asterism = asterism_list.toOwnedSlice(),
+            .is_zodiac = is_zodiac,
+        };
     }
 };
 
@@ -371,6 +371,7 @@ fn writeConstellationData(constellations: []Constellation, const_out_filename: [
 
     for (constellations) |constellation| {
         const info = constellation.getInfo();
+        std.debug.print("Is Zodiac? {}\n", .{info.is_zodiac});
         try const_out_writer.writeAll(std.mem.toBytes(info)[0..]);
     }
 
