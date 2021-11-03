@@ -70,6 +70,11 @@ pub const Star = packed struct {
 };
 
 pub const Constellation = struct {
+    /// Iterate over the boundaries two at a time. The iteration goes like this:
+    ///
+    /// Boundary List: `A - B - C - D`
+    ///
+    /// Iteration: `(A B) - (B C) - (C D) - (D A)`
     pub const BoundaryIter = struct {
         constellation: Constellation,
         boundary_index: usize = 0,
@@ -99,6 +104,9 @@ pub const Constellation = struct {
         return .{ .constellation = self };
     }
 
+    /// The centroid of a constellation is the coordinate that, when navigated to, will put the constellation
+    /// in the center of the canvas. This point might be outside of the boundaries of the constellation if that
+    /// constellation is irregularly shaped.
     pub fn centroid(constellation: Constellation) SkyCoord {
         var x: f32 = 0;
         var y: f32 = 0;
@@ -129,15 +137,23 @@ pub const Constellation = struct {
 // aren't getting drawn before the next draw cycle starts. That could explain why they happen towards the middle of the screen,
 // since the constellations are ordered in a roughly clockwise-by-longitude way. Needs more investigation though
 
+/// A Great Circle is a circle that intersects the center of a sphere. The path along a great circle is the shortest path between
+/// two points on the surface of a sphere.
 pub fn GreatCircle(comptime num_waypoints: usize) type {
     return struct {
         const Self = @This();
 
         start: Coord = .{ .latitude = 0, .longitude = 0},
         end: Coord = .{ .latitude = 0, .longitude = 0},
+
+        /// The angular distance between start and end. Measured in radians.
         distance: f32 = 0,
+
+        /// The course angle is the angle at which the great circle path crosses the
+        /// equator.
         course_angle: f32 = 0,
 
+        /// waypooints are equidistant along the great circle path between start and end.
         waypoints: [num_waypoints]Coord = undefined,
 
         pub fn init(start: Coord, end: Coord) Self {
@@ -164,12 +180,11 @@ pub fn GreatCircle(comptime num_waypoints: usize) type {
                 break :blk math_utils.boundedACos(cos_c) catch 0;
             };
 
-            const negative_dir = great_circle.end.longitude < great_circle.start.longitude and great_circle.end.longitude > (great_circle.start.longitude - math.pi);
+            const negative_dir: bool = great_circle.end.longitude < great_circle.start.longitude and great_circle.end.longitude > (great_circle.start.longitude - math.pi);
 
             const waypoint_inc: f32 = great_circle.distance / @intToFloat(f32, num_waypoints);
-            var waypoints: [num_waypoints]Coord = undefined;
             
-            for (waypoints) |*waypoint, i| {
+            for (great_circle.waypoints) |*waypoint, i| {
                 const waypoint_dist = @intToFloat(f32, i + 1) * waypoint_inc;
                 const lat = blk: {
                     const sin_lat_x = math.sin(great_circle.start.latitude) * math.cos(waypoint_dist) + math.cos(great_circle.start.latitude) * math.sin(waypoint_dist) * math.cos(great_circle.course_angle);
@@ -188,13 +203,13 @@ pub fn GreatCircle(comptime num_waypoints: usize) type {
                 };
             }
 
-            great_circle.waypoints = waypoints;
-
             return great_circle;
         }
     };
 }
 
+/// Each star has a spectral type based on its temperature. Each spectral type category emits a different
+/// color of light.
 pub const SpectralType = enum(u8) {
     /// > 30,000 K
     O,
@@ -231,6 +246,7 @@ pub const SpectralType = enum(u8) {
     }
 };
 
+/// Draw a star on the canvas
 pub fn projectStar(canvas: *Canvas, star: Star, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
     const point = canvas.coordToPoint(
         SkyCoord{ .right_ascension = star.right_ascension, .declination = star.declination }, 
@@ -267,6 +283,7 @@ pub fn projectConstellationAsterism(canvas: *Canvas, constellation: Constellatio
     }
 }
 
+/// Get the constellation that's currently at the point on the canvas.
 pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []Constellation, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) ?usize {
     if (!canvas.isInsideCircle(point)) return null;
 

@@ -12,7 +12,8 @@ import {
 } from './size';
 import { CanvasSettings } from '../renderer';
 
-interface WasmFns {
+interface WasmLib {
+    memory: WebAssembly.Memory;
     allocateStars: (num_stars: number) => pointer;
     initializeCanvas: (settings: pointer) => void;
     initializeConstellations: (constellation_data: pointer) => void;
@@ -42,13 +43,16 @@ interface WasmFns {
 }
 
 export class WasmInterface {
-    private lib: WasmFns;
+    private lib: WasmLib;
 
     private settings_ptr: number = 0;
     private result_ptr: number = 0;
 
     private star_ptr: number = 0;
     private num_stars_seen: number = 0;
+
+    private pixel_data_ptr: number = 0;
+    private pixel_count: number = 0;
 
     constructor(private instance: WebAssembly.Instance) {
         this.lib = this.instance.exports as any;
@@ -69,10 +73,18 @@ export class WasmInterface {
 
         this.result_ptr = this.lib.initializeResultData();
 
+        this.pixel_data_ptr = this.lib.getImageData();
+        this.pixel_count = new Uint32Array(this.memory, this.result_ptr, 2)[0];
+
         const init_end = performance.now();
         console.log(`Took ${init_end - init_start} ms to initialize`);
     }
 
+    /**
+     * Add new stars to the current end of a pre-allocated star buffer. This pattern is here to enable streaming star data
+     * from the server to the client, since the data can be large.
+     * @param star_data A buffer of star data
+     */
     addStars(star_data: Uint8Array): void {
         const num_stars = star_data.byteLength / 13;
         const view = new Uint8Array(this.memory, this.star_ptr + this.num_stars_seen * 13, star_data.byteLength);
@@ -98,16 +110,24 @@ export class WasmInterface {
         };
     }
 
+    /** Clear the canvas. */
     resetImageData(): void {
         this.lib.resetImageData();
     }
 
+    /**
+     * Get the pixel data, which can then be put onto the canvas.
+     * @returns
+     */
     getImageData(): Uint8ClampedArray {
-        const pixel_data_ptr = this.lib.getImageData();
-        const result_data = new Uint32Array(this.memory, this.result_ptr, 2);
-        return new Uint8ClampedArray(this.memory, pixel_data_ptr, result_data[0]);
+        return new Uint8ClampedArray(this.memory, this.pixel_data_ptr, this.pixel_count);
     }
 
+    /**
+     * Find waypoints between two coordinates. This will return 150 waypoints.
+     * @returns A `Float32Array` containing the waypoint latitude and longitudes. Every 2 sequential floats in
+     *      this array represent 1 waypoint coordinate.
+     */
     findWaypoints(start: Coord, end: Coord): Float32Array {
         const result_ptr = this.lib.findWaypoints(start.latitude, start.longitude, end.latitude, end.longitude);
         return new Float32Array(this.memory.slice(result_ptr, result_ptr + 4 * 300));
@@ -223,6 +243,6 @@ export class WasmInterface {
     }
 
     get memory(): ArrayBuffer {
-        return (this.instance.exports.memory as any).buffer;
+        return this.lib.memory.buffer;
     }
 }
