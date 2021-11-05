@@ -18,7 +18,7 @@ interface Canvas {
 
 export class Renderer {
     public static readonly DefaultDragSpeed = 1.3;
-    public static readonly DefaultMobileDragSpeed = 3;
+    public static readonly DefaultMobileDragSpeed = 1.5;
     /**
      * The main canvas is the one that's shown to the user. It's only drawn to in single batches, once the workers
      * have finished drawing everything to the offscreen buffer.
@@ -39,10 +39,15 @@ export class Renderer {
             context: main_canvas_context,
         };
 
+        const canvas_dim = main_canvas.clientWidth < main_canvas.clientHeight ? main_canvas.clientWidth : main_canvas.clientHeight;
+
+        this.main_canvas.canvas.width = canvas_dim;
+        this.main_canvas.canvas.height = canvas_dim;
+
         this.settings = {
             width: this.main_canvas.canvas.width,
             height: this.main_canvas.canvas.height,
-            background_radius: 0.45 * Math.min(this.main_canvas.canvas.width, this.main_canvas.canvas.height),
+            background_radius: 0.5 * Math.min(this.main_canvas.canvas.width, this.main_canvas.canvas.height),
             zoom_factor: 1.0,
             drag_speed: Renderer.DefaultDragSpeed,
             draw_north_up: true,
@@ -52,6 +57,7 @@ export class Renderer {
         };
 
         this.main_canvas.canvas.addEventListener('resize', _ => {
+            console.log('Renderer resize event');
             this.width = this.main_canvas.canvas.width;
             this.height = this.main_canvas.canvas.height;
         });
@@ -94,6 +100,8 @@ export class Renderer {
     set width(value: number) {
         this._settings_did_change = true;
         this.settings.width = value;
+        this.main_canvas.canvas.width = value;
+        this.background_radius = 0.5 * Math.min(this.width, this.height);
     }
 
     /**
@@ -106,6 +114,7 @@ export class Renderer {
     set height(value: number) {
         this._settings_did_change = true;
         this.settings.height = value;
+        this.main_canvas.canvas.height = value;
     }
 
     get background_radius() {

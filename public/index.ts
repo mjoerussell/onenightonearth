@@ -27,7 +27,7 @@ const renderStars = (controls: Controls, date?: Date) => {
     const diff = draw_end - draw_start;
 
     // 60frame/sec 1sec/1000ms ~= 16.6 ms per frame
-    console.log(`Took ${1 / (diff / 1000)} ms to update`);
+    console.log(`${1 / (diff / 1000)} fps`);
     wasm_interface.resetImageData();
 };
 
@@ -72,6 +72,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         constellations = await fetch('/constellations/meta').then(c => c.json());
         controls.setConstellations(constellations);
+    });
+
+    controls.onResize(() => {
+        renderStars(controls);
     });
 
     controls.onDateChange(_ => {

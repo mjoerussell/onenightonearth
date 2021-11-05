@@ -18,7 +18,7 @@ interface WasmLib {
     initializeCanvas: (settings: pointer) => void;
     initializeConstellations: (constellation_data: pointer) => void;
     initializeResultData: () => pointer;
-    updateCanvasSettings: (settings: pointer) => void;
+    updateCanvasSettings: (settings: pointer) => pointer;
     getImageData: () => pointer;
     resetImageData: () => void;
     projectStarsAndConstellations: (observer_latitude: number, observer_longitude: number, observer_timestamp: BigInt) => void;
@@ -153,7 +153,12 @@ export class WasmInterface {
 
     updateSettings(settings: CanvasSettings): void {
         this.setObject(new DataView(this.memory, this.settings_ptr), settings, sizedCanvasSettings);
-        this.lib.updateCanvasSettings(this.settings_ptr);
+        const pixel_data_ptr = this.lib.updateCanvasSettings(this.settings_ptr);
+        if (pixel_data_ptr !== 0) {
+            this.pixel_data_ptr = pixel_data_ptr;
+            this.pixel_count = new Uint32Array(this.memory, this.result_ptr, 2)[0];
+            console.log('New pixel count is ', this.pixel_count);
+        }
     }
 
     getString(ptr: pointer, len: number): string {

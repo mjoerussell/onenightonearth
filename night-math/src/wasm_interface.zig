@@ -69,6 +69,17 @@ pub export fn initializeCanvas(settings: *ExternCanvasSettings) void {
     };
 }
 
+pub export fn updateCanvasSettings(settings: *ExternCanvasSettings) ?[*]Pixel {
+    const new_settings = settings.getCanvasSettings();
+    if (new_settings.width != canvas.settings.width or new_settings.height != canvas.settings.height) {
+        canvas.data = allocator.realloc(canvas.data, new_settings.width * new_settings.height) catch unreachable;
+        canvas.settings = new_settings;
+        return getImageData();
+    } 
+    canvas.settings = new_settings;
+    return null;
+}
+
 /// Initialize the result data slice - this will be used to "return" multiple results at once in functions like `getCoordForSkyCoord`.
 pub export fn initializeResultData() [*]u8 {
     result_data = allocator.alloc(u8, 8) catch unreachable;
@@ -116,10 +127,6 @@ pub export fn initializeConstellations(data: [*]u8) void {
         c_bound_start += constellation_data[c_index].num_boundaries;
         c_ast_start += constellation_data[c_index].num_asterisms;
     }
-}
-
-pub export fn updateCanvasSettings(settings: *ExternCanvasSettings) void {
-    canvas.settings = settings.getCanvasSettings();
 }
 
 /// Returns a pointer to the pixel data so that it can be rendered on the canvas. Also sets the length of this buffer into the first slot

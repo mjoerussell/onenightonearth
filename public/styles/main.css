@@ -210,11 +210,11 @@ div.constellation-info.mobile {
 }
 
 .canvas-container {
-    display: inline-block;
     position: relative;
     margin-left: 10%;
-    width: 850px;
-    min-height: 850px;
+    min-width: 45vw;
+    height: 45vw;
+    transform: translateY(-5%);
 }
 
 .canvas-container canvas {
@@ -224,8 +224,8 @@ div.constellation-info.mobile {
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    width: 850px;
-    height: 850px;
+    width: 100%;
+    height: 100%;
 }
 
 .canvas-container canvas.moving {
@@ -234,8 +234,8 @@ div.constellation-info.mobile {
 
 .backdrop {
     background-color: #00091d;
-    width: calc(850px * 0.9);
-    height: calc(850px * 0.9);
+    width: 100%;
+    height: 100%;
     border-radius: 50%;
     display: inline;
     position: absolute;
@@ -261,27 +261,20 @@ div.constellation-info.mobile {
     }
 
     .canvas-container {
-        width: 100%;
+        min-width: 60vw;
+        height: 60vw;
         margin-left: 0;
         margin-bottom: 5%;
-    }
-
-    .canvas-container canvas {
-        width: 100%;
     }
 }
 
 @media only screen and (max-width: 1000px) {
     :root {
-        font-size: 1.5em;
+        font-size: 0.9em;
     }
 
-    html {
-        height: 100vh;
-    }
-
-    body {
-        height: 100%;
+    h1 {
+        margin: 0;
     }
 
     div.constellation-info.desktop {
@@ -291,14 +284,5 @@ div.constellation-info.mobile {
     div.constellation-info.mobile {
         display: block;
         font-size: 1.5em;
-    }
-
-    .canvas-container {
-        margin-top: 20%;
-    }
-
-    .page-container {
-        width: 100%;
-        height: 100%;
     }
 }

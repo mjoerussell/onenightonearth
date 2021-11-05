@@ -34,6 +34,7 @@ export class Controls {
     private extraContellationControlsContainer: HTMLDivElement | null;
 
     public renderer: Renderer;
+    private canvas_resize_observer: ResizeObserver;
 
     private current_latitude = 0;
     private current_longitude = 0;
@@ -54,6 +55,8 @@ export class Controls {
         is_zooming: false,
         previous_distance: 0,
     };
+
+    private resizeHandler: () => void = () => {};
 
     constructor() {
         this.date_input = document.getElementById('dateInput') as HTMLInputElement;
@@ -102,6 +105,25 @@ export class Controls {
         this.location_input?.addEventListener('change', () => {
             this.user_changed_location = true;
         });
+
+        const canvas_container = document.getElementById('canvas-container') as HTMLDivElement;
+        this.canvas_resize_observer = new ResizeObserver(entries => {
+            const canvas_container_entry = entries[0];
+            if (canvas_container_entry.contentBoxSize != null) {
+                const content_box: ResizeObserverSize = Array.isArray(canvas_container_entry.contentBoxSize)
+                    ? canvas_container_entry.contentBoxSize[0]
+                    : canvas_container_entry.contentBoxSize;
+                this.renderer.width = content_box.inlineSize;
+                this.renderer.height = content_box.inlineSize;
+            } else {
+                this.renderer.width = canvas_container_entry.contentRect.width;
+                this.renderer.height = canvas_container_entry.contentRect.height;
+            }
+
+            this.resizeHandler();
+        });
+
+        this.canvas_resize_observer.observe(canvas_container);
     }
 
     /**
@@ -267,6 +289,9 @@ export class Controls {
                     y: ((y - center_y) / this.renderer.height) * drag_scale,
                 };
 
+                console.log('Old drag state: ', this.drag_state);
+                console.log('New Drag State: ', new_drag_state);
+
                 handler(this.drag_state, new_drag_state);
 
                 this.drag_state = new_drag_state;
@@ -393,6 +418,10 @@ export class Controls {
                 handler(index);
             }
         });
+    }
+
+    onResize(handler: () => void) {
+        this.resizeHandler = handler;
     }
 
     get date(): Date {

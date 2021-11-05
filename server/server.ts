@@ -13,7 +13,7 @@ interface Constellation {
 }
 
 const PORT = 8080;
-const HOST = process.env['HOST'] ?? '127.0.0.1';
+const HOST = process.env['HOST'] ?? '0.0.0.0';
 const app = express();
 
 app.use(express.static(path.join(__dirname, '../public')));
