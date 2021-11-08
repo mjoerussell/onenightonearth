@@ -43,13 +43,14 @@ If you don't have Docker, or would rather run the app directly, there's a few st
 
 **On First Run Only:**
 
-1. Run `cd public && npm install`
-2. Run `cp server && npm install`
+1. Run `cd web && npm install`
+2. Run `cd server && npm install`
+3. Run `cd prepare-data && zig build run -Drelease-fast -- ../server/star_data.bin ../server/const_data.bin`
 
 **Each Run:**
 
 1. In one terminal, run `cd server && npm start`.
-2. In another terminal, run `cd public && npm run build`. Do this every time you want to view changes you've made to the frontend code.
+2. In another terminal, run `cd web && npm run build`. Do this every time you want to view changes you've made to the frontend code.
 3. In the same terminal from 2. (or a different one if you prefer, doesn't really matter) run `cd public/one-lib && zig build`. Do this
    every time you want to make changes to the WASM code.
 
