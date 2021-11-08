@@ -14,7 +14,7 @@ pub fn build(b: *Builder) !void {
         .cpu_features = "generic+simd128"
     });
     lib.setTarget(target);
-    lib.setOutputDir("../public/dist/wasm/bin");
+    lib.setOutputDir("../web/dist/wasm/bin");
     lib.install();
 
     const test_step = b.step("test", "Run library tests");
