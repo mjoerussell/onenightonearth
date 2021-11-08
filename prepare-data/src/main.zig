@@ -337,11 +337,33 @@ fn readConstellationFiles(allocator: *Allocator, constellation_dir_name: []const
 
     var read_buffer: [4096]u8 = undefined;
 
+    var constellation_filenames = std.ArrayList([]const u8).init(allocator);
+    defer {
+        for (constellation_filenames.items) |name| allocator.free(name);
+        constellation_filenames.deinit();
+    }
+
     while (try constellation_dir_walker.next()) |entry| {
         if (entry.kind != .File) continue;
         if (!std.mem.endsWith(u8, entry.basename, ".sky")) continue;
 
-        var sky_file = try entry.dir.openFile(entry.basename, .{});
+        var name_copy = try allocator.alloc(u8, entry.basename.len);
+        std.mem.copy(u8, name_copy, entry.basename);
+        try constellation_filenames.append(name_copy);
+    }
+
+    const string_sort = (struct {
+        fn sort(context: u32, lhs: []const u8, rhs: []const u8) bool {
+            _ = context;
+
+            return std.ascii.lessThanIgnoreCase(lhs, rhs);
+        }
+    }).sort;
+
+    std.sort.sort([]const u8, constellation_filenames.items, @as(u32, 0), string_sort);
+
+    for (constellation_filenames.items) |basename| {
+        var sky_file = try constellation_dir.openFile(basename, .{});
         defer sky_file.close();
 
         const bytes_read = try sky_file.readAll(read_buffer[0..]);
@@ -368,14 +390,12 @@ fn writeConstellationData(constellations: []Constellation, const_out_filename: [
         num_asterisms += @intCast(u32, constellation.asterism.len);
     }
 
-
     try const_out_writer.writeAll(std.mem.toBytes(@intCast(u32, constellations.len))[0..]);
     try const_out_writer.writeAll(std.mem.toBytes(num_boundaries)[0..]);
     try const_out_writer.writeAll(std.mem.toBytes(num_asterisms)[0..]);
 
     for (constellations) |constellation| {
         const info = constellation.getInfo();
-        std.debug.print("Is Zodiac? {}\n", .{info.is_zodiac});
         try const_out_writer.writeAll(std.mem.toBytes(info)[0..]);
     }
 
