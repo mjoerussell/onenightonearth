@@ -1,5 +1,4 @@
 import express from 'express';
-import bodyParser from 'body-parser';
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
@@ -17,7 +16,6 @@ const HOST = process.env['HOST'] ?? '0.0.0.0';
 const app = express();
 
 app.use(express.static(path.join(__dirname, '../web')));
-app.use(bodyParser.json());
 
 const readFile = (path: string): Promise<Buffer> => {
     return new Promise((resolve, reject) => {
