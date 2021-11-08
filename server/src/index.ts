@@ -2,71 +2,13 @@ import http, { IncomingMessage, ServerResponse } from 'http';
 import fs from 'fs';
 import path from 'path';
 import { performance } from 'perf_hooks';
-import { readFile, readDir, stat } from './fs-util';
-
-type SkyFile = Record<string, string>;
-
-interface Constellation {
-    name: string;
-    epithet: string;
-}
+import { readFile, stat } from './fs-util';
+import { readConstellationFiles, Constellation } from './sky';
 
 const PORT = 8080;
 const HOST = process.env['HOST'] ?? '0.0.0.0';
 
 const static_assets = ['dist/bundle.js', 'styles/main.css', 'assets/favicon.ico', 'dist/wasm/bin/night-math.wasm'];
-
-const parseSkyFile = (data: string): SkyFile => {
-    const fields: SkyFile = {};
-    const lines = data.includes('\r\n') ? data.split('\r\n') : data.split('\n');
-    for (let i = 0; i < lines.length; i += 1) {
-        const current_line = lines[i];
-        if (current_line.startsWith('@')) {
-            if (current_line.includes('=') && !current_line.includes('=|')) {
-                const [field_name, field_value] = current_line
-                    .substring(1)
-                    .split('=')
-                    .map(s => s.trim());
-                fields[field_name] = field_value;
-            } else if (current_line.includes('=|')) {
-                // Get each line after this as a multiline string
-                // Keep going until the next new symbol
-                const field_name = current_line.substring(1).split('=|')[0].trim();
-                let field_value = '';
-                i += 1;
-                while (i < lines.length && !lines[i].startsWith('@') && !lines[i].startsWith('#')) {
-                    field_value = field_value.concat('\n', lines[i]);
-                    i += 1;
-                }
-                fields[field_name] = field_value;
-                i -= 1;
-            }
-        } else if (current_line.startsWith('#')) {
-            const field_name = current_line.substring(1);
-            fields[field_name] = 'true';
-        }
-    }
-    return fields;
-};
-
-const readConstellationFiles = async (): Promise<Constellation[]> => {
-    const sky_files = await readDir(path.join(__dirname, '../..', 'prepare-data', 'constellations', 'iau'));
-    const result: Constellation[] = [];
-    for (const filename of sky_files) {
-        const file = await readFile(filename);
-        const data = parseSkyFile(file.toString());
-        const const_name = data['name'];
-
-        console.log(const_name);
-
-        result.push({
-            name: const_name,
-            epithet: data['epithet'],
-        });
-    }
-
-    return result;
-};
 
 const getContentType = (file_path: string): string | null => {
     if (file_path.endsWith('.css')) {

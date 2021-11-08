@@ -29,7 +29,7 @@ WORKDIR /usr/src
 COPY --from=zig /usr/src/bin /usr/src/bin
 COPY ./night-math .
 
-RUN /usr/src/bin/zig build -Drelease-small
+RUN /usr/src/bin/zig build -Drelease-fast
 
 # Prepare the star and constellation data
 FROM alpine:3.13 AS prepare-data
@@ -47,8 +47,7 @@ FROM node:15-alpine AS build
 
 WORKDIR /usr/src
 
-RUN mkdir server
-RUN mkdir public
+COPY ./tsconfig.base.json .
 
 # Server Setup 
 WORKDIR /usr/src/server
@@ -56,17 +55,17 @@ WORKDIR /usr/src/server
 COPY ./server/package*.json .
 RUN npm install
 
-COPY ./server/server.ts .
+COPY ./server/src ./src
 COPY ./server/tsconfig.json .
 RUN npm run build
 
 # Client Setup
-WORKDIR /usr/src/public
+WORKDIR /usr/src/web
 
-COPY ./public/package*.json .
+COPY ./web/package*.json .
 RUN npm install
 
-COPY ./public .
+COPY ./web .
 RUN npm run build
 
 FROM node:15-alpine
@@ -75,21 +74,19 @@ ENV HOST=0.0.0.0
 
 WORKDIR /usr/src
 
-RUN mkdir public
+RUN mkdir web
 RUN mkdir server
 RUN mkdir prepare-data
 
 # Copy over necessary files from build images
 COPY ./prepare-data/constellations ./prepare-data/constellations
-COPY ./public/assets/favicon.ico ./public/assets/favicon.ico
-COPY --from=build /usr/src/public/styles ./public/styles
-COPY --from=build /usr/src/public/index.html ./public/index.html
-COPY --from=build /usr/src/server/server.js ./server/server.js
-COPY --from=build /usr/src/public/dist ./public/dist
-COPY --from=night-math /usr/public/dist/wasm ./public/dist/wasm
+COPY ./web/assets/favicon.ico ./web/assets/favicon.ico
+COPY --from=build /usr/src/web/styles ./web/styles
+COPY --from=build /usr/src/web/index.html ./web/index.html
+COPY --from=build /usr/src/server/dist ./server/dist
+COPY --from=build /usr/src/web/dist ./web/dist
+COPY --from=night-math /usr/web/dist/wasm ./web/dist/wasm
 COPY --from=prepare-data /usr/src/star_data.bin ./server/star_data.bin
 COPY --from=prepare-data /usr/src/const_data.bin ./server/const_data.bin
 
-COPY --from=build /usr/src/server/node_modules ./server/node_modules 
-
-ENTRYPOINT [ "node", "/usr/src/server/server.js" ]
+ENTRYPOINT [ "node", "/usr/src/server/dist/index.js" ]
