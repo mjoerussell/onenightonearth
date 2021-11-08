@@ -1,6 +1,6 @@
-import express from 'express';
-import http from 'http';
-import fs from 'fs';
+// import express from 'express';
+import http, { IncomingMessage, ServerResponse } from 'http';
+import fs, { read } from 'fs';
 import path from 'path';
 import { performance } from 'perf_hooks';
 
@@ -13,9 +13,11 @@ interface Constellation {
 
 const PORT = 8080;
 const HOST = process.env['HOST'] ?? '0.0.0.0';
-const app = express();
+// const app = express();
 
-app.use(express.static(path.join(__dirname, '../web')));
+// app.use(express.static(path.join(__dirname, '../web')));
+
+const static_assets = ['dist/bundle.js', 'styles/main.css', 'assets/favicon.ico', 'dist/wasm/bin/night-math.wasm'];
 
 const readFile = (path: string): Promise<Buffer> => {
     return new Promise((resolve, reject) => {
@@ -114,6 +116,26 @@ const readConstellationFiles = async (): Promise<Constellation[]> => {
     return result;
 };
 
+const getContentType = (file_path: string): string | null => {
+    if (file_path.endsWith('.css')) {
+        return 'text/css';
+    }
+    if (file_path.endsWith('.html')) {
+        return 'text/html';
+    }
+    if (file_path.endsWith('.js')) {
+        return 'application/javascript';
+    }
+    if (file_path.endsWith('.wasm')) {
+        return 'application/wasm';
+    }
+    if (file_path.endsWith('.ico')) {
+        return 'image/x-icon';
+    }
+
+    return null;
+};
+
 const main = async () => {
     const const_bin = await readFile(path.join(__dirname, 'const_data.bin'));
 
@@ -122,48 +144,88 @@ const main = async () => {
     const const_parse_end = performance.now();
 
     console.log(`Constellation parsing took ${const_parse_end - const_parse_start} ms`);
-    app.get('/', async (req, res) => {
-        res.sendFile(path.join(__dirname, 'index.html'));
-    });
+    const requestListener = (req: IncomingMessage, res: ServerResponse) => {
+        if (req.url == null) return;
 
-    app.get('/stars', async (req, res) => {
-        const response_start = performance.now();
-        const star_path = path.join(__dirname, 'star_data.bin');
-        const star_stat = await stat(star_path);
-        const star_bin_stream = fs.createReadStream(star_path, { highWaterMark: 13 * 100 });
-        res.writeHead(200, {
-            'Content-Type': 'application/octet-stream',
-            'Transfer-Encoding': 'chunked',
-            'Content-Length': star_stat.size,
-            'X-Content-Length': star_stat.size,
-        });
+        switch (req.url) {
+            case '/':
+                {
+                    readFile(path.join(__dirname, '../web', 'index.html')).then(index_file => {
+                        res.writeHead(200, {
+                            'Content-Type': 'text/html',
+                        });
+                        res.write(index_file);
+                        res.end();
+                    });
+                }
+                break;
+            case '/stars':
+                {
+                    const response_start = performance.now();
+                    const star_path = path.join(__dirname, 'star_data.bin');
+                    stat(star_path).then(star_stat => {
+                        const star_bin_stream = fs.createReadStream(star_path, { highWaterMark: 13 * 100 });
+                        res.writeHead(200, {
+                            'Content-Type': 'application/octet-stream',
+                            'Transfer-Encoding': 'chunked',
+                            'Content-Length': star_stat.size,
+                            'X-Content-Length': star_stat.size,
+                        });
 
-        star_bin_stream.on('data', chunk => {
-            res.write(chunk);
-        });
+                        star_bin_stream.on('data', chunk => {
+                            res.write(chunk);
+                        });
 
-        star_bin_stream.on('end', () => {
-            res.end();
-            const response_end = performance.now();
-            console.log(`Sending stars took ${response_end - response_start} ms`);
-        });
-    });
+                        star_bin_stream.on('end', () => {
+                            res.end();
+                            const response_end = performance.now();
+                            console.log(`Sending stars took ${response_end - response_start} ms`);
+                        });
+                    });
+                }
+                break;
+            case '/constellations':
+                {
+                    res.writeHead(200, {
+                        'Content-Type': 'application/octet-stream',
+                        'Content-Length': const_bin.buffer.byteLength,
+                    });
 
-    app.get('/constellations', (req, res) => {
-        res.writeHead(200, {
-            'Content-Type': 'application/octet-stream',
-            'Content-Length': const_bin.buffer.byteLength,
-        });
-
-        res.write(const_bin);
-        res.end();
-    });
-
-    app.get('/constellations/meta', (req, res) => {
-        res.send(constellations);
-    });
-
-    http.createServer(app).listen(PORT, HOST, () => console.log(`Listening on port ${PORT}`));
+                    res.write(const_bin);
+                    res.end();
+                }
+                break;
+            case '/constellations/meta':
+                {
+                    res.write(JSON.stringify(constellations));
+                    res.end();
+                }
+                break;
+            default: {
+                for (const asset of static_assets) {
+                    if (req.url.endsWith(asset)) {
+                        const asset_path = path.join(__dirname, '../web', req.url);
+                        stat(asset_path).then(file_stat => {
+                            if (file_stat.isFile()) {
+                                const content_type = getContentType(asset_path);
+                                if (content_type != null) {
+                                    readFile(asset_path).then(file => {
+                                        res.writeHead(200, {
+                                            'Content-Type': content_type,
+                                            'Content-Length': file.byteLength,
+                                        });
+                                        res.write(file);
+                                        res.end();
+                                    });
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        }
+    };
+    http.createServer(requestListener).listen(PORT, HOST, () => console.log(`Listening on port ${PORT}`));
 };
 
 main();
