@@ -45,19 +45,32 @@ interface WasmLib {
 export class WasmInterface {
     private lib: WasmLib;
 
+    /** Pointer to the wasm canvas settings. */
     private settings_ptr: number = 0;
+    /** Pointer to wasm result data, for returning multiple values from functions. */
     private result_ptr: number = 0;
 
+    /** Pointer to star data. */
     private star_ptr: number = 0;
+    /** The number of stars added to the buffer at `star_ptr` so far. */
     private num_stars_seen: number = 0;
 
+    /** Pointer to the image data. */
     private pixel_data_ptr: number = 0;
+    /** The number of pixels in the image. This may change if the window is resized. */
     private pixel_count: number = 0;
 
     constructor(private instance: WebAssembly.Instance) {
         this.lib = this.instance.exports as any;
     }
 
+    /**
+     * Initialize the wasm module, performing initial allocations and settng up the canvas. This function **must** be called
+     * before any other wasm function, as everything relies on these steps being completed.
+     * @param num_stars The *total* number of stars that will eventually be added.
+     * @param constellation_data The constellation data to use when rendering.
+     * @param canvas_settings The initial canvas settings.
+     */
     initialize(num_stars: number, constellation_data: Uint8Array, canvas_settings: CanvasSettings): void {
         const init_start = performance.now();
 
@@ -133,8 +146,8 @@ export class WasmInterface {
         return new Float32Array(this.memory.slice(result_ptr, result_ptr + 4 * 300));
     }
 
-    dragAndMove(drag_start: Coord, drag_end: Coord): Coord {
-        this.lib.dragAndMove(drag_start.latitude, drag_start.longitude, drag_end.latitude, drag_end.longitude);
+    dragAndMove(start_x: number, start_y: number, end_x: number, end_y: number): Coord {
+        this.lib.dragAndMove(start_x, start_y, end_x, end_y);
         const result_data = new Float32Array(this.memory, this.result_ptr, 2);
         return {
             latitude: result_data[0],
@@ -157,7 +170,6 @@ export class WasmInterface {
         if (pixel_data_ptr !== 0) {
             this.pixel_data_ptr = pixel_data_ptr;
             this.pixel_count = new Uint32Array(this.memory, this.result_ptr, 2)[0];
-            console.log('New pixel count is ', this.pixel_count);
         }
     }
 

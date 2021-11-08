@@ -55,14 +55,12 @@ export class Renderer {
             draw_asterisms: false,
             zodiac_only: false,
         };
-
-        this.main_canvas.canvas.addEventListener('resize', _ => {
-            console.log('Renderer resize event');
-            this.width = this.main_canvas.canvas.width;
-            this.height = this.main_canvas.canvas.height;
-        });
     }
 
+    /**
+     * Given pixel data as a `Uint8ClampedArray`, put the image onto the canvas using `canvas.putImageData`.
+     * @param data The pixel data buffer.
+     */
     drawData(data: Uint8ClampedArray): void {
         try {
             const image_data = new ImageData(data, this.main_canvas.canvas.width, this.main_canvas.canvas.height);
@@ -101,7 +99,7 @@ export class Renderer {
         this._settings_did_change = true;
         this.settings.width = value;
         this.main_canvas.canvas.width = value;
-        this.background_radius = 0.5 * Math.min(this.width, this.height);
+        this.settings.background_radius = 0.5 * Math.min(this.width, this.height);
     }
 
     /**
@@ -115,15 +113,11 @@ export class Renderer {
         this._settings_did_change = true;
         this.settings.height = value;
         this.main_canvas.canvas.height = value;
+        this.settings.background_radius = 0.5 * Math.min(this.width, this.height);
     }
 
     get background_radius() {
         return this.settings.background_radius;
-    }
-
-    set background_radius(r: number) {
-        this.settings.background_radius = r;
-        this._settings_did_change = true;
     }
 
     get zoom_factor() {

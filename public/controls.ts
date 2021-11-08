@@ -13,6 +13,11 @@ interface PinchState {
     is_zooming: boolean;
 }
 
+/**
+ * A wrapper class for the many different view controls and page buttons available. This class handles binding event listeners to
+ * specific HTML elements, as well as abstracting over the difference between mouse & touch controls, so that the main function has
+ * a simple interface for handling higher-level types of events, such as "map drag" or "timelapse".
+ */
 export class Controls {
     private date_input: HTMLInputElement | null;
     private location_input: HTMLInputElement | null;
@@ -60,7 +65,9 @@ export class Controls {
 
     constructor() {
         this.date_input = document.getElementById('dateInput') as HTMLInputElement;
+
         this.location_input = document.getElementById('locationInput') as HTMLInputElement;
+        this.location_input.value = '0.0000, 0.0000';
 
         this.time_travel_button = document.getElementById('timelapse') as HTMLButtonElement;
         this.today_button = document.getElementById('today') as HTMLButtonElement;

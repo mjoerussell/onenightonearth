@@ -75,17 +75,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     controls.onResize(() => {
-        renderStars(controls);
+        window.requestAnimationFrame(() => renderStars(controls));
     });
 
     controls.onDateChange(_ => {
-        renderStars(controls);
+        window.requestAnimationFrame(() => renderStars(controls));
     });
 
     controls.onChangeConstellationView(() => {
         window.requestAnimationFrame(() => renderStars(controls));
     });
 
+    // currently deprecated
     controls.onSetToday((current, target) => {
         const days_per_frame = 2;
         const days_per_frame_millis = days_per_frame * 86400000;
@@ -157,10 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     controls.onMapDrag((current_state, new_state) => {
-        const new_coord = wasm_interface.dragAndMove(
-            { latitude: current_state.x, longitude: current_state.y },
-            { latitude: new_state.x, longitude: new_state.y }
-        );
+        const new_coord = wasm_interface.dragAndMove(current_state.x, current_state.y, new_state.x, new_state.y);
 
         // Add or subtract new_value from current_value depending on the orientation
         const directed_add = (current_value: number, new_value: number): number => {
