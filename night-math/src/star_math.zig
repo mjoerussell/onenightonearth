@@ -231,15 +231,15 @@ pub const SpectralType = enum(u8) {
             // Blue
             .O => Pixel.rgb(2, 89, 156),
             // Blue-white
-            .B => Pixel.rgb(131, 195, 222),
+            .B => Pixel.rgb(129, 212, 247),
             // White
             .A => Pixel.rgb(255, 255, 255),
             // Yellow-white
-            .F => Pixel.rgb(249, 250, 192),
+            .F => Pixel.rgb(254, 255, 219),
             // Yellow
-            .G => Pixel.rgb(253, 255, 133),
+            .G => Pixel.rgb(253, 255, 112),
             // Orange
-            .K => Pixel.rgb(255, 142, 61),
+            .K => Pixel.rgb(240, 129, 50),
             // Red
             .M => Pixel.rgb(207, 32, 23)
         };

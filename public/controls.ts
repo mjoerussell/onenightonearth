@@ -289,9 +289,6 @@ export class Controls {
                     y: ((y - center_y) / this.renderer.height) * drag_scale,
                 };
 
-                console.log('Old drag state: ', this.drag_state);
-                console.log('New Drag State: ', new_drag_state);
-
                 handler(this.drag_state, new_drag_state);
 
                 this.drag_state = new_drag_state;

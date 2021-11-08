@@ -136,8 +136,8 @@ export class TouchInterface {
             if (old_touch_index >= 0) {
                 const new_touch: Touch = {
                     id: event.changedTouches[0].identifier,
-                    client_x: event.changedTouches[0].clientX,
-                    client_y: event.changedTouches[0].clientY,
+                    client_x: event.changedTouches[0].pageX,
+                    client_y: event.changedTouches[0].pageY,
                 };
                 for (const handler of this.drag_handlers) {
                     handler([this.current_touches[old_touch_index], new_touch]);
