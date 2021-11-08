@@ -2,7 +2,7 @@ const path = require('path');
 
 const config = {
     entry: {
-        bundle: './index.ts',
+        bundle: './src/index.ts',
     },
     module: {
         rules: [
