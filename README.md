@@ -15,8 +15,7 @@ The controls currently available on the site are:
 3. 'Use My Location' - Navigate to your current location.
 4. 'Time Travel' - Click this button to start automatically advancing the date. Click again to stop.
 5. Drag and Move - Click and drag on the map to move the sky. Your updated coordinates will be populated in the 'Latitude' and 'Longitude' fields.
-6. Double Click - Double Click on the map to navigate to that point.
-7. Zoom - Scroll with your mouse while hovering over the map to zoom in/out.
+6. Zoom - Scroll with your mouse while hovering over the map to zoom in/out.
 
 ## Running Locally
 
