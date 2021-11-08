@@ -67,7 +67,7 @@ COPY ./public/package*.json .
 RUN npm install
 
 COPY ./public .
-RUN npm run build:prod
+RUN npm run build
 
 FROM node:15-alpine
 

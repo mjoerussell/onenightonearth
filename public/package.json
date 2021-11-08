@@ -4,9 +4,8 @@
     "description": "A Star Map App",
     "main": "index.ts",
     "scripts": {
-        "start": "tsc --watch",
-        "build": "webpack --mode=development",
-        "build:prod": "webpack --mode=production",
+        "start": "webpack --mode=development",
+        "build": "webpack --mode=production",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "author": "mjoerussell",
