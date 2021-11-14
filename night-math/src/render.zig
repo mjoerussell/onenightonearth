@@ -134,31 +134,43 @@ pub const Canvas = struct {
         return point.getDist(center) <= self.settings.background_radius;
     }
 
-    pub fn drawLine(self: *Canvas, line: Line, color: Pixel, thickness: u32) void {
-        const num_points = @floatToInt(u32, 75 * self.settings.zoom_factor);
-        const start = line.a;
-        const end = line.b;
+    pub fn drawLine(self: *Canvas, line: Line, color: Pixel) void {
+        if (math.isNan(line.a.x) or math.isNan(line.a.y) or math.isNan(line.b.x) or math.isNan(line.b.y)) return;
 
-        const expand_x = line.getSlope() > 1.5;
+        const IntPoint = struct {
+            x: i32,
+            y: i32,
 
-        const total_dist = start.getDist(end);
-        var point_index: u32 = 0;
-        while (point_index < num_points) : (point_index += 1) {
-            const point_dist = (total_dist / @intToFloat(f32, num_points)) * @intToFloat(f32, point_index);
-            var next_point = Point{
-                .x = start.x + (point_dist / total_dist) * (end.x - start.x),
-                .y = start.y + (point_dist / total_dist) * (end.y - start.y)
-            };
-            var width_index: u32 = 0;
-            while (width_index < thickness) : (width_index += 1) {
-                if (expand_x) {
-                    next_point.x += 1; 
-                } else {
-                    next_point.y += 1;
-                }
-                if (self.isInsideCircle(next_point)) {
-                    self.setPixelAt(next_point, color);
-                } else break;
+            fn toPoint(int_point: @This()) Point {
+                return .{ .x = @intToFloat(f32, int_point.x), .y = @intToFloat(f32, int_point.y) };
+            }
+        };
+
+        var a = IntPoint{ .x = @floatToInt(i32, line.a.x), .y = @floatToInt(i32, line.a.y) };
+        var b = IntPoint{ .x = @floatToInt(i32, line.b.x), .y = @floatToInt(i32, line.b.y) };
+
+        const dist_x = math.absInt(b.x - a.x) catch unreachable;
+        const dist_y = -(math.absInt(b.y - a.y) catch unreachable);
+
+        const step_x: i32 = if (a.x < b.x) 1 else -1;
+        const step_y: i32 = if (a.y < b.y) 1 else -1;
+
+        var curr_point = a;
+        var err = dist_x + dist_y;
+        while (true) {
+            var f_point = curr_point.toPoint();
+            if (self.isInsideCircle(f_point)) self.setPixelAt(f_point, color);
+
+            if (curr_point.x == b.x and curr_point.y == b.y) break;
+
+            const err_2 = 2 * err;
+            if (err_2 >= dist_y) {
+                err += dist_y;
+                curr_point.x += step_x;
+            }
+            if (err_2 <= dist_x) {
+                err += dist_x;
+                curr_point.y += step_y;
             }
         }
     }

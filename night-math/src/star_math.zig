@@ -265,10 +265,20 @@ pub fn projectStar(canvas: *Canvas, star: Star, local_sidereal_time: f32, sin_la
 pub fn projectConstellationGrid(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
     var iter = constellation.boundary_iter();
     while (iter.next()) |bound| {
-        const point_a = canvas.coordToPoint(bound[0], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
-        const point_b = canvas.coordToPoint(bound[1], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
+        const point_a = canvas.coordToPoint(bound[0], local_sidereal_time, sin_latitude, cos_latitude, false).?;
+        const point_b = canvas.coordToPoint(bound[1], local_sidereal_time, sin_latitude, cos_latitude, false).?;
+
+        if (!canvas.isInsideCircle(point_a) and !canvas.isInsideCircle(point_b)) {
+            continue;
+        }
+
+        var line_index: u32 = 0;
+        while (line_index < line_width) : (line_index += 1) {
+            const start = Point{ .x = point_a.x + @intToFloat(f32, line_index), .y = point_a.y + @intToFloat(f32, line_index) };
+            const end = Point{ .x = point_b.x + @intToFloat(f32, line_index), .y = point_b.y + @intToFloat(f32, line_index) };
+            canvas.drawLine(Line{ .a = start, .b = end }, color);
+        }
         
-        canvas.drawLine(Line{ .a = point_a, .b = point_b }, color, line_width);
     }
 }
 
@@ -278,8 +288,17 @@ pub fn projectConstellationAsterism(canvas: *Canvas, constellation: Constellatio
     while (branch_index < constellation.asterism.len - 1) : (branch_index += 2) {
         const point_a = canvas.coordToPoint(constellation.asterism[branch_index], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
         const point_b = canvas.coordToPoint(constellation.asterism[branch_index + 1], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
+
+        if (!canvas.isInsideCircle(point_a) and !canvas.isInsideCircle(point_b)) {
+            continue;
+        }
         
-        canvas.drawLine(Line{ .a = point_a, .b = point_b }, color, line_width);
+        var line_index: u32 = 0;
+        while (line_index < line_width) : (line_index += 1) {
+            const start = Point{ .x = point_a.x + @intToFloat(f32, line_index), .y = point_a.y + @intToFloat(f32, line_index) };
+            const end = Point{ .x = point_b.x + @intToFloat(f32, line_index), .y = point_b.y + @intToFloat(f32, line_index) };
+            canvas.drawLine(Line{ .a = start, .b = end }, color);
+        }
     }
 }
 

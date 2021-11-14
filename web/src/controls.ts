@@ -19,7 +19,7 @@ interface PinchState {
  * a simple interface for handling higher-level types of events, such as "map drag" or "timelapse".
  */
 export class Controls {
-    private date_input: HTMLInputElement | null;
+    private date_input: HTMLInputElement;
     private location_input: HTMLInputElement | null;
 
     private time_travel_button: HTMLButtonElement | null;
