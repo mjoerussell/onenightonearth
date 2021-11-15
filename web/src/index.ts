@@ -53,6 +53,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }).then(async wasm_result => {
         wasm_interface = new WasmInterface(wasm_result.instance);
         const constellation_bin: ArrayBuffer = await fetch('/constellations').then(s => s.arrayBuffer());
+        const constellation_data = new Uint8Array(constellation_bin);
+
+        console.log(`Constellation data is ${constellation_data.byteLength} bytes long`);
 
         const star_response = await fetch('/stars');
         const content_length = star_response.headers.get('Content-Length') ?? star_response.headers.get('X-Content-Length') ?? '0';

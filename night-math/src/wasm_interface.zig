@@ -99,6 +99,7 @@ pub export fn initializeConstellations(data: [*]u8) void {
         num_asterisms: u32,
         is_zodiac: u8,
     };
+
     const num_constellations = std.mem.bytesToValue(u32, data[0..4]);
     const num_boundaries = std.mem.bytesToValue(u32, data[4..8]);
     const num_asterisms = std.mem.bytesToValue(u32, data[8..12]);
