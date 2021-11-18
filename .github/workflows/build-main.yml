@@ -37,12 +37,12 @@ jobs:
           npm run build
       - name: Build Client
         run: |
-          cd ./public
+          cd ./web
           npm install
           npm run build
       - name: Build WASM
         run: |
-          cd ./public/one-lib
+          cd ./night-math
           zig build
       # Runs a single command using the runners shell
 #       - name: Run a one-line script
