@@ -64,13 +64,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const response_reader = star_response.body?.getReader();
         while (true) {
-            const chunk = await response_reader?.read();
-            if (chunk == null || chunk.done) {
+            try {
+                const chunk = await response_reader?.read();
+                if (chunk == null || chunk.done) {
+                    break;
+                }
+
+                wasm_interface.addStars(chunk.value);
+                renderStars(controls);
+            } catch (err) {
+                console.error(`Error reading star data: ${err}`);
                 break;
             }
-
-            wasm_interface.addStars(chunk.value);
-            renderStars(controls);
         }
 
         constellations = await fetch('/constellations/meta').then(c => c.json());

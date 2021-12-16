@@ -179,15 +179,29 @@ pub const HttpResponse = struct {
         const status_code = @enumToInt(response.status);
         const status_reason_phrase = response.status.getMessage();
 
-        try writer.print("{s} {} {s}\n", .{response.version.toString(), status_code, status_reason_phrase});
+        try writer.print("{s} {} {s}\r\n", .{response.version.toString(), status_code, status_reason_phrase});
 
         var header_iter = response.headers.iterator();
         while (header_iter.next()) |entry| {
-            try writer.print("{s}: {s}\n", .{entry.key_ptr.*, entry.value_ptr.*});
+            try writer.print("{s}: {s}\r\n", .{entry.key_ptr.*, entry.value_ptr.*});
         }
 
-        try writer.writeAll("\n");
+        try writer.writeAll("\r\n");
+
         if (response.body) |body| {
+            if (response.headers.get("Transfer-Encoding")) |transfer_encoding| {
+                if (std.ascii.eqlIgnoreCase(transfer_encoding, "chunked")) {
+                    // Size of the chunk, in bytes
+                    const chunk_size: usize = 200;
+                    var transferred_size: usize = 0;
+                    while (transferred_size < body.len) : (transferred_size += chunk_size) {
+                        const next_chunk_end = if (transferred_size + chunk_size >= body.len) body.len else transferred_size + chunk_size;
+                        const next_chunk_size = next_chunk_end - transferred_size;
+                        try writer.print("{x}\r\n{s}\r\n", .{ next_chunk_size, body[transferred_size..next_chunk_end]});
+                    }
+                    return;
+                }
+            }
             try writer.writeAll(body);
         }
     }

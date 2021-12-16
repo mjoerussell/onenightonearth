@@ -5,7 +5,7 @@ import { performance } from 'perf_hooks';
 import { readFile, stat } from './fs-util';
 import { readConstellationFiles, Constellation } from './sky';
 
-const PORT = 8080;
+const PORT = 3000;
 const HOST = process.env['HOST'] ?? '0.0.0.0';
 
 const static_assets = ['dist/bundle.js', 'styles/main.css', 'assets/favicon.ico', 'dist/wasm/bin/night-math.wasm'];

@@ -46,15 +46,15 @@ const route_handlers = std.ComptimeStringMap(RequestHandler, .{
 });
 
 pub fn main() anyerror!void {
-
-    var localhost = try net.Address.parseIp("0.0.0.0", 8080);
+    const port = 8080;
+    var localhost = try net.Address.parseIp("0.0.0.0", port);
 
     var server = net.StreamServer.init(.{});
     defer server.deinit();
 
     try server.listen(localhost);
 
-    std.log.info("Listening on port {}", .{ 8080 });
+    std.log.info("Listening on port {}", .{ port });
 
     while (true) {
         var connection = try server.accept();
@@ -74,6 +74,7 @@ fn handleConnection(allocator: *Allocator, connection: net.StreamServer.Connecti
     var timer = std.time.Timer.start() catch unreachable;
 
     const start_ts = timer.read();
+    
     var cwd = std.fs.cwd();
     var request_writer = std.ArrayList(u8).init(allocator);
     
@@ -92,6 +93,11 @@ fn handleConnection(allocator: *Allocator, connection: net.StreamServer.Connecti
     }
 
     var request = http.HttpRequest{ .data = request_writer.items };
+    defer {
+        const end_ts = timer.read();
+        const uri = request.uri() orelse "/";
+        std.log.info("Thread {}: Handling request for {s} took {d:.6}ms", .{std.Thread.getCurrentId(), uri, (@intToFloat(f64, end_ts) - @intToFloat(f64, start_ts)) / std.time.ns_per_ms});
+    }
 
     if (route_handlers.get(request.uri() orelse "/")) |handler| {
         var response = handler(allocator, request) catch http.HttpResponse.initStatus(allocator, .internal_server_error);
@@ -125,11 +131,6 @@ fn handleConnection(allocator: *Allocator, connection: net.StreamServer.Connecti
         var response = http.HttpResponse.initStatus(allocator, .not_found);
         try response.write(writer);
     }
-
-    const end_ts = timer.read();
-
-    const uri: []const u8 = request.uri() orelse "/";
-    std.log.debug("Handling request for {s} took {} us", .{uri, @divFloor(end_ts - start_ts, 1_000)});
 }
 
 fn handleIndex(allocator: *Allocator, request: http.HttpRequest) !http.HttpResponse {
