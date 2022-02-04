@@ -66,7 +66,8 @@ pub const HttpRequest = struct {
         return HttpVersion.fromString(version_str) catch return null;
     }
 
-    pub fn header(request: HttpRequest, header_name: []const u8) ?[]const u8 {
+    // pub fn header(request: HttpRequest, header_name: []const u8) ?[]const u8 {
+    pub fn header(request: HttpRequest, header_name: []const u8) ?std.mem.SplitIterator(u8) {
         // @todo Multiple header values
         var line_iter = std.mem.split(u8, request.data, "\r\n");
         _ = line_iter.next() orelse return null;
@@ -75,7 +76,9 @@ pub const HttpRequest = struct {
             if (std.mem.startsWith(u8, header_line, header_name)) {
                 const delim_index = std.mem.indexOf(u8, header_line, ":") orelse return null;
                 const header_value = header_line[delim_index + 1..];
-                return std.mem.trim(u8, header_value, " ");
+                const trimmed = std.mem.trim(u8, header_value, " ");
+                return std.mem.split(u8, trimmed, ",");
+                // return std.mem.trim(u8, header_value, " ");
             }
         }
 

@@ -144,16 +144,16 @@ pub const HttpResponse = struct {
     headers: std.StringHashMap([]const u8),
     body: ?[]const u8 = null,
 
-    allocator: *Allocator,
+    allocator: Allocator,
 
-    pub fn init(allocator: *Allocator) HttpResponse {
+    pub fn init(allocator: Allocator) HttpResponse {
         return HttpResponse{
             .headers = std.StringHashMap([]const u8).init(allocator),
             .allocator = allocator,
         };
     }
 
-    pub fn initStatus(allocator: *Allocator, status: ResponseStatus) HttpResponse {
+    pub fn initStatus(allocator: Allocator, status: ResponseStatus) HttpResponse {
         return HttpResponse{
             .headers = std.StringHashMap([]const u8).init(allocator),
             .status = status,
@@ -166,12 +166,19 @@ pub const HttpResponse = struct {
     }
 
     pub fn header(response: *HttpResponse, header_name: []const u8, header_value: anytype) !void {
-        // @todo: Multiple header values
-        if (comptime std.meta.trait.isZigString(@TypeOf(header_value))) {
-            try response.headers.put(header_name, header_value);
+        const header_str_value = if (comptime std.meta.trait.isZigString(@TypeOf(header_value))) 
+                header_value
+            else 
+                try std.fmt.allocPrint(response.allocator, "{}", .{header_value});
+        
+        var entry = try response.headers.getOrPut(header_name);
+        if (entry.found_existing) {
+            // This header has already been set, so append the new value to it instead of overwriting it
+            const concat_header_vals = try std.fmt.allocPrint(response.allocator, "{s}, {s}", .{entry.value_ptr.*, header_str_value});
+            entry.value_ptr.* = concat_header_vals;
         } else {
-            const header_str_value = try std.fmt.allocPrint(response.allocator, "{}", .{header_value});
-            try response.headers.put(header_name, header_str_value);
+            // This header has not been set, so initialize it
+            entry.value_ptr.* = header_str_value;
         }
     }
 
@@ -206,7 +213,7 @@ pub const HttpResponse = struct {
         }
     }
 
-    pub fn writeAlloc(response: *const HttpResponse, allocator: *Allocator) ![]const u8 {
+    pub fn writeAlloc(response: *const HttpResponse, allocator: Allocator) ![]const u8 {
         var buffer = std.ArrayList(u8).init(allocator);
         errdefer buffer.deinit();
 
