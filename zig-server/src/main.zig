@@ -46,7 +46,7 @@ const Client = struct {
         client.connected = false;
     }
 
-    fn handle(client: *Client) !void {   
+    fn handle(client: *Client, file_map: *std.StringHashMap([]const u8)) !void {   
         defer client.close();
 
         var timer = std.time.Timer.start() catch unreachable;
@@ -55,7 +55,7 @@ const Client = struct {
 
         const allocator = client.arena.allocator();
         
-        var cwd = std.fs.cwd();
+        // var cwd = std.fs.cwd();
         var request_writer = std.ArrayList(u8).init(allocator);
         
         var reader = client.common_client.reader();
@@ -88,20 +88,18 @@ const Client = struct {
                 try response.write(writer);
                 return;
             };
-            for (resource_paths) |resource_path, path_index| {
-                if (std.mem.endsWith(u8, uri, resource_path)) {
-                    var resource = try cwd.openFile(resource_path_rel[path_index], .{});
-                    defer resource.close();
 
-                    var resource_data = try resource.readToEndAlloc(allocator, std.math.maxInt(usize));
-                    
+            var available_resource_iter = file_map.keyIterator();
+            while (available_resource_iter.next()) |resource_path| {
+                if (std.mem.endsWith(u8, uri, resource_path.*)) {
+                    var resource = file_map.get(resource_path.*).?;
                     var response = http.HttpResponse.init(allocator);
 
-                    const content_type = getContentType(resource_path).?;
-                    try response.header("Content-Length", resource_data.len);
+                    const content_type = getContentType(resource_path.*).?;
+                    try response.header("Content-Length", resource.len);
                     try response.header("Content-Type", content_type);
 
-                    response.body = resource_data;
+                    response.body = resource;
 
                     try response.write(writer);
                     return;
@@ -183,6 +181,8 @@ const OneNightServer = struct {
     clients: std.ArrayList(*Client),
     client_mutex: std.Thread.Mutex,
 
+    static_file_map: std.StringHashMap([]const u8),
+
     fn init(one_night: *OneNightServer, allocator: Allocator, address: std.net.Address) !void {
         one_night.server = Server.init(.{});
         try one_night.server.listen(address);
@@ -197,6 +197,16 @@ const OneNightServer = struct {
         one_night.clients = std.ArrayList(*Client).init(allocator);
         one_night.running = true;
         one_night.client_mutex = .{};
+
+        const cwd = std.fs.cwd();
+        one_night.static_file_map = std.StringHashMap([]const u8).init(allocator);
+        for (resource_paths) |path, path_index| {
+            var file = try cwd.openFile(resource_path_rel[path_index], .{});
+            defer file.close();
+
+            var file_content = try file.readToEndAlloc(allocator, std.math.maxInt(u32));
+            try one_night.static_file_map.putNoClobber(path, file_content);
+        }
 
         one_night.cleanup_thread = try std.Thread.spawn(.{}, OneNightServer.cleanup, .{one_night, allocator});
     }
@@ -223,7 +233,7 @@ const OneNightServer = struct {
         var client = try allocator.create(Client);
         client.* = try Client.init(allocator, &server.net_loop, connection);
         client.handle_frame = try allocator.create(@Frame(Client.handle));
-        client.handle_frame.* = async client.handle();
+        client.handle_frame.* = async client.handle(&server.static_file_map);
         client.connected = true;
 
         server.client_mutex.lock();
