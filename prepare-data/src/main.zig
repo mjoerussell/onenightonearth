@@ -37,13 +37,17 @@ pub const ConstellationInfo = packed struct {
 };
 
 pub const Constellation = struct {
+    name: []const u8,
+    epithet: []const u8,
     boundaries: []SkyCoord,
     asterism: []SkyCoord,
     is_zodiac: bool = false,
 
-    pub fn deinit(self: *Constellation, allocator: *Allocator) void {
+    pub fn deinit(self: *Constellation, allocator: Allocator) void {
         allocator.free(self.boundaries);
         allocator.free(self.asterism);
+        allocator.free(self.name);
+        allocator.free(self.epithet);
     }
 
     pub fn getInfo(self: Constellation) ConstellationInfo {
@@ -54,12 +58,15 @@ pub const Constellation = struct {
         };
     }
 
-    pub fn parseSkyFile(allocator: *Allocator, data: []const u8) !Constellation {
+    pub fn parseSkyFile(allocator: Allocator, data: []const u8) !Constellation {
         const ParseState = enum {
             stars,
             asterism,
             boundaries,
-        };
+        }; 
+
+        var constellation: Constellation = undefined;
+        constellation.is_zodiac = false;
 
         var stars = std.StringHashMap(SkyCoord).init(allocator);
         defer stars.deinit();
@@ -70,8 +77,6 @@ pub const Constellation = struct {
         var asterism_list = std.ArrayList(SkyCoord).init(allocator);
         errdefer asterism_list.deinit();
 
-        var is_zodiac = false;
-
         var line_iter = std.mem.split(u8, data, "\r\n");
 
         var parse_state: ParseState = .stars;
@@ -80,7 +85,29 @@ pub const Constellation = struct {
             if (std.mem.trim(u8, line, " ").len == 0) continue;
 
             if (std.mem.indexOf(u8, line, "#zodiac")) |_| {
-                is_zodiac = true;
+                constellation.is_zodiac = true;
+                continue;
+            }
+
+            if (std.mem.indexOf(u8, line, "@name")) |_| {
+                var line_split = std.mem.split(u8, line, "=");
+                _ = line_split.next();
+                const name = line_split.next().?;
+                const trimmed_name = std.mem.trim(u8, name, " ");
+                var name_copy = try allocator.alloc(u8, trimmed_name.len);
+                std.mem.copy(u8, name_copy, trimmed_name);
+                constellation.name = name_copy;
+                continue;
+            }
+
+            if (std.mem.indexOf(u8, line, "@epithet")) |_| {
+                var line_split = std.mem.split(u8, line, "=");
+                _ = line_split.next();
+                const epithet = line_split.next().?;
+                const trimmed_epithet = std.mem.trim(u8, epithet, " ");
+                var epithet_copy = try allocator.alloc(u8, trimmed_epithet.len);
+                std.mem.copy(u8, epithet_copy, trimmed_epithet);
+                constellation.epithet = epithet_copy;
                 continue;
             }
 
@@ -153,13 +180,12 @@ pub const Constellation = struct {
                     },
                 }
             }
-        }
+        }   
 
-        return Constellation{
-            .boundaries = boundary_list.toOwnedSlice(),
-            .asterism = asterism_list.toOwnedSlice(),
-            .is_zodiac = is_zodiac,
-        };
+        constellation.boundaries = boundary_list.toOwnedSlice();
+        constellation.asterism = asterism_list.toOwnedSlice();
+
+        return constellation;
     }
 };
 
@@ -217,18 +243,19 @@ pub fn main() anyerror!void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
 
-    const allocator = &arena.allocator;
+    const allocator = arena.allocator();
 
     var args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    if (args.len != 3) {
-        std.log.err("Must provide an output file name for both outputs", .{});
+    if (args.len != 4) {
+        std.log.err("Must provide an output file name for all three outputs", .{});
         return error.InvalidArgs;
     }
 
     const star_out_filename = args[1];
     const const_out_filename = args[2];
+    const const_out_metadata_filename = args[3];
 
     var timer = std.time.Timer.start() catch unreachable;
     const start = timer.read();
@@ -251,10 +278,10 @@ pub fn main() anyerror!void {
         allocator.free(constellations);
     }
 
-    try writeConstellationData(constellations, const_out_filename);
+    try writeConstellationData(constellations, allocator, const_out_filename, const_out_metadata_filename);
 }
 
-fn readSaoCatalog(allocator: *Allocator, catalog_filename: []const u8) ![]Star {
+fn readSaoCatalog(allocator: Allocator, catalog_filename: []const u8) ![]Star {
     const cwd = fs.cwd();
     const sao_catalog = try cwd.openFile(catalog_filename, .{});
     defer sao_catalog.close();
@@ -324,7 +351,7 @@ fn writeStarData(stars: []Star, out_filename: []const u8) !void {
 }
 
 /// Read and parse all of the constellation files in a given directory.
-fn readConstellationFiles(allocator: *Allocator, constellation_dir_name: []const u8) ![]Constellation {
+fn readConstellationFiles(allocator: Allocator, constellation_dir_name: []const u8) ![]Constellation {
     var constellations = std.ArrayList(Constellation).init(allocator);
     errdefer constellations.deinit();
 
@@ -375,13 +402,20 @@ fn readConstellationFiles(allocator: *Allocator, constellation_dir_name: []const
     return constellations.toOwnedSlice();
 }
 
-fn writeConstellationData(constellations: []Constellation, const_out_filename: []const u8) !void {
+fn writeConstellationData(constellations: []Constellation, allocator: Allocator, const_out_filename: []const u8, const_out_metadata_filename: []const u8) !void {
     const cwd = fs.cwd();
+
     const constellation_out_file = try cwd.createFile(const_out_filename, .{});
     defer constellation_out_file.close();
 
+    const constellation_metadata_out_file = try cwd.createFile(const_out_metadata_filename, .{});
+    defer constellation_metadata_out_file.close();
+
     var const_out_buffered_writer = std.io.bufferedWriter(constellation_out_file.writer());
     var const_out_writer = const_out_buffered_writer.writer();
+
+    var const_meta_buffered_writer = std.io.bufferedWriter(constellation_metadata_out_file.writer());
+    var const_meta_writer = const_meta_buffered_writer.writer();
     
     var num_boundaries: u32 = 0;
     var num_asterisms: u32 = 0;
@@ -411,7 +445,21 @@ fn writeConstellationData(constellations: []Constellation, const_out_filename: [
         }
     }
 
+    var metadata_json = std.ArrayList(std.json.Value).init(allocator);
+    for (constellations) |constellation| {
+        var c_map = std.json.ObjectMap.init(allocator);
+        try c_map.putNoClobber("name", std.json.Value{ .String = constellation.name });
+        try c_map.putNoClobber("epithet", std.json.Value{ .String = constellation.epithet });
+    
+        const val = std.json.Value{ .Object = c_map };
+        try metadata_json.append(val);
+    }
+
+    const metadata = std.json.Value{ .Array = metadata_json };
+    try metadata.jsonStringify(.{}, const_meta_writer);
+
     try const_out_buffered_writer.flush();
+    try const_meta_buffered_writer.flush();
 }
 
 /// Randomize the order of the stars. This is so that, when the star data starts streaming in when the page begins loading, the
@@ -422,8 +470,8 @@ fn shuffleStars(stars: []Star) void {
 
     const fold_range_size = stars.len / 6;
 
-    const fold_low_start = rand.random.intRangeAtMost(usize, 0, stars.len / 2);
-    const fold_high_start = rand.random.intRangeAtMost(usize, stars.len / 2, stars.len - fold_range_size);
+    const fold_low_start = rand.random().intRangeAtMost(usize, 0, stars.len / 2);
+    const fold_high_start = rand.random().intRangeAtMost(usize, stars.len / 2, stars.len - fold_range_size);
 
     var fold_index: usize = 0;
     while (fold_index <= fold_range_size) : (fold_index += 1) {
@@ -435,8 +483,8 @@ fn shuffleStars(stars: []Star) void {
     var low_index: usize = 0;
     var high_index: usize = stars.len - 1;
     while (low_index < high_index) : ({ low_index += 1; high_index -= 1; }) {
-        const low_bias: isize = rand.random.intRangeLessThan(isize, -5, 5);
-        const high_bias: isize = rand.random.intRangeLessThan(isize, -5, 5);
+        const low_bias: isize = rand.random().intRangeLessThan(isize, -5, 5);
+        const high_bias: isize = rand.random().intRangeLessThan(isize, -5, 5);
 
         const low_swap_index = if (@intCast(isize, low_index) + low_bias < 0) 
             low_index

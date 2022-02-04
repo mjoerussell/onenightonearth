@@ -328,5 +328,17 @@ fn handleConstellations(allocator: Allocator, request: http.HttpRequest) !http.H
 
 fn handleConstellationMetadata(allocator: Allocator, request: http.HttpRequest) !http.HttpResponse {
     _ = request;
-    return http.HttpResponse.initStatus(allocator, .not_found);
+    const cwd = std.fs.cwd();
+    var index_file = try cwd.openFile("../web/const_meta.json", .{});
+    defer index_file.close();
+
+    const index_data = try index_file.readToEndAlloc(allocator, std.math.maxInt(usize));
+    
+    var response = http.HttpResponse.init(allocator);
+    response.status = .ok;
+    try response.header("Content-Type", "application/json");
+    try response.header("Content-Length", index_data.len);
+    response.body = index_data;
+
+    return response;
 }
