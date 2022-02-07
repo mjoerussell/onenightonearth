@@ -43,7 +43,7 @@ pub const Canvas = struct {
     data: []Pixel,
     settings: Settings,
 
-    pub fn init(allocator: *Allocator, settings: Settings) !Canvas {
+    pub fn init(allocator: Allocator, settings: Settings) !Canvas {
         var canvas: Canvas = undefined;
         canvas.settings = settings;
         canvas.data = try allocator.alloc(Pixel, canvas.settings.width * canvas.settings.height);

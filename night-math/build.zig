@@ -2,6 +2,7 @@ const std = @import("std");
 const Builder = std.build.Builder;
 const Target = std.build.Target;
 
+const output_dir = "../web/dist/wasm";
 const test_files = [_][]const u8{ "src/star_math.zig", "src/math_utils.zig", "src/render.zig" };
 
 pub fn build(b: *Builder) !void {
@@ -14,7 +15,12 @@ pub fn build(b: *Builder) !void {
         .cpu_features = "generic+simd128"
     });
     lib.setTarget(target);
-    lib.setOutputDir("../web/dist/wasm/bin");
+    lib.setOutputDir(output_dir);
+    
+    const cwd = std.fs.cwd();
+    // If the dir isn't deleted before writing the lib, then it fails with the error 'TooManyParentDirs'
+    try cwd.deleteTree(output_dir);
+    
     lib.install();
 
     const test_step = b.step("test", "Run library tests");

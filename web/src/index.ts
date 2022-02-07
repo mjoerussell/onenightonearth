@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const controls = new Controls();
     controls.date = new Date();
 
-    WebAssembly.instantiateStreaming(fetch('./dist/wasm/bin/night-math.wasm'), {
+    WebAssembly.instantiateStreaming(fetch('./dist/wasm/night-math.wasm'), {
         env: {
             consoleLog: (msg_ptr: number, msg_len: number) => {
                 const message = wasm_interface.getString(msg_ptr, msg_len);

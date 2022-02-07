@@ -157,8 +157,8 @@ const WindowsClient = struct {
 };
 
 const DefaultClient = struct {
-    pub const Reader = net.StreamServer.Connection.Reader;
-    pub const Writer = net.StreamServer.Connection.Writer;
+    pub const Reader = net.Stream.Reader;
+    pub const Writer = net.Stream.Writer;
 
     conn: net.StreamServer.Connection,
 
@@ -167,11 +167,11 @@ const DefaultClient = struct {
     }
 
     pub fn reader(client: DefaultClient) Reader {
-        return .{ .context = client.conn };
+        return .{ .context = client.conn.stream };
     }
 
     pub fn writer(client: DefaultClient) Writer {
-        return .{ .context = client.conn };
+        return .{ .context = client.conn.stream };
     }
 
 };

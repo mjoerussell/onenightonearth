@@ -8,7 +8,7 @@ import { readConstellationFiles, Constellation } from './sky';
 const PORT = 3000;
 const HOST = process.env['HOST'] ?? '0.0.0.0';
 
-const static_assets = ['dist/bundle.js', 'styles/main.css', 'assets/favicon.ico', 'dist/wasm/bin/night-math.wasm'];
+const static_assets = ['dist/bundle.js', 'styles/main.css', 'assets/favicon.ico', 'dist/wasm/night-math.wasm'];
 
 const getContentType = (file_path: string): string | null => {
     if (file_path.endsWith('.css')) {
@@ -53,38 +53,39 @@ const handleStarsRequest = (res: ServerResponse): void => {
     });
 };
 
-const handleStaticAssetRequest = (req: IncomingMessage, res: ServerResponse): void => {
+const handleStaticAssetRequest = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+    const response_start = performance.now();
     let found_asset: boolean = false;
     for (const asset of static_assets) {
         if (req.url!.endsWith(asset)) {
             found_asset = true;
             const asset_path = path.join(__dirname, '../../web', req.url!);
-            stat(asset_path).then(file_stat => {
-                if (file_stat.isFile()) {
-                    const content_type = getContentType(asset_path);
-                    if (content_type != null) {
-                        readFile(asset_path)
-                            .then(file => {
-                                res.writeHead(200, {
-                                    'Content-Type': content_type,
-                                    'Content-Length': file.byteLength,
-                                });
-                                res.write(file);
-                                res.end();
-                            })
-                            .catch(err => {
-                                console.error('Error reading file ', asset_path.toString());
-                                console.error(err);
+            const file_stat = await stat(asset_path);
+            if (file_stat.isFile()) {
+                const content_type = getContentType(asset_path);
+                if (content_type != null) {
+                    try {
+                        const file = await readFile(asset_path);
+                        res.writeHead(200, {
+                            'Content-Type': content_type,
+                            'Content-Length': file.byteLength,
+                        });
+                        res.write(file);
+                        res.end();
+                        const response_end = performance.now();
+                        console.log(`Handling response for ${asset} took ${response_end - response_start} ms`);
+                    } catch (err) {
+                        console.error('Error reading file ', asset_path.toString());
+                        console.error(err);
 
-                                res.writeHead(500);
-                                res.end();
-                            });
+                        res.writeHead(500);
+                        res.end();
                     }
-                } else {
-                    res.writeHead(404);
-                    res.end();
                 }
-            });
+            } else {
+                res.writeHead(404);
+                res.end();
+            }
         }
     }
 

@@ -6,4 +6,4 @@ zig-out
 !**/webpack.config.js
 dist/
 *.bin
-web/**/const_meta.json
+**/const_meta.json

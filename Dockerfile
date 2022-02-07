@@ -1,7 +1,7 @@
 FROM alpine:3.13 AS zig
-ARG ZIG_VERSION=0.9.0-dev.1444+e2a2e6c14
+ARG ZIG_VERSION=0.10.0-dev.555+1b6a1e691
 ARG ZIG_URL=https://ziglang.org/builds/zig-linux-x86_64-${ZIG_VERSION}.tar.xz
-ARG ZIG_SHA=c9a901c2df0661eede242a0860cddc30bbdb34d33f329ddae3e5cbdaed27306c
+ARG ZIG_SHA=342ae034706d1a43de968414264896df710d45ecbf6058b2f16de7206d290eca
 
 WORKDIR /usr/src
 
@@ -41,23 +41,26 @@ COPY --from=zig /usr/src/bin /usr/src/bin
 RUN mkdir -p prepare-data
 COPY ./prepare-data .
 
-RUN /usr/src/bin/zig build run -Drelease-fast -- star_data.bin const_data.bin 
+RUN /usr/src/bin/zig build run -Drelease-fast -- star_data.bin const_data.bin const_meta.json
 
-FROM node:15-alpine AS build
+FROM alpine:3.13 AS build-server
+
+WORKDIR /usr/src
+
+COPY --from=zig /usr/src/bin /usr/src/bin
+
+COPY ./zig-server /usr/src/
+
+COPY --from=prepare-data /usr/src/star_data.bin .
+COPY --from=prepare-data /usr/src/const_data.bin .
+
+RUN /usr/src/bin/zig build
+
+FROM node:15-alpine AS build-web  
 
 WORKDIR /usr/src
 
 COPY ./tsconfig.base.json .
-
-# Server Setup 
-WORKDIR /usr/src/server
-
-COPY ./server/package*.json .
-RUN npm install
-
-COPY ./server/src ./src
-COPY ./server/tsconfig.json .
-RUN npm run build
 
 # Client Setup
 WORKDIR /usr/src/web
@@ -70,8 +73,6 @@ RUN npm run build
 
 FROM node:15-alpine
 
-ENV HOST=0.0.0.0
-
 WORKDIR /usr/src
 
 RUN mkdir web
@@ -81,12 +82,19 @@ RUN mkdir prepare-data
 # Copy over necessary files from build images
 COPY ./prepare-data/constellations ./prepare-data/constellations
 COPY ./web/assets/favicon.ico ./web/assets/favicon.ico
-COPY --from=build /usr/src/web/styles ./web/styles
-COPY --from=build /usr/src/web/index.html ./web/index.html
-COPY --from=build /usr/src/server/dist ./server/dist
-COPY --from=build /usr/src/web/dist ./web/dist
-COPY --from=night-math /usr/web/dist/wasm ./web/dist/wasm
-COPY --from=prepare-data /usr/src/star_data.bin ./server/star_data.bin
-COPY --from=prepare-data /usr/src/const_data.bin ./server/const_data.bin
 
-ENTRYPOINT [ "node", "/usr/src/server/dist/index.js" ]
+COPY --from=build-web /usr/src/web/styles ./web/styles
+COPY --from=build-web /usr/src/web/index.html ./web/index.html
+COPY --from=build-web /usr/src/web/dist ./web/dist
+
+COPY --from=build-server /usr/src/zig-out/bin/zig-server /usr/src/server
+
+COPY --from=night-math /usr/web/dist/wasm ./web/dist/wasm
+
+# COPY --from=prepare-data /usr/src/star_data.bin ./server/star_data.bin
+# COPY --from=prepare-data /usr/src/const_data.bin ./server/const_data.bin
+COPY --from=prepare-data /usr/src/const_meta.json ./server/const_meta.json
+
+WORKDIR /usr/src/server
+
+ENTRYPOINT [ "./zig-server" ]
