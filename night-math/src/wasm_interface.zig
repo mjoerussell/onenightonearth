@@ -23,7 +23,6 @@ var canvas: Canvas = undefined;
 
 var stars: []ExternStar = undefined;
 var stars_multi: std.MultiArrayList(Star) = .{};
-var points_multi: std.MultiArrayList(Point) = .{};
 
 var waypoints: []Coord = undefined;
 const num_waypoints = 150;
@@ -68,14 +67,10 @@ pub export fn allocateStars(num_stars: u32) [*]ExternStar {
 
 pub export fn initializeStars() void {
     stars_multi.ensureTotalCapacity(allocator, stars.len) catch unreachable;
-    points_multi.ensureTotalCapacity(allocator, stars.len) catch unreachable;
 
     for (stars) |star| {
         stars_multi.appendAssumeCapacity(Star.fromExternStar(star));
-        points_multi.appendAssumeCapacity(.{});
     }
-
-    // allocator.free(stars);
 }
 
 /// Initialize the canvas pixel data, and set the initial settings.
@@ -168,20 +163,7 @@ pub export fn projectStarsAndConstellations(observer_latitude: f32, observer_lon
     const cos_latitude = std.math.cos(observer_latitude);
 
     if (true) {
-        canvas.coordToPointWide(stars_multi, local_sidereal_time, sin_latitude, cos_latitude, &points_multi);
-
-        const point_slice = points_multi.slice();
-        const point_xs = point_slice.items(.x);
-        const point_ys = point_slice.items(.y);
-        const pixels = stars_multi.items(.pixel);
-
-        // canvas.setPixelAtWide(points_multi, pixels);
-        for (point_xs) |x, index| {
-            const point = Point{ .x = x, .y = point_ys[index] };
-            // if (canvas.isInsideCircle(point)) {
-            canvas.setPixelAt(point, pixels[index]);
-            // }
-        }
+        canvas.projectAndRenderStarsWide(stars_multi, local_sidereal_time, sin_latitude, cos_latitude);
     } else {
         for (stars) |star| {
             star_math.projectStar(&canvas, star, local_sidereal_time, sin_latitude, cos_latitude);
