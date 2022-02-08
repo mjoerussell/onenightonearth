@@ -7,3 +7,5 @@ zig-out
 dist/
 *.bin
 **/const_meta.json
+profiles
+*.wast

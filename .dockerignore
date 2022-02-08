@@ -5,3 +5,6 @@ dist
 .vscode
 .github
 *.bin
+profiles
+const_meta.json
+*.wast

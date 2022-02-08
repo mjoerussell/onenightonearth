@@ -8,8 +8,8 @@ const rad_to_deg_constant = 180.0 / math.pi;
 const deg_to_rad_constant = math.pi / 180.0;
 
 pub const Point = packed struct {
-    x: f32,
-    y: f32,
+    x: f32 = 0,
+    y: f32 = 0,
 
     pub fn getDist(self: Point, other: Point) f32 {
         const x_diff_sq = (self.x - other.x) * (self.x - other.x);

@@ -10,6 +10,7 @@ const Point = @import("./math_utils.zig").Point;
 
 const star_math = @import("./star_math.zig");
 const Star = star_math.Star;
+const ExternStar = star_math.ExternStar;
 const Constellation = star_math.Constellation;
 const SkyCoord = star_math.SkyCoord;
 const Coord = star_math.Coord;
@@ -19,7 +20,11 @@ const GreatCircle = star_math.GreatCircle;
 const allocator = std.heap.page_allocator;
 
 var canvas: Canvas = undefined;
-var stars: []Star = undefined;
+
+var stars: []ExternStar = undefined;
+var stars_multi: std.MultiArrayList(Star) = .{};
+var points_multi: std.MultiArrayList(Point) = .{};
+
 var waypoints: []Coord = undefined;
 const num_waypoints = 150;
 
@@ -54,10 +59,23 @@ const ExternCanvasSettings = packed struct {
 };
 
 /// Allocate memory for the stars and waypoints. Returns a pointer to the start of the star slice.
-pub export fn allocateStars(num_stars: u32) [*]Star {
-    stars = allocator.alloc(Star, @intCast(usize, num_stars)) catch unreachable;
+pub export fn allocateStars(num_stars: u32) [*]ExternStar {
+    stars = allocator.alloc(ExternStar, @intCast(usize, num_stars)) catch unreachable;
     waypoints = allocator.alloc(Coord, num_waypoints) catch unreachable;
+
     return stars.ptr;
+}
+
+pub export fn initializeStars() void {
+    stars_multi.ensureTotalCapacity(allocator, stars.len) catch unreachable;
+    points_multi.ensureTotalCapacity(allocator, stars.len) catch unreachable;
+
+    for (stars) |star| {
+        stars_multi.appendAssumeCapacity(Star.fromExternStar(star));
+        points_multi.appendAssumeCapacity(.{});
+    }
+
+    // allocator.free(stars);
 }
 
 /// Initialize the canvas pixel data, and set the initial settings.
@@ -69,7 +87,7 @@ pub export fn initializeCanvas(settings: *ExternCanvasSettings) void {
     };
 }
 
-pub export fn updateCanvasSettings(settings: *ExternCanvasSettings) ?[*]Pixel {
+pub export fn updateCanvasSettings(settings: *ExternCanvasSettings) ?[*]u32 {
     const new_settings = settings.getCanvasSettings();
     if (new_settings.width != canvas.settings.width or new_settings.height != canvas.settings.height) {
         canvas.data = allocator.realloc(canvas.data, new_settings.width * new_settings.height) catch unreachable;
@@ -132,7 +150,7 @@ pub export fn initializeConstellations(data: [*]u8) void {
 
 /// Returns a pointer to the pixel data so that it can be rendered on the canvas. Also sets the length of this buffer into the first slot
 /// of result_data.
-pub export fn getImageData() [*]Pixel {
+pub export fn getImageData() [*]u32 {
     setResult(@as(u32, canvas.data.len) * 4, 0);
     return canvas.data.ptr;
 }
@@ -148,9 +166,26 @@ pub export fn projectStarsAndConstellations(observer_latitude: f32, observer_lon
     const local_sidereal_time = pos.localSiderealTime();
     const sin_latitude = std.math.sin(observer_latitude);
     const cos_latitude = std.math.cos(observer_latitude);
-    
-    for (stars) |star| {
-        star_math.projectStar(&canvas, star, local_sidereal_time, sin_latitude, cos_latitude);
+
+    if (true) {
+        canvas.coordToPointWide(stars_multi, local_sidereal_time, sin_latitude, cos_latitude, &points_multi);
+
+        const point_slice = points_multi.slice();
+        const point_xs = point_slice.items(.x);
+        const point_ys = point_slice.items(.y);
+        const pixels = stars_multi.items(.pixel);
+
+        // canvas.setPixelAtWide(points_multi, pixels);
+        for (point_xs) |x, index| {
+            const point = Point{ .x = x, .y = point_ys[index] };
+            // if (canvas.isInsideCircle(point)) {
+            canvas.setPixelAt(point, pixels[index]);
+            // }
+        }
+    } else {
+        for (stars) |star| {
+            star_math.projectStar(&canvas, star, local_sidereal_time, sin_latitude, cos_latitude);
+        }
     }
 
     if (canvas.settings.draw_constellation_grid or canvas.settings.draw_asterisms) {

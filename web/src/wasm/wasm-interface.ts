@@ -15,6 +15,7 @@ import { CanvasSettings } from '../renderer';
 interface WasmLib {
     memory: WebAssembly.Memory;
     allocateStars: (num_stars: number) => pointer;
+    initializeStars: () => void;
     initializeCanvas: (settings: pointer) => void;
     initializeConstellations: (constellation_data: pointer) => void;
     initializeResultData: () => pointer;
@@ -52,8 +53,6 @@ export class WasmInterface {
 
     /** Pointer to star data. */
     private star_ptr: number = 0;
-    /** The number of stars added to the buffer at `star_ptr` so far. */
-    private num_stars_seen: number = 0;
 
     /** Pointer to the image data. */
     private pixel_data_ptr: number = 0;
@@ -71,7 +70,7 @@ export class WasmInterface {
      * @param constellation_data The constellation data to use when rendering.
      * @param canvas_settings The initial canvas settings.
      */
-    initialize(num_stars: number, constellation_data: Uint8Array, canvas_settings: CanvasSettings): void {
+    initialize(star_data: Uint8Array, constellation_data: Uint8Array, canvas_settings: CanvasSettings): void {
         const init_start = performance.now();
 
         const const_ptr = this.allocBytes(constellation_data.byteLength);
@@ -79,7 +78,13 @@ export class WasmInterface {
         const_view.set(constellation_data);
         this.lib.initializeConstellations(const_ptr);
 
+        const num_stars = star_data.byteLength / 13;
+
         this.star_ptr = this.lib.allocateStars(num_stars);
+        const star_view = new Uint8Array(this.memory, this.star_ptr, star_data.byteLength);
+        star_view.set(star_data);
+
+        this.lib.initializeStars();
 
         this.settings_ptr = this.allocObject(canvas_settings, sizedCanvasSettings);
         this.lib.initializeCanvas(this.settings_ptr);
@@ -91,18 +96,6 @@ export class WasmInterface {
 
         const init_end = performance.now();
         console.log(`Took ${init_end - init_start} ms to initialize`);
-    }
-
-    /**
-     * Add new stars to the current end of a pre-allocated star buffer. This pattern is here to enable streaming star data
-     * from the server to the client, since the data can be large.
-     * @param star_data A buffer of star data
-     */
-    addStars(star_data: Uint8Array): void {
-        const num_stars = star_data.byteLength / 13;
-        const view = new Uint8Array(this.memory, this.star_ptr + this.num_stars_seen * 13, star_data.byteLength);
-        view.set(star_data);
-        this.num_stars_seen += num_stars;
     }
 
     projectStarsAndConstellations(latitude: number, longitude: number, timestamp: BigInt): void {

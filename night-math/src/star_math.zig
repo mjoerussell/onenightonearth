@@ -48,13 +48,31 @@ fn getPartialLocalSiderealTime(timestamp: i64) f32 {
     return @floatCast(f32, math_utils.floatMod(lst, 2 * math.pi));
 }
 
-pub const Star = packed struct {
+pub const Star = struct {
+    right_ascension: f32,
+    declination: f32,
+    sin_declination: f32,
+    cos_declination: f32,
+    pixel: Pixel,
+
+    pub fn fromExternStar(ext_star: ExternStar) Star {
+        return .{
+            .right_ascension = ext_star.right_ascension,
+            .declination = ext_star.declination,
+            .sin_declination = math.sin(ext_star.declination),
+            .cos_declination = math.cos(ext_star.declination),
+            .pixel = ext_star.getColor(),
+        };
+    }
+};
+
+pub const ExternStar = packed struct {
     right_ascension: f32,
     declination: f32,
     brightness: f32,
     spec_type: SpectralType,
 
-    pub fn getColor(star: Star) Pixel {
+    pub fn getColor(star: ExternStar) Pixel {
         var base_color = star.spec_type.getColor();
         base_color.a = blk: {
             const brightness = star.brightness + 0.15;
@@ -247,15 +265,16 @@ pub const SpectralType = enum(u8) {
 };
 
 /// Draw a star on the canvas
-pub fn projectStar(canvas: *Canvas, star: Star, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
+pub fn projectStar(canvas: *Canvas, star: ExternStar, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
     const point = canvas.coordToPoint(
-        SkyCoord{ .right_ascension = star.right_ascension, .declination = star.declination }, 
+        SkyCoord{ .right_ascension = star.right_ascension, .declination = star.declination },
         local_sidereal_time,
         sin_latitude,
         cos_latitude,
         true
     ) orelse return;
 
+    canvas.setPixelAt(point, star.getColor());
     if (canvas.isInsideCircle(point)) {
         canvas.setPixelAt(point, star.getColor());
     }

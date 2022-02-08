@@ -57,27 +57,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log(`Constellation data is ${constellation_data.byteLength} bytes long`);
 
-        const star_response = await fetch('/stars');
-        const content_length = star_response.headers.get('Content-Length') ?? star_response.headers.get('X-Content-Length') ?? '0';
-        const total_length: number = parseInt(content_length, 10);
-        wasm_interface.initialize(total_length / 13, new Uint8Array(constellation_bin), controls.renderer.getCanvasSettings());
+        const star_bin = await fetch('/stars').then(s => s.arrayBuffer());
+        wasm_interface.initialize(new Uint8Array(star_bin), new Uint8Array(constellation_bin), controls.renderer.getCanvasSettings());
 
-        const response_reader = star_response.body?.getReader();
-        while (true) {
-            try {
-                const chunk = await response_reader?.read();
-                if (chunk == null || chunk.done) {
-                    break;
-                }
-
-                wasm_interface.addStars(chunk.value);
-                renderStars(controls);
-            } catch (err) {
-                console.error(`Error reading star data: ${err}`);
-                break;
-            }
-        }
-
+        renderStars(controls);
         constellations = await fetch('/constellations/meta').then(c => c.json());
         controls.setConstellations(constellations);
     });
