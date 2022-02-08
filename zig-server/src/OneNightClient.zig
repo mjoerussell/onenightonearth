@@ -89,8 +89,10 @@ pub fn handle(client: *OneNightClient, file_source: FileSource) !void {
     }
 
     if (route_handlers.get(request.uri() orelse "/")) |handler| {
-        var response = handler(allocator, request) catch http.Response.initStatus(allocator, .internal_server_error);
-        std.log.debug("Writing response", .{});
+        var response = handler(allocator, request) catch |err| {
+            std.log.err("Error handling request at {s}: {}", .{request.uri().?, err});
+            break http.Response.initStatus(allocator, .internal_server_error);
+        };
         try response.write(writer);
     } else {
         const uri = request.uri() orelse {
@@ -191,7 +193,7 @@ fn handleConstellations(allocator: Allocator, request: http.Request) !http.Respo
 fn handleConstellationMetadata(allocator: Allocator, request: http.Request) !http.Response {
     _ = request;
     const cwd = std.fs.cwd();
-    var index_file = try cwd.openFile("../const_meta.json", .{});
+    var index_file = try cwd.openFile("const_meta.json", .{});
     defer index_file.close();
 
     const index_data = try index_file.readToEndAlloc(allocator, std.math.maxInt(usize));
