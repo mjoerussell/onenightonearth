@@ -4,9 +4,10 @@ const Allocator = std.mem.Allocator;
 const math = std.math;
 const assert = std.debug.assert;
 const log = @import("./log.zig").log;
-const render = @import("./render.zig");
-const Pixel = render.Pixel;
-const Canvas = render.Canvas;
+
+const Canvas = @import("./Canvas.zig");
+const Pixel = Canvas.Pixel;
+
 const math_utils = @import("./math_utils.zig");
 const Point = math_utils.Point;
 const Line = math_utils.Line;

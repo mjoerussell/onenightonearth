@@ -2,9 +2,8 @@ const std = @import("std");
 
 const log = @import("./log.zig").log;
 
-const render = @import("./render.zig");
-const Canvas = render.Canvas;
-const Pixel = render.Pixel;
+const Canvas = @import("./Canvas.zig");
+const Pixel = Canvas.Pixel;
 
 const Point = @import("./math_utils.zig").Point;
 
