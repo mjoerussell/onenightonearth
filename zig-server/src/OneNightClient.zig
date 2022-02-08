@@ -11,6 +11,7 @@ const OneNightClient = @This();
 
 const CommonClient = @import("client.zig").Client;
 const NetworkLoop = @import("client.zig").NetworkLoop;
+const FileSource = @import("FileSource.zig");
 
 const is_windows = builtin.os.tag == .windows;
 
@@ -55,7 +56,7 @@ pub fn close(client: *OneNightClient) void {
     client.connected = false;
 }
 
-pub fn handle(client: *OneNightClient, file_map: *std.StringHashMap([]const u8)) !void {   
+pub fn handle(client: *OneNightClient, file_source: FileSource) !void {   
     defer client.close();
 
     var timer = Timer.start() catch unreachable;
@@ -98,26 +99,28 @@ pub fn handle(client: *OneNightClient, file_map: *std.StringHashMap([]const u8))
             return;
         };
 
-        var available_resource_iter = file_map.keyIterator();
-        while (available_resource_iter.next()) |resource_path| {
-            if (std.mem.endsWith(u8, uri, resource_path.*)) {
-                var resource = file_map.get(resource_path.*).?;
-                var response = http.HttpResponse.init(allocator);
-
-                const content_type = getContentType(resource_path.*).?;
-                try response.header("Content-Length", resource.len);
-                try response.header("Content-Type", content_type);
-
-                response.body = resource;
-
+        const file_data = file_source.getFile(allocator, uri) catch |err| switch (err) {
+            error.FileNotFound => {
+                std.log.warn("Client tried to get file {s}, but it could not be found", .{uri});
+                var response = http.HttpResponse.initStatus(allocator, .not_found);
+                try response.write(writer);
+                return;
+            },
+            else => {
+                std.log.err("Error when trying to get file {s}: {}", .{uri, err});
+                var response = http.HttpResponse.initStatus(allocator, .internal_server_error);
                 try response.write(writer);
                 return;
             }
-        }
+        };
 
-        std.log.warn("OneNightClient tried to get resource '{s}', which could not be found", .{uri});
+        const content_type = getContentType(uri).?;
+        
+        var response = http.HttpResponse.init(allocator);    
+        try response.header("Content-Length", file_data.len);
+        try response.header("Content-Type", content_type);
+        response.body = file_data;
 
-        var response = http.HttpResponse.initStatus(allocator, .not_found);
         try response.write(writer);
     }
 }
@@ -145,6 +148,7 @@ fn getContentType(filename: []const u8) ?[]const u8 {
 
     return null;
 }
+
 fn handleIndex(allocator: Allocator, request: http.HttpRequest) !http.HttpResponse {
     _ = request;
     const cwd = std.fs.cwd();
