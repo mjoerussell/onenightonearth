@@ -4,8 +4,6 @@ const Allocator = std.mem.Allocator;
 const Timer = std.time.Timer;
 const Thread = std.Thread;
 
-const http = @import("http");
-
 const OneNightServer = @This();
 
 const Client = @import("OneNightClient.zig");
@@ -29,9 +27,8 @@ cleanup_thread: Thread,
 clients: ClientList,
 client_mutex: Thread.Mutex,
 
-static_file_map: FileSource,
+file_source: FileSource,
 
-// pub fn init(one_night: *OneNightServer, allocator: Allocator, address: std.net.Address, resource_paths: []const []const u8, resource_path_rel: []const []const u8) !void {
 pub fn init(one_night: *OneNightServer, allocator: Allocator, address: std.net.Address) !void {
     one_night.server = Server.init(.{});
     try one_night.server.listen(address);
@@ -46,28 +43,7 @@ pub fn init(one_night: *OneNightServer, allocator: Allocator, address: std.net.A
     one_night.clients = ClientList.init(allocator);
     one_night.running = true;
     one_night.client_mutex = .{};
-    one_night.static_file_map = try FileSource.init(allocator);
-
-    // const cwd = std.fs.cwd();
-    // one_night.static_file_map = FileMap.init(allocator);
-    // for (resource_paths) |path, path_index| {
-    //     var file = cwd.openFile(resource_path_rel[path_index], .{}) catch |err| switch (err) {
-    //         error.FileNotFound => {
-    //             std.log.err("Could not open file {s}", .{resource_path_rel[path_index]});
-    //             continue;
-    //         },
-    //         else => {
-    //             std.log.err("Error opening file '{s}': {}", .{resource_path_rel[path_index], err});
-    //             continue;
-    //         }
-    //     };
-    //     defer file.close();
-
-    //     var file_content = try file.readToEndAlloc(allocator, std.math.maxInt(u32));
-    //     try one_night.static_file_map.putNoClobber(path, file_content);
-
-    //     std.log.info("Loaded file '{s}'", .{path});
-    // }
+    one_night.file_source = try FileSource.init(allocator);
 
     one_night.cleanup_thread = try std.Thread.spawn(.{}, OneNightServer.cleanup, .{one_night, allocator});
 }
@@ -96,7 +72,7 @@ pub fn accept(server: *OneNightServer, allocator: Allocator) !void {
     var client = try allocator.create(Client);
     client.* = try Client.init(allocator, &server.net_loop, connection);
     client.handle_frame = try allocator.create(@Frame(Client.handle));
-    client.handle_frame.* = async client.handle(server.static_file_map);
+    client.handle_frame.* = async client.handle(server.file_source);
 
     client.connected = true;
 

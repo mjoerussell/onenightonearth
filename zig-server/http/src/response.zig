@@ -3,6 +3,8 @@ const Allocator = std.mem.Allocator;
 
 const HttpVersion = @import("request.zig").HttpVersion;
 
+const Response = @This();
+
 pub const ResponseStatus = enum(u32) {
     // 100 information responses
     @"continue"                     = 100,
@@ -138,87 +140,84 @@ pub const ResponseStatus = enum(u32) {
     }
 };
 
-pub const HttpResponse = struct {
-    version: HttpVersion = .http_11,
-    status: ResponseStatus = .ok,
-    headers: std.StringHashMap([]const u8),
-    body: ?[]const u8 = null,
+version: HttpVersion = .http_11,
+status: ResponseStatus = .ok,
+headers: std.StringHashMap([]const u8),
+body: ?[]const u8 = null,
 
-    allocator: Allocator,
+allocator: Allocator,
 
-    pub fn init(allocator: Allocator) HttpResponse {
-        return HttpResponse{
-            .headers = std.StringHashMap([]const u8).init(allocator),
-            .allocator = allocator,
-        };
+pub fn init(allocator: Allocator) Response {
+    return Response{
+        .headers = std.StringHashMap([]const u8).init(allocator),
+        .allocator = allocator,
+    };
+}
+
+pub fn initStatus(allocator: Allocator, status: ResponseStatus) Response {
+    return Response{
+        .headers = std.StringHashMap([]const u8).init(allocator),
+        .status = status,
+        .allocator = allocator,
+    };
+}
+
+pub fn deinit(response: *Response) void {
+    response.headers.deinit();
+}
+
+pub fn header(response: *Response, header_name: []const u8, header_value: anytype) !void {
+    const header_str_value = if (comptime std.meta.trait.isZigString(@TypeOf(header_value))) 
+            header_value
+        else 
+            try std.fmt.allocPrint(response.allocator, "{}", .{header_value});
+    
+    var entry = try response.headers.getOrPut(header_name);
+    if (entry.found_existing) {
+        // This header has already been set, so append the new value to it instead of overwriting it
+        const concat_header_vals = try std.fmt.allocPrint(response.allocator, "{s}, {s}", .{entry.value_ptr.*, header_str_value});
+        entry.value_ptr.* = concat_header_vals;
+    } else {
+        // This header has not been set, so initialize it
+        entry.value_ptr.* = header_str_value;
+    }
+}
+
+pub fn write(response: *const Response, writer: anytype) !void {
+    const status_code = @enumToInt(response.status);
+    const status_reason_phrase = response.status.getMessage();
+
+    try writer.print("{s} {} {s}\r\n", .{response.version.toString(), status_code, status_reason_phrase});
+
+    var header_iter = response.headers.iterator();
+    while (header_iter.next()) |entry| {
+        try writer.print("{s}: {s}\r\n", .{entry.key_ptr.*, entry.value_ptr.*});
     }
 
-    pub fn initStatus(allocator: Allocator, status: ResponseStatus) HttpResponse {
-        return HttpResponse{
-            .headers = std.StringHashMap([]const u8).init(allocator),
-            .status = status,
-            .allocator = allocator,
-        };
-    }
+    try writer.writeAll("\r\n");
 
-    pub fn deinit(response: *HttpResponse) void {
-        response.headers.deinit();
-    }
-
-    pub fn header(response: *HttpResponse, header_name: []const u8, header_value: anytype) !void {
-        const header_str_value = if (comptime std.meta.trait.isZigString(@TypeOf(header_value))) 
-                header_value
-            else 
-                try std.fmt.allocPrint(response.allocator, "{}", .{header_value});
-        
-        var entry = try response.headers.getOrPut(header_name);
-        if (entry.found_existing) {
-            // This header has already been set, so append the new value to it instead of overwriting it
-            const concat_header_vals = try std.fmt.allocPrint(response.allocator, "{s}, {s}", .{entry.value_ptr.*, header_str_value});
-            entry.value_ptr.* = concat_header_vals;
-        } else {
-            // This header has not been set, so initialize it
-            entry.value_ptr.* = header_str_value;
-        }
-    }
-
-    pub fn write(response: *const HttpResponse, writer: anytype) !void {
-        const status_code = @enumToInt(response.status);
-        const status_reason_phrase = response.status.getMessage();
-
-        try writer.print("{s} {} {s}\r\n", .{response.version.toString(), status_code, status_reason_phrase});
-
-        var header_iter = response.headers.iterator();
-        while (header_iter.next()) |entry| {
-            try writer.print("{s}: {s}\r\n", .{entry.key_ptr.*, entry.value_ptr.*});
-        }
-
-        try writer.writeAll("\r\n");
-
-        if (response.body) |body| {
-            if (response.headers.get("Transfer-Encoding")) |transfer_encoding| {
-                if (std.ascii.eqlIgnoreCase(transfer_encoding, "chunked")) {
-                    // Size of the chunk, in bytes
-                    const chunk_size: usize = 200;
-                    var transferred_size: usize = 0;
-                    while (transferred_size < body.len) : (transferred_size += chunk_size) {
-                        const next_chunk_end = if (transferred_size + chunk_size >= body.len) body.len else transferred_size + chunk_size;
-                        const next_chunk_size = next_chunk_end - transferred_size;
-                        try writer.print("{x}\r\n{s}\r\n", .{ next_chunk_size, body[transferred_size..next_chunk_end]});
-                    }
-                    return;
+    if (response.body) |body| {
+        if (response.headers.get("Transfer-Encoding")) |transfer_encoding| {
+            if (std.ascii.eqlIgnoreCase(transfer_encoding, "chunked")) {
+                // Size of the chunk, in bytes
+                const chunk_size: usize = 200;
+                var transferred_size: usize = 0;
+                while (transferred_size < body.len) : (transferred_size += chunk_size) {
+                    const next_chunk_end = if (transferred_size + chunk_size >= body.len) body.len else transferred_size + chunk_size;
+                    const next_chunk_size = next_chunk_end - transferred_size;
+                    try writer.print("{x}\r\n{s}\r\n", .{ next_chunk_size, body[transferred_size..next_chunk_end]});
                 }
+                return;
             }
-            try writer.writeAll(body);
         }
+        try writer.writeAll(body);
     }
+}
 
-    pub fn writeAlloc(response: *const HttpResponse, allocator: Allocator) ![]const u8 {
-        var buffer = std.ArrayList(u8).init(allocator);
-        errdefer buffer.deinit();
+pub fn writeAlloc(response: *const Response, allocator: Allocator) ![]const u8 {
+    var buffer = std.ArrayList(u8).init(allocator);
+    errdefer buffer.deinit();
 
-        try response.write(buffer.writer());
-        return buffer.toOwnedSlice();
-    }
-
-};
+    try response.write(buffer.writer());
+    return buffer.toOwnedSlice();
+}

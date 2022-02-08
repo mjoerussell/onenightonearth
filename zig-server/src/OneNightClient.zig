@@ -17,7 +17,7 @@ const is_windows = builtin.os.tag == .windows;
 
 const Connection = if (is_windows) std.os.socket_t else net.StreamServer.Connection;
 
-const RequestHandler = fn (Allocator, http.HttpRequest) anyerror!http.HttpResponse;
+const RequestHandler = fn (Allocator, http.Request) anyerror!http.Response;
 const route_handlers = std.ComptimeStringMap(RequestHandler, .{
     .{ "/", handleIndex },
     .{ "/stars", handleStars },
@@ -81,7 +81,7 @@ pub fn handle(client: *OneNightClient, file_source: FileSource) !void {
         bytes_read = try reader.read(request_buffer[0..]);
     }
 
-    var request = http.HttpRequest{ .data = request_writer.items };
+    var request = http.Request{ .data = request_writer.items };
     defer {
         const end_ts = timer.read();
         const uri = request.uri() orelse "/";
@@ -89,12 +89,12 @@ pub fn handle(client: *OneNightClient, file_source: FileSource) !void {
     }
 
     if (route_handlers.get(request.uri() orelse "/")) |handler| {
-        var response = handler(allocator, request) catch http.HttpResponse.initStatus(allocator, .internal_server_error);
+        var response = handler(allocator, request) catch http.Response.initStatus(allocator, .internal_server_error);
         std.log.debug("Writing response", .{});
         try response.write(writer);
     } else {
         const uri = request.uri() orelse {
-            var response = http.HttpResponse.initStatus(allocator, .bad_request);
+            var response = http.Response.initStatus(allocator, .bad_request);
             try response.write(writer);
             return;
         };
@@ -102,13 +102,13 @@ pub fn handle(client: *OneNightClient, file_source: FileSource) !void {
         const file_data = file_source.getFile(allocator, uri) catch |err| switch (err) {
             error.FileNotFound => {
                 std.log.warn("Client tried to get file {s}, but it could not be found", .{uri});
-                var response = http.HttpResponse.initStatus(allocator, .not_found);
+                var response = http.Response.initStatus(allocator, .not_found);
                 try response.write(writer);
                 return;
             },
             else => {
                 std.log.err("Error when trying to get file {s}: {}", .{uri, err});
-                var response = http.HttpResponse.initStatus(allocator, .internal_server_error);
+                var response = http.Response.initStatus(allocator, .internal_server_error);
                 try response.write(writer);
                 return;
             }
@@ -116,7 +116,7 @@ pub fn handle(client: *OneNightClient, file_source: FileSource) !void {
 
         const content_type = getContentType(uri).?;
         
-        var response = http.HttpResponse.init(allocator);    
+        var response = http.Response.init(allocator);    
         try response.header("Content-Length", file_data.len);
         try response.header("Content-Type", content_type);
         response.body = file_data;
@@ -149,7 +149,7 @@ fn getContentType(filename: []const u8) ?[]const u8 {
     return null;
 }
 
-fn handleIndex(allocator: Allocator, request: http.HttpRequest) !http.HttpResponse {
+fn handleIndex(allocator: Allocator, request: http.Request) !http.Response {
     _ = request;
     const cwd = std.fs.cwd();
     std.log.info("Reading index.html", .{});
@@ -159,7 +159,7 @@ fn handleIndex(allocator: Allocator, request: http.HttpRequest) !http.HttpRespon
     
     const index_data = try index_file.readToEndAlloc(allocator, std.math.maxInt(usize));
     
-    var response = http.HttpResponse.init(allocator);
+    var response = http.Response.init(allocator);
     response.status = .ok;
     try response.header("Content-Type", "text/html");
     try response.header("Content-Length", index_data.len);
@@ -168,9 +168,9 @@ fn handleIndex(allocator: Allocator, request: http.HttpRequest) !http.HttpRespon
     return response;
 }
 
-fn handleStars(allocator: Allocator, request: http.HttpRequest) !http.HttpResponse {
+fn handleStars(allocator: Allocator, request: http.Request) !http.Response {
     _ = request;
-    var response = http.HttpResponse.init(allocator);
+    var response = http.Response.init(allocator);
     response.status = .ok;
     try response.header("Content-Type", "application/octet-stream");
     try response.header("Content-Length", star_data.len);
@@ -179,16 +179,16 @@ fn handleStars(allocator: Allocator, request: http.HttpRequest) !http.HttpRespon
     return response;
 }
 
-fn handleConstellations(allocator: Allocator, request: http.HttpRequest) !http.HttpResponse {
+fn handleConstellations(allocator: Allocator, request: http.Request) !http.Response {
     _ = request;
-    var response = http.HttpResponse.init(allocator);
+    var response = http.Response.init(allocator);
     try response.header("Content-Type", "application/octet-stream");
     try response.header("Content-Length", const_data.len);
     response.body = const_data;
     return response;
 }
 
-fn handleConstellationMetadata(allocator: Allocator, request: http.HttpRequest) !http.HttpResponse {
+fn handleConstellationMetadata(allocator: Allocator, request: http.Request) !http.Response {
     _ = request;
     const cwd = std.fs.cwd();
     var index_file = try cwd.openFile("../const_meta.json", .{});
@@ -196,7 +196,7 @@ fn handleConstellationMetadata(allocator: Allocator, request: http.HttpRequest) 
 
     const index_data = try index_file.readToEndAlloc(allocator, std.math.maxInt(usize));
     
-    var response = http.HttpResponse.init(allocator);
+    var response = http.Response.init(allocator);
     response.status = .ok;
     try response.header("Content-Type", "application/json");
     try response.header("Content-Length", index_data.len);

@@ -1,2 +1,2 @@
-pub usingnamespace @import("request.zig");
-pub usingnamespace @import("response.zig");
+pub const Request = @import("Request.zig");
+pub const Response = @import("Response.zig");
