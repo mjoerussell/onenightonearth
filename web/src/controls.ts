@@ -1,6 +1,7 @@
 import { Renderer } from './renderer';
 import { TouchInterface } from './touch-interface';
-import { CanvasPoint, Constellation, Coord } from './wasm/size';
+import { Point, Coord } from './wasm/wasm_module';
+import { Constellation } from './index';
 
 interface DragState {
     is_dragging: boolean;
@@ -358,7 +359,7 @@ export class Controls {
         });
     }
 
-    onMapHover(handler: (_: CanvasPoint) => void): void {
+    onMapHover(handler: (_: Point) => void): void {
         this.touch_handler.onSingleClick(touch => {
             if (!this.drag_state.is_dragging) {
                 const canvas_rect = this.renderer.canvas.getBoundingClientRect();

@@ -1,4 +1,5 @@
-export type CanvasSettings = {
+import { ExternCanvasSettings } from './wasm/wasm_module';
+export class CanvasSettings {
     width: number;
     height: number;
     background_radius: number;
@@ -8,7 +9,21 @@ export type CanvasSettings = {
     draw_constellation_grid: boolean;
     draw_asterisms: boolean;
     zodiac_only: boolean;
-};
+
+    public toExtern(): ExternCanvasSettings {
+        return {
+            width: this.width,
+            height: this.height,
+            background_radius: this.background_radius,
+            zoom_factor: this.zoom_factor,
+            drag_speed: this.drag_speed,
+            draw_north_up: this.draw_north_up ? 1 : 0,
+            draw_constellation_grid: this.draw_constellation_grid ? 1 : 0,
+            draw_asterisms: this.draw_asterisms ? 1 : 0,
+            zodiac_only: this.zodiac_only ? 1 : 0,
+        };
+    }
+}
 
 interface Canvas {
     id: string;
@@ -44,17 +59,16 @@ export class Renderer {
         this.main_canvas.canvas.width = canvas_dim;
         this.main_canvas.canvas.height = canvas_dim;
 
-        this.settings = {
-            width: this.main_canvas.canvas.width,
-            height: this.main_canvas.canvas.height,
-            background_radius: 0.5 * Math.min(this.main_canvas.canvas.width, this.main_canvas.canvas.height),
-            zoom_factor: 1.0,
-            drag_speed: Renderer.DefaultDragSpeed,
-            draw_north_up: true,
-            draw_constellation_grid: false,
-            draw_asterisms: false,
-            zodiac_only: false,
-        };
+        this.settings = new CanvasSettings();
+        this.settings.width = this.main_canvas.canvas.width;
+        this.settings.height = this.main_canvas.canvas.height;
+        this.settings.background_radius = 0.5 * Math.min(this.main_canvas.canvas.width, this.main_canvas.canvas.height);
+        this.settings.zoom_factor = 1.0;
+        this.settings.drag_speed = Renderer.DefaultDragSpeed;
+        this.settings.draw_north_up = true;
+        this.settings.draw_constellation_grid = false;
+        this.settings.draw_asterisms = false;
+        this.settings.zodiac_only = false;
     }
 
     /**

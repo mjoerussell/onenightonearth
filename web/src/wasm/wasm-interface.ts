@@ -1,61 +1,14 @@
-import {
-    WasmPrimative,
-    Coord,
-    // pointer,
-    Sized,
-    sizeOf,
-    sizeOfPrimative,
-    sizedCanvasSettings,
-    CanvasPoint,
-    SkyCoord,
-    Allocatable,
-} from './size';
-import { CanvasSettings } from '../renderer';
-import { WasmModule, pointer } from './wasm_module';
-
-// interface WasmLib {
-//     memory: WebAssembly.Memory;
-//     // allocateStars: (num_stars: number) => pointer;
-//     // initializeStars: () => void;
-//     // initializeCanvas: (settings: pointer) => void;
-//     // initializeConstellations: (constellation_data: pointer) => void;
-//     initialize: (star_ptr: pointer, num_stars: number, const_ptr: pointer, settings: pointer) => pointer;
-//     initializeResultData: () => pointer;
-//     updateCanvasSettings: (settings: pointer) => pointer;
-//     getImageData: () => pointer;
-//     resetImageData: () => void;
-//     projectStarsAndConstellations: (observer_latitude: number, observer_longitude: number, observer_timestamp: BigInt) => void;
-//     getConstellationAtPoint: (
-//         x: number,
-//         y: number,
-//         observer_latitude: number,
-//         observer_longitude: number,
-//         observer_timestamp: BigInt
-//     ) => number;
-//     getConstellationCentroid: (constellation_index: number) => pointer;
-//     dragAndMove: (drag_start_x: number, drag_start_y: number, drag_end_x: number, drag_end_y: number) => void;
-//     findWaypoints: (start_lat: number, start_long: number, end_lat: number, end_long: number) => pointer;
-//     getCoordForSkyCoord: (right_ascension: number, declination: number, observer_timestamp: BigInt) => void;
-//     getCoordForCanvasPoint: (
-//         x: number,
-//         y: number,
-//         observer_latitude: number,
-//         observer_longitude: number,
-//         observer_timestamp: BigInt
-//     ) => void;
-// }
+import * as wasm from './wasm_module';
 
 export class WasmInterface {
-    private lib: WasmModule;
+    private lib: wasm.WasmModule;
 
     /** Pointer to the wasm canvas settings. */
     private settings_ptr: number = 0;
     /** Pointer to wasm result data, for returning multiple values from functions. */
     private result_ptr: number = 0;
 
-    /** Pointer to star data. */
-    // private star_ptr: number = 0;
-    // private renderer_ptr: number = 0;
+    private renderer_ptr: number = 0;
 
     /** Pointer to the image data. */
     private pixel_data_ptr: number = 0;
@@ -73,7 +26,7 @@ export class WasmInterface {
      * @param constellation_data The constellation data to use when rendering.
      * @param canvas_settings The initial canvas settings.
      */
-    initialize(star_data: Uint8Array, constellation_data: Uint8Array, canvas_settings: CanvasSettings): void {
+    initialize(star_data: Uint8Array, constellation_data: Uint8Array, canvas_settings: wasm.ExternCanvasSettings): void {
         const init_start = performance.now();
 
         console.log(`Star byteLength: ${star_data.byteLength / 1024} k`);
@@ -85,21 +38,11 @@ export class WasmInterface {
         const const_view = new Uint8Array(this.memory, const_ptr);
         const_view.set(constellation_data);
 
-        // this.lib.initializeConstellations(const_ptr);
-
         const num_stars = star_data.byteLength / 13;
 
-        // this.star_ptr = this.lib.allocateStars(num_stars);
-        // const star_view = new Uint8Array(this.memory, this.star_ptr, star_data.byteLength);
-        // star_view.set(star_data);
+        this.settings_ptr = this.allocObject(canvas_settings, wasm.sizedExternCanvasSettings);
 
-        // this.lib.initializeStars();
-
-        this.settings_ptr = this.allocObject(canvas_settings, sizedCanvasSettings);
-        // this.lib.initializeCanvas(this.settings_ptr);
-
-        // this.renderer_ptr = this.lib.initialize(star_ptr, num_stars, const_ptr, this.settings_ptr);
-        this.lib.initialize(star_ptr, num_stars, const_ptr, this.settings_ptr);
+        this.renderer_ptr = this.lib.initialize(star_ptr, num_stars, const_ptr, this.settings_ptr);
 
         this.result_ptr = this.lib.initializeResultData();
 
@@ -111,15 +54,15 @@ export class WasmInterface {
     }
 
     projectStarsAndConstellations(latitude: number, longitude: number, timestamp: BigInt): void {
-        this.lib.projectStarsAndConstellations(latitude, longitude, timestamp);
+        this.lib.projectStarsAndConstellations(this.renderer_ptr, latitude, longitude, timestamp);
     }
 
-    getConstellationAtPoint(point: CanvasPoint, latitude: number, longitude: number, timestamp: BigInt): BigInt {
+    getConstellationAtPoint(point: wasm.Point, latitude: number, longitude: number, timestamp: BigInt): BigInt {
         const constellation_index = this.lib.getConstellationAtPoint(point.x, point.y, latitude, longitude, timestamp);
         return constellation_index;
     }
 
-    getConstellationCentroid(index: number): SkyCoord | null {
+    getConstellationCentroid(index: number): wasm.SkyCoord | null {
         this.lib.getConstellationCentroid(index);
         const result_data = new Float32Array(this.memory, this.result_ptr, 2);
         return {
@@ -146,12 +89,12 @@ export class WasmInterface {
      * @returns A `Float32Array` containing the waypoint latitude and longitudes. Every 2 sequential floats in
      *      this array represent 1 waypoint coordinate.
      */
-    findWaypoints(start: Coord, end: Coord): Float32Array {
+    findWaypoints(start: wasm.Coord, end: wasm.Coord): Float32Array {
         const result_ptr = this.lib.findWaypoints(start.latitude, start.longitude, end.latitude, end.longitude);
         return new Float32Array(this.memory.slice(result_ptr, result_ptr + 4 * 300));
     }
 
-    dragAndMove(start_x: number, start_y: number, end_x: number, end_y: number): Coord {
+    dragAndMove(start_x: number, start_y: number, end_x: number, end_y: number): wasm.Coord {
         this.lib.dragAndMove(start_x, start_y, end_x, end_y);
         const result_data = new Float32Array(this.memory, this.result_ptr, 2);
         return {
@@ -160,7 +103,7 @@ export class WasmInterface {
         };
     }
 
-    getCoordForSkyCoord(sky_coord: SkyCoord, timestamp: BigInt): Coord {
+    getCoordForSkyCoord(sky_coord: wasm.SkyCoord, timestamp: BigInt): wasm.Coord {
         this.lib.getCoordForSkyCoord(sky_coord.right_ascension, sky_coord.declination, timestamp);
         const result_data = new Float32Array(this.memory, this.result_ptr, 2);
         return {
@@ -169,8 +112,8 @@ export class WasmInterface {
         };
     }
 
-    updateSettings(settings: CanvasSettings): void {
-        this.setObject(new DataView(this.memory, this.settings_ptr), settings, sizedCanvasSettings);
+    updateSettings(settings: wasm.ExternCanvasSettings): void {
+        this.setObject(new DataView(this.memory, this.settings_ptr), settings, wasm.sizedExternCanvasSettings);
         const pixel_data_ptr = this.lib.updateCanvasSettings(this.settings_ptr);
         if (pixel_data_ptr !== 0) {
             this.pixel_data_ptr = pixel_data_ptr;
@@ -178,38 +121,38 @@ export class WasmInterface {
         }
     }
 
-    getString(ptr: pointer, len: number): string {
+    getString(ptr: wasm.pointer, len: number): string {
         const message_mem = this.memory.slice(ptr, ptr + len);
         const decoder = new TextDecoder();
         return decoder.decode(message_mem);
     }
 
-    allocObject<T extends Allocatable>(data: T, size: Sized<T>): pointer {
-        const total_bytes = sizeOf(size);
+    allocObject<T>(data: T, size: wasm.Sized<T>): wasm.pointer {
+        const total_bytes = wasm.sizeOf(size);
         const ptr = this.allocBytes(total_bytes);
         const data_mem = new DataView(this.memory, ptr, total_bytes);
         this.setObject(data_mem, data, size);
         return ptr;
     }
 
-    allocBytes(num_bytes: number): pointer {
+    allocBytes(num_bytes: number): wasm.pointer {
         return (this.instance.exports as any)._wasm_alloc(num_bytes);
     }
 
-    freeBytes(location: pointer, num_bytes: number): void {
+    freeBytes(location: wasm.pointer, num_bytes: number): void {
         (this.instance.exports as any)._wasm_free(location, num_bytes);
     }
 
-    setObject<T extends Allocatable>(mem: DataView, data: T, type: Sized<T>, offset = 0): number {
+    setObject<T>(mem: DataView, data: T, type: wasm.Sized<T>, offset = 0): number {
         let current_offset = offset;
         for (const key in data) {
-            this.setPrimative(mem, data[key], type[key], current_offset);
-            current_offset += sizeOfPrimative(type[key]);
+            this.setPrimative(mem, data[key] as any, type[key], current_offset);
+            current_offset += wasm.sizeOfPrimative(type[key]);
         }
         return current_offset;
     }
 
-    private setPrimative(mem: DataView, value: number | boolean, type: WasmPrimative, offset = 0) {
+    private setPrimative(mem: DataView, value: number | boolean, type: wasm.WasmPrimative, offset = 0) {
         let val: number;
         if (typeof value === 'boolean') {
             val = value ? 1 : 0;
@@ -217,47 +160,47 @@ export class WasmInterface {
             val = value;
         }
         switch (type) {
-            case WasmPrimative.bool: {
+            case wasm.WasmPrimative.bool: {
                 mem.setUint8(offset, val);
                 break;
             }
-            case WasmPrimative.u8: {
+            case wasm.WasmPrimative.u8: {
                 mem.setUint8(offset, val);
                 break;
             }
-            case WasmPrimative.u16: {
+            case wasm.WasmPrimative.u16: {
                 mem.setUint16(offset, val, true);
                 break;
             }
-            case WasmPrimative.u32: {
+            case wasm.WasmPrimative.u32: {
                 mem.setUint32(offset, val, true);
                 break;
             }
-            case WasmPrimative.u64: {
+            case wasm.WasmPrimative.u64: {
                 mem.setBigUint64(offset, BigInt(val), true);
                 break;
             }
-            case WasmPrimative.i8: {
+            case wasm.WasmPrimative.i8: {
                 mem.setInt8(offset, val);
                 break;
             }
-            case WasmPrimative.i16: {
+            case wasm.WasmPrimative.i16: {
                 mem.setInt16(offset, val, true);
                 break;
             }
-            case WasmPrimative.i32: {
+            case wasm.WasmPrimative.i32: {
                 mem.setInt32(offset, val, true);
                 break;
             }
-            case WasmPrimative.i64: {
+            case wasm.WasmPrimative.i64: {
                 mem.setBigInt64(offset, BigInt(val), true);
                 break;
             }
-            case WasmPrimative.f32: {
+            case wasm.WasmPrimative.f32: {
                 mem.setFloat32(offset, val, true);
                 break;
             }
-            case WasmPrimative.f64: {
+            case wasm.WasmPrimative.f64: {
                 mem.setFloat64(offset, val, true);
                 break;
             }

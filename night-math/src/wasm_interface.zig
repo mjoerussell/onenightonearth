@@ -27,7 +27,7 @@ var waypoints: [num_waypoints]Coord = undefined;
 
 var result_data: []u8 = undefined;
 
-const ExternCanvasSettings = packed struct {
+pub const ExternCanvasSettings = packed struct {
     width: u32,
     height: u32,
     background_radius: f32,
@@ -67,23 +67,23 @@ pub fn initializeStars(star_renderer: *StarRenderer, stars: []ExternStar) void {
     allocator.free(stars);
 }
 
-pub export fn initialize(stars: [*]ExternStar, num_stars: u32, constellation_data: [*]u8, settings: *ExternCanvasSettings) void {
+pub export fn initialize(stars: [*]ExternStar, num_stars: u32, constellation_data: [*]u8, settings: *ExternCanvasSettings) *StarRenderer {
     var star_renderer = allocator.create(StarRenderer) catch {
         log.err("Could not create StarRenderer, needs {} bytes", .{@sizeOf(StarRenderer)});
         unreachable;
     };
-    initializeStars(renderer, stars[0..num_stars]);
-    
-    log.debug("Stars initialized", .{});
+    initializeStars(star_renderer, stars[0..num_stars]);
     
     star_renderer.canvas = Canvas.init(allocator, settings.getCanvasSettings()) catch {
         const num_pixels = star_renderer.canvas.settings.width * star_renderer.canvas.settings.height;
         log.err("Ran out of memory during canvas intialization (needed {} kB for {} pixels)", .{(num_pixels * @sizeOf(Pixel)) / 1000, num_pixels});
         unreachable;
     };
-    initializeConstellations(renderer, constellation_data);
+
+    initializeConstellations(star_renderer, constellation_data);
     
-    // return star_renderer;
+    renderer = star_renderer;
+    return star_renderer;
 }
 
 pub export fn updateCanvasSettings(settings: *ExternCanvasSettings) ?[*]u32 {
@@ -160,39 +160,14 @@ pub export fn resetImageData() void {
 }
 
 /// The main rendering function. This will render all of the stars and, if turned on, the constellation asterisms and/or boundaries.
-pub export fn projectStarsAndConstellations(observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
-    renderer.run(observer_latitude, observer_longitude, observer_timestamp);
-    // const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
-    // const local_sidereal_time = pos.localSiderealTime();
-    // const sin_latitude = std.math.sin(observer_latitude);
-    // const cos_latitude = std.math.cos(observer_latitude);
-
-    // if (true) {
-    //     canvas.projectAndRenderStarsWide(stars_multi, local_sidereal_time, sin_latitude, cos_latitude);
-    // } else {
-    //     for (stars) |star| {
-    //         star_math.projectStar(&canvas, star, local_sidereal_time, sin_latitude, cos_latitude);
-    //     }
-    // }
-
-    // if (canvas.settings.draw_constellation_grid or canvas.settings.draw_asterisms) {
-    //     for (constellations) |constellation| {
-    //         if (canvas.settings.zodiac_only and !constellation.is_zodiac) continue;
-            
-    //         if (canvas.settings.draw_constellation_grid) {
-    //             star_math.projectConstellationGrid(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, local_sidereal_time, sin_latitude, cos_latitude);
-    //         }
-    //         if (canvas.settings.draw_asterisms) {
-    //             star_math.projectConstellationAsterism(&canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, local_sidereal_time, sin_latitude, cos_latitude);
-    //         }
-    //     }
-    // }
+pub export fn projectStarsAndConstellations(star_renderer: *StarRenderer, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
+    star_renderer.run(observer_latitude, observer_longitude, observer_timestamp);
 }
 
 /// Given a point on the canvas, determine which constellation (if any (but there should always be one)) is currently at that point. Once
 /// the constellation is found, draw a thicker line over that constellation's boundary and/or asterism to highlight it.
 /// Finally, return the index of the constellation so that the JS part of the frontend can show the constellation info.
-pub export fn getConstellationAtPoint(x: f32, y: f32, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) isize {
+pub export fn getConstellationAtPoint(star_renderer: *StarRenderer, x: f32, y: f32, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) isize {
     const point = Point{ .x = x, .y = y };
 
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
@@ -200,13 +175,13 @@ pub export fn getConstellationAtPoint(x: f32, y: f32, observer_latitude: f32, ob
     const sin_lat = std.math.sin(observer_latitude);
     const cos_lat = std.math.cos(observer_latitude);
 
-    const index = star_math.getConstellationAtPoint(&renderer.canvas, point, renderer.constellations, local_sidereal_time, sin_lat, cos_lat);
+    const index = star_math.getConstellationAtPoint(&star_renderer.canvas, point, star_renderer.constellations, local_sidereal_time, sin_lat, cos_lat);
     if (index) |i| {
-        if (renderer.canvas.settings.draw_constellation_grid) {
-            star_math.projectConstellationGrid(&renderer.canvas, renderer.constellations[i], Pixel.rgb(255, 255, 255), 3, local_sidereal_time, sin_lat, cos_lat);
+        if (star_renderer.canvas.settings.draw_constellation_grid) {
+            star_math.projectConstellationGrid(&star_renderer.canvas, star_renderer.constellations[i], Pixel.rgb(255, 255, 255), 3, local_sidereal_time, sin_lat, cos_lat);
         }
-        if (renderer.canvas.settings.draw_asterisms) {
-            star_math.projectConstellationAsterism(&renderer.canvas, renderer.constellations[i], Pixel.rgb(255, 255, 255), 3, local_sidereal_time, sin_lat, cos_lat);
+        if (star_renderer.canvas.settings.draw_asterisms) {
+            star_math.projectConstellationAsterism(&renderer.canvas, star_renderer.constellations[i], Pixel.rgb(255, 255, 255), 3, local_sidereal_time, sin_lat, cos_lat);
         }
         return @intCast(isize, i);
     } else return -1;

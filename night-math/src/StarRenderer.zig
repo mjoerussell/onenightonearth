@@ -2,6 +2,8 @@ const std = @import("std");
 const math = std.math;
 const Allocator = std.mem.Allocator;
 
+const log = @import("log.zig");
+
 const Canvas = @import("Canvas.zig");
 const Pixel = Canvas.Pixel;
 

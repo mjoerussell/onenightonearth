@@ -1,6 +1,15 @@
 import { Controls } from './controls';
-import { Constellation, Coord } from './wasm/size';
 import { WasmInterface } from './wasm/wasm-interface';
+import { Coord } from './wasm/wasm_module';
+
+export type Constellation = {
+    name: string;
+    /**
+     * This is roughly and English translation of the constellation name. For example, the epithet for
+     * Aries is "The Ram".
+     */
+    epithet: string;
+};
 
 let constellations: Constellation[] = [];
 let wasm_interface: WasmInterface;
@@ -15,7 +24,7 @@ const renderStars = (controls: Controls, date?: Date) => {
     }
 
     if (controls.renderer.settings_did_change) {
-        wasm_interface.updateSettings(controls.renderer.getCanvasSettings());
+        wasm_interface.updateSettings(controls.renderer.getCanvasSettings().toExtern());
     }
 
     const draw_start = performance.now();
@@ -49,17 +58,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const message = wasm_interface.getString(msg_ptr, msg_len);
                 console.error(`[WASM] ${message}`);
             },
-            memory: new WebAssembly.Memory({ initial: 100, maximum: 200 }),
         },
     }).then(async wasm_result => {
         wasm_interface = new WasmInterface(wasm_result.instance);
-        const constellation_bin: ArrayBuffer = await fetch('/constellations').then(s => s.arrayBuffer());
-        const constellation_data = new Uint8Array(constellation_bin);
+        const [star_bin, constellation_bin] = await Promise.all([
+            fetch('/stars').then(s => s.arrayBuffer()),
+            fetch('/constellations').then(s => s.arrayBuffer()),
+        ]);
 
-        console.log(`Constellation data is ${constellation_data.byteLength} bytes long`);
-
-        const star_bin = await fetch('/stars').then(s => s.arrayBuffer());
-        wasm_interface.initialize(new Uint8Array(star_bin), new Uint8Array(constellation_bin), controls.renderer.getCanvasSettings());
+        wasm_interface.initialize(
+            new Uint8Array(star_bin),
+            new Uint8Array(constellation_bin),
+            controls.renderer.getCanvasSettings().toExtern()
+        );
 
         renderStars(controls);
         constellations = await fetch('/constellations/meta').then(c => c.json());

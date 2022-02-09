@@ -20,6 +20,7 @@ pub fn build(b: *Builder) !void {
     lib.setTarget(target);
     lib.setOutputDir(output_dir);
     
+    
     const cwd = std.fs.cwd();
     // If the dir isn't deleted before writing the lib, then it fails with the error 'TooManyParentDirs'
     try cwd.deleteTree(output_dir);
@@ -34,8 +35,6 @@ pub fn build(b: *Builder) !void {
 
     const gen_step = b.step("gen-ts", "Generate a .d.ts file for Typescript to consume");
     gen_step.dependOn(&run_generator.step);
-
-    // try ts_generator.generateInterface();
 
     lib.install();
 
