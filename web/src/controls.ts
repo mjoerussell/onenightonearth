@@ -41,6 +41,7 @@ export class Controls {
 
     public renderer: Renderer;
     private canvas_resize_observer: ResizeObserver;
+    private should_detect_resize = false;
 
     private current_latitude = 0;
     private current_longitude = 0;
@@ -116,6 +117,7 @@ export class Controls {
 
         const canvas_container = document.getElementById('canvas-container') as HTMLDivElement;
         this.canvas_resize_observer = new ResizeObserver(entries => {
+            if (!this.should_detect_resize) return;
             const canvas_container_entry = entries[0];
             if (canvas_container_entry.contentBoxSize != null) {
                 const content_box: ResizeObserverSize = Array.isArray(canvas_container_entry.contentBoxSize)
@@ -427,6 +429,10 @@ export class Controls {
 
     onResize(handler: () => void) {
         this.resizeHandler = handler;
+    }
+
+    startDetectingResize(): void {
+        this.should_detect_resize = true;
     }
 
     get date(): Date {

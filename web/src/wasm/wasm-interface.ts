@@ -1,6 +1,7 @@
 import * as wasm from './wasm_module';
 
 export class WasmInterface {
+    private is_ready = false;
     private lib: wasm.WasmModule;
 
     /** Pointer to the wasm canvas settings. */
@@ -46,11 +47,12 @@ export class WasmInterface {
 
         this.result_ptr = this.lib.initializeResultData();
 
-        this.pixel_data_ptr = this.lib.getImageData();
+        this.pixel_data_ptr = this.lib.getImageData(this.renderer_ptr);
         this.pixel_count = new Uint32Array(this.memory, this.result_ptr, 2)[0];
 
         const init_end = performance.now();
         console.log(`Took ${init_end - init_start} ms to initialize`);
+        this.is_ready = true;
     }
 
     projectStarsAndConstellations(latitude: number, longitude: number, timestamp: BigInt): void {
@@ -63,7 +65,7 @@ export class WasmInterface {
     }
 
     getConstellationCentroid(index: number): wasm.SkyCoord | null {
-        this.lib.getConstellationCentroid(index);
+        this.lib.getConstellationCentroid(this.renderer_ptr, index);
         const result_data = new Float32Array(this.memory, this.result_ptr, 2);
         return {
             right_ascension: result_data[0],
@@ -73,14 +75,15 @@ export class WasmInterface {
 
     /** Clear the canvas. */
     resetImageData(): void {
-        this.lib.resetImageData();
+        this.lib.resetImageData(this.renderer_ptr);
     }
 
     /**
      * Get the pixel data, which can then be put onto the canvas.
      * @returns
      */
-    getImageData(): Uint8ClampedArray {
+    getImageData(): Uint8ClampedArray | null {
+        if (!this.is_ready) return null;
         return new Uint8ClampedArray(this.memory, this.pixel_data_ptr, this.pixel_count);
     }
 
@@ -95,7 +98,7 @@ export class WasmInterface {
     }
 
     dragAndMove(start_x: number, start_y: number, end_x: number, end_y: number): wasm.Coord {
-        this.lib.dragAndMove(start_x, start_y, end_x, end_y);
+        this.lib.dragAndMove(this.renderer_ptr, start_x, start_y, end_x, end_y);
         const result_data = new Float32Array(this.memory, this.result_ptr, 2);
         return {
             latitude: result_data[0],
@@ -114,7 +117,7 @@ export class WasmInterface {
 
     updateSettings(settings: wasm.ExternCanvasSettings): void {
         this.setObject(new DataView(this.memory, this.settings_ptr), settings, wasm.sizedExternCanvasSettings);
-        const pixel_data_ptr = this.lib.updateCanvasSettings(this.settings_ptr);
+        const pixel_data_ptr = this.lib.updateCanvasSettings(this.renderer_ptr, this.settings_ptr);
         if (pixel_data_ptr !== 0) {
             this.pixel_data_ptr = pixel_data_ptr;
             this.pixel_count = new Uint32Array(this.memory, this.result_ptr, 2)[0];

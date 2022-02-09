@@ -143,16 +143,16 @@ export const sizedPixel: Sized<Pixel> = {
 export interface WasmModule {
 	memory: WebAssembly.Memory;
 	initialize: (arg_0: pointer, arg_1: number, arg_2: pointer, arg_3: pointer) => pointer;
-	updateCanvasSettings: (arg_0: pointer) => pointer;
+	updateCanvasSettings: (arg_0: pointer, arg_1: pointer) => pointer;
 	initializeResultData: () => pointer;
-	getImageData: () => pointer;
-	resetImageData: () => void;
+	getImageData: (arg_0: pointer) => pointer;
+	resetImageData: (arg_0: pointer) => void;
 	projectStarsAndConstellations: (arg_0: pointer, arg_1: number, arg_2: number, arg_3: BigInt) => void;
 	getConstellationAtPoint: (arg_0: pointer, arg_1: number, arg_2: number, arg_3: number, arg_4: number, arg_5: BigInt) => BigInt;
-	dragAndMove: (arg_0: number, arg_1: number, arg_2: number, arg_3: number) => void;
+	dragAndMove: (arg_0: pointer, arg_1: number, arg_2: number, arg_3: number, arg_4: number) => void;
 	findWaypoints: (arg_0: number, arg_1: number, arg_2: number, arg_3: number) => pointer;
 	getCoordForSkyCoord: (arg_0: number, arg_1: number, arg_2: BigInt) => void;
-	getConstellationCentroid: (arg_0: number) => void;
+	getConstellationCentroid: (arg_0: pointer, arg_1: number) => void;
 	_wasm_alloc: (arg_0: number) => pointer;
 	_wasm_free: (arg_0: pointer, arg_1: number) => void;
 };

@@ -20,8 +20,6 @@ const GreatCircle = star_math.GreatCircle;
 
 const allocator = std.heap.page_allocator;
 
-var renderer: *StarRenderer = undefined;
-
 const num_waypoints = 150;
 var waypoints: [num_waypoints]Coord = undefined;
 
@@ -82,18 +80,17 @@ pub export fn initialize(stars: [*]ExternStar, num_stars: u32, constellation_dat
 
     initializeConstellations(star_renderer, constellation_data);
     
-    renderer = star_renderer;
     return star_renderer;
 }
 
-pub export fn updateCanvasSettings(settings: *ExternCanvasSettings) ?[*]u32 {
+pub export fn updateCanvasSettings(star_renderer: *StarRenderer, settings: *ExternCanvasSettings) ?[*]u32 {
     const new_settings = settings.getCanvasSettings();
-    if (new_settings.width != renderer.canvas.settings.width or new_settings.height != renderer.canvas.settings.height) {
-        renderer.canvas.data = allocator.realloc(renderer.canvas.data, new_settings.width * new_settings.height) catch unreachable;
-        renderer.canvas.settings = new_settings;
-        return getImageData();
+    if (new_settings.width != star_renderer.canvas.settings.width or new_settings.height != star_renderer.canvas.settings.height) {
+        star_renderer.canvas.data = allocator.realloc(star_renderer.canvas.data, new_settings.width * new_settings.height) catch unreachable;
+        star_renderer.canvas.settings = new_settings;
+        return getImageData(star_renderer);
     } 
-    renderer.canvas.settings = new_settings;
+    star_renderer.canvas.settings = new_settings;
     return null;
 }
 
@@ -149,14 +146,14 @@ pub fn initializeConstellations(star_renderer: *StarRenderer, data: [*]u8) void 
 
 /// Returns a pointer to the pixel data so that it can be rendered on the canvas. Also sets the length of this buffer into the first slot
 /// of result_data.
-pub export fn getImageData() [*]u32 {
-    setResult(@intCast(u32, renderer.canvas.data.len) * 4, 0);
-    return renderer.canvas.data.ptr;
+pub export fn getImageData(star_renderer: *StarRenderer) [*]u32 {
+    setResult(@intCast(u32, star_renderer.canvas.data.len) * 4, 0);
+    return star_renderer.canvas.data.ptr;
 }
 
 /// Clear the canvas pixel data.
-pub export fn resetImageData() void {
-    renderer.canvas.resetImageData();
+pub export fn resetImageData(star_renderer: *StarRenderer) void {
+    star_renderer.canvas.resetImageData();
 }
 
 /// The main rendering function. This will render all of the stars and, if turned on, the constellation asterisms and/or boundaries.
@@ -181,7 +178,7 @@ pub export fn getConstellationAtPoint(star_renderer: *StarRenderer, x: f32, y: f
             star_math.projectConstellationGrid(&star_renderer.canvas, star_renderer.constellations[i], Pixel.rgb(255, 255, 255), 3, local_sidereal_time, sin_lat, cos_lat);
         }
         if (star_renderer.canvas.settings.draw_asterisms) {
-            star_math.projectConstellationAsterism(&renderer.canvas, star_renderer.constellations[i], Pixel.rgb(255, 255, 255), 3, local_sidereal_time, sin_lat, cos_lat);
+            star_math.projectConstellationAsterism(&star_renderer.canvas, star_renderer.constellations[i], Pixel.rgb(255, 255, 255), 3, local_sidereal_time, sin_lat, cos_lat);
         }
         return @intCast(isize, i);
     } else return -1;
@@ -189,8 +186,8 @@ pub export fn getConstellationAtPoint(star_renderer: *StarRenderer, x: f32, y: f
 
 /// Compute a new coordiate based on the mouse drag state. Sets the latitude and longitude of the new coordinate into the respective slots of
 /// `result_data`.
-pub export fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_end_y: f32) void {
-    const coord = star_math.dragAndMove(drag_start_x, drag_start_y, drag_end_x, drag_end_y, renderer.canvas.settings.drag_speed);
+pub export fn dragAndMove(star_renderer: *StarRenderer, drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_end_y: f32) void {
+    const coord = star_math.dragAndMove(drag_start_x, drag_start_y, drag_end_x, drag_end_y, star_renderer.canvas.settings.drag_speed);
     setResult(coord.latitude, coord.longitude);
 }
 
@@ -217,8 +214,8 @@ pub export fn getCoordForSkyCoord(right_ascension: f32, declination: f32, observ
 
 /// Get the central point of a given constellation. This point may be outside of the boundaries of a constellation if the constellation is
 /// irregularly shaped. The point is selected to make the constellation centered in the canvas.
-pub export fn getConstellationCentroid(constellation_index: u32) void {
-    const centroid = if (constellation_index > renderer.constellations.len) SkyCoord{} else renderer.constellations[@intCast(usize, constellation_index)].centroid();
+pub export fn getConstellationCentroid(star_renderer: *StarRenderer, constellation_index: u32) void {
+    const centroid = if (constellation_index > star_renderer.constellations.len) SkyCoord{} else star_renderer.constellations[@intCast(usize, constellation_index)].centroid();
     setResult(centroid.right_ascension, centroid.declination);
 }
 

@@ -30,7 +30,9 @@ const renderStars = (controls: Controls, date?: Date) => {
     const draw_start = performance.now();
     wasm_interface.projectStarsAndConstellations(controls.latitude, controls.longitude, BigInt(timestamp));
     const data = wasm_interface.getImageData();
-    controls.renderer.drawData(data);
+    if (data != null) {
+        controls.renderer.drawData(data);
+    }
     const draw_end = performance.now();
 
     const diff = draw_end - draw_start;
@@ -75,6 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderStars(controls);
         constellations = await fetch('/constellations/meta').then(c => c.json());
         controls.setConstellations(constellations);
+        controls.startDetectingResize();
     });
 
     controls.onResize(() => {
@@ -214,7 +217,9 @@ document.addEventListener('DOMContentLoaded', () => {
             );
             const index = Number(big_index);
             const data = wasm_interface.getImageData();
-            controls.renderer.drawData(data);
+            if (data != null) {
+                controls.renderer.drawData(data);
+            }
             renderStars(controls);
             if (index >= 0) {
                 controls.constellation_name = `${constellations[index].name} - ${constellations[index].epithet}`;
