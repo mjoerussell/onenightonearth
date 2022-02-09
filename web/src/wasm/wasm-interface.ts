@@ -58,7 +58,7 @@ export class WasmInterface {
     }
 
     getConstellationAtPoint(point: wasm.Point, latitude: number, longitude: number, timestamp: BigInt): BigInt {
-        const constellation_index = this.lib.getConstellationAtPoint(point.x, point.y, latitude, longitude, timestamp);
+        const constellation_index = this.lib.getConstellationAtPoint(this.renderer_ptr, point.x, point.y, latitude, longitude, timestamp);
         return constellation_index;
     }
 

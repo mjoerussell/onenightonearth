@@ -11,6 +11,8 @@ pub fn build(b: *Builder) !void {
     const mode = b.standardReleaseOptions();
     const default_target = b.standardTargetOptions(.{});
 
+    const skip_ts_gen = b.option(bool, "no-gen", "Skip generating a .ts file containing type definitions for exported functions and extern-compatible types.") orelse false;
+
     const lib = b.addSharedLibrary("night-math", "src/main.zig", b.version(0, 0, 0));
     lib.setBuildMode(mode);
     const target = try std.zig.CrossTarget.parse(.{
@@ -24,6 +26,8 @@ pub fn build(b: *Builder) !void {
     const cwd = std.fs.cwd();
     // If the dir isn't deleted before writing the lib, then it fails with the error 'TooManyParentDirs'
     try cwd.deleteTree(output_dir);
+    
+    lib.install();
 
     const ts_gen = b.addExecutable("gen", "generate_interface.zig");
     ts_gen.setBuildMode(.ReleaseSafe);
@@ -33,12 +37,9 @@ pub fn build(b: *Builder) !void {
     const run_generator = ts_gen.run();
     run_generator.step.dependOn(&ts_gen.install_step.?.step);
 
-    const gen_step = b.step("gen-ts", "Generate a .d.ts file for Typescript to consume");
-    gen_step.dependOn(&run_generator.step);
-
-    lib.install_step.?.step.dependOn(&run_generator.step);
-
-    lib.install();
+    if (!skip_ts_gen) {
+        lib.install_step.?.step.dependOn(&run_generator.step);
+    }
 
     const test_step = b.step("test", "Run library tests");
     for (test_files) |file| {
