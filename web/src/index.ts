@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const message = wasm_interface.getString(msg_ptr, msg_len);
                 console.error(`[WASM] ${message}`);
             },
+            memory: new WebAssembly.Memory({ initial: 100, maximum: 200 }),
         },
     }).then(async wasm_result => {
         wasm_interface = new WasmInterface(wasm_result.instance);
@@ -194,12 +195,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     controls.onMapHover(point => {
         if (controls.renderer.draw_asterisms || controls.renderer.draw_constellation_grid) {
-            const index = wasm_interface.getConstellationAtPoint(
+            const big_index = wasm_interface.getConstellationAtPoint(
                 point,
                 controls.latitude,
                 controls.longitude,
                 BigInt(controls.date.valueOf())
             );
+            const index = Number(big_index);
             const data = wasm_interface.getImageData();
             controls.renderer.drawData(data);
             renderStars(controls);

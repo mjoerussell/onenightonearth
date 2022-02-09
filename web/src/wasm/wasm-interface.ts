@@ -1,7 +1,7 @@
 import {
     WasmPrimative,
     Coord,
-    pointer,
+    // pointer,
     Sized,
     sizeOf,
     sizeOfPrimative,
@@ -11,40 +11,42 @@ import {
     Allocatable,
 } from './size';
 import { CanvasSettings } from '../renderer';
+import { WasmModule, pointer } from './wasm_module';
 
-interface WasmLib {
-    memory: WebAssembly.Memory;
-    allocateStars: (num_stars: number) => pointer;
-    initializeStars: () => void;
-    initializeCanvas: (settings: pointer) => void;
-    initializeConstellations: (constellation_data: pointer) => void;
-    initializeResultData: () => pointer;
-    updateCanvasSettings: (settings: pointer) => pointer;
-    getImageData: () => pointer;
-    resetImageData: () => void;
-    projectStarsAndConstellations: (observer_latitude: number, observer_longitude: number, observer_timestamp: BigInt) => void;
-    getConstellationAtPoint: (
-        x: number,
-        y: number,
-        observer_latitude: number,
-        observer_longitude: number,
-        observer_timestamp: BigInt
-    ) => number;
-    getConstellationCentroid: (constellation_index: number) => pointer;
-    dragAndMove: (drag_start_x: number, drag_start_y: number, drag_end_x: number, drag_end_y: number) => void;
-    findWaypoints: (start_lat: number, start_long: number, end_lat: number, end_long: number) => pointer;
-    getCoordForSkyCoord: (right_ascension: number, declination: number, observer_timestamp: BigInt) => void;
-    getCoordForCanvasPoint: (
-        x: number,
-        y: number,
-        observer_latitude: number,
-        observer_longitude: number,
-        observer_timestamp: BigInt
-    ) => void;
-}
+// interface WasmLib {
+//     memory: WebAssembly.Memory;
+//     // allocateStars: (num_stars: number) => pointer;
+//     // initializeStars: () => void;
+//     // initializeCanvas: (settings: pointer) => void;
+//     // initializeConstellations: (constellation_data: pointer) => void;
+//     initialize: (star_ptr: pointer, num_stars: number, const_ptr: pointer, settings: pointer) => pointer;
+//     initializeResultData: () => pointer;
+//     updateCanvasSettings: (settings: pointer) => pointer;
+//     getImageData: () => pointer;
+//     resetImageData: () => void;
+//     projectStarsAndConstellations: (observer_latitude: number, observer_longitude: number, observer_timestamp: BigInt) => void;
+//     getConstellationAtPoint: (
+//         x: number,
+//         y: number,
+//         observer_latitude: number,
+//         observer_longitude: number,
+//         observer_timestamp: BigInt
+//     ) => number;
+//     getConstellationCentroid: (constellation_index: number) => pointer;
+//     dragAndMove: (drag_start_x: number, drag_start_y: number, drag_end_x: number, drag_end_y: number) => void;
+//     findWaypoints: (start_lat: number, start_long: number, end_lat: number, end_long: number) => pointer;
+//     getCoordForSkyCoord: (right_ascension: number, declination: number, observer_timestamp: BigInt) => void;
+//     getCoordForCanvasPoint: (
+//         x: number,
+//         y: number,
+//         observer_latitude: number,
+//         observer_longitude: number,
+//         observer_timestamp: BigInt
+//     ) => void;
+// }
 
 export class WasmInterface {
-    private lib: WasmLib;
+    private lib: WasmModule;
 
     /** Pointer to the wasm canvas settings. */
     private settings_ptr: number = 0;
@@ -52,7 +54,8 @@ export class WasmInterface {
     private result_ptr: number = 0;
 
     /** Pointer to star data. */
-    private star_ptr: number = 0;
+    // private star_ptr: number = 0;
+    // private renderer_ptr: number = 0;
 
     /** Pointer to the image data. */
     private pixel_data_ptr: number = 0;
@@ -73,21 +76,30 @@ export class WasmInterface {
     initialize(star_data: Uint8Array, constellation_data: Uint8Array, canvas_settings: CanvasSettings): void {
         const init_start = performance.now();
 
+        console.log(`Star byteLength: ${star_data.byteLength / 1024} k`);
+        const star_ptr = this.allocBytes(star_data.byteLength);
+        const star_view = new Uint8Array(this.memory, star_ptr);
+        star_view.set(star_data);
+
         const const_ptr = this.allocBytes(constellation_data.byteLength);
         const const_view = new Uint8Array(this.memory, const_ptr);
         const_view.set(constellation_data);
-        this.lib.initializeConstellations(const_ptr);
+
+        // this.lib.initializeConstellations(const_ptr);
 
         const num_stars = star_data.byteLength / 13;
 
-        this.star_ptr = this.lib.allocateStars(num_stars);
-        const star_view = new Uint8Array(this.memory, this.star_ptr, star_data.byteLength);
-        star_view.set(star_data);
+        // this.star_ptr = this.lib.allocateStars(num_stars);
+        // const star_view = new Uint8Array(this.memory, this.star_ptr, star_data.byteLength);
+        // star_view.set(star_data);
 
-        this.lib.initializeStars();
+        // this.lib.initializeStars();
 
         this.settings_ptr = this.allocObject(canvas_settings, sizedCanvasSettings);
-        this.lib.initializeCanvas(this.settings_ptr);
+        // this.lib.initializeCanvas(this.settings_ptr);
+
+        // this.renderer_ptr = this.lib.initialize(star_ptr, num_stars, const_ptr, this.settings_ptr);
+        this.lib.initialize(star_ptr, num_stars, const_ptr, this.settings_ptr);
 
         this.result_ptr = this.lib.initializeResultData();
 
@@ -102,7 +114,7 @@ export class WasmInterface {
         this.lib.projectStarsAndConstellations(latitude, longitude, timestamp);
     }
 
-    getConstellationAtPoint(point: CanvasPoint, latitude: number, longitude: number, timestamp: BigInt): number {
+    getConstellationAtPoint(point: CanvasPoint, latitude: number, longitude: number, timestamp: BigInt): BigInt {
         const constellation_index = this.lib.getConstellationAtPoint(point.x, point.y, latitude, longitude, timestamp);
         return constellation_index;
     }

@@ -2,7 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const math = std.math;
 
-const log = @import("./log.zig").log;
+const log = @import("./log.zig");
 const math_utils = @import("./math_utils.zig");
 const Point = math_utils.Point;
 const Line = math_utils.Line;

@@ -3,7 +3,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const math = std.math;
 const assert = std.debug.assert;
-const log = @import("./log.zig").log;
+const log = @import("./log.zig");
 
 const Canvas = @import("./Canvas.zig");
 const Pixel = Canvas.Pixel;
