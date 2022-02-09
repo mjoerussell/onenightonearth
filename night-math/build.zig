@@ -36,6 +36,8 @@ pub fn build(b: *Builder) !void {
     const gen_step = b.step("gen-ts", "Generate a .d.ts file for Typescript to consume");
     gen_step.dependOn(&run_generator.step);
 
+    lib.install_step.?.step.dependOn(&run_generator.step);
+
     lib.install();
 
     const test_step = b.step("test", "Run library tests");
