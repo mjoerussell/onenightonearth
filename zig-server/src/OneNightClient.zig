@@ -36,7 +36,7 @@ connected: bool = false,
 pub fn init(allocator: Allocator, loop: *NetworkLoop, conn: Connection) !OneNightClient {
     const common_client = 
         if (is_windows) try CommonClient.init(loop, conn) 
-        else try CommonClient.init(conn);
+        else CommonClient.init(conn);
 
     if (!is_windows) _ = loop;
 
@@ -89,9 +89,9 @@ pub fn handle(client: *OneNightClient, file_source: FileSource) !void {
     }
 
     if (route_handlers.get(request.uri() orelse "/")) |handler| {
-        var response = handler(allocator, request) catch |err| {
+        var response = handler(allocator, request) catch |err| blk: {
             std.log.err("Error handling request at {s}: {}", .{request.uri().?, err});
-            break http.Response.initStatus(allocator, .internal_server_error);
+            break :blk http.Response.initStatus(allocator, .internal_server_error);
         };
         try response.write(writer);
     } else {

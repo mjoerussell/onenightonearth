@@ -1,3 +1,8 @@
+###############################
+# This layer is for downloading and installing the specified version
+# of zig. Other layers can copy the binary from it
+###############################
+
 FROM alpine:3.13 AS zig
 ARG ZIG_VERSION=0.10.0-dev.555+1b6a1e691
 ARG ZIG_URL=https://ziglang.org/builds/zig-linux-x86_64-${ZIG_VERSION}.tar.xz
@@ -21,6 +26,10 @@ RUN mkdir -p /usr/src/bin
 RUN chmod +x /usr/local/bin/zig/zig-linux-x86_64-${ZIG_VERSION}/zig
 RUN cp -R /usr/local/bin/zig/zig-linux-x86_64-${ZIG_VERSION}/. /usr/src/bin/
 
+####################################
+# This layer is for building the WASM night-math library
+####################################
+
 FROM alpine:3.13 AS night-math
 
 WORKDIR /usr/src
@@ -31,7 +40,10 @@ COPY ./night-math .
 
 RUN /usr/src/bin/zig build -Drelease-fast
 
+#####################################
 # Prepare the star and constellation data
+#####################################
+
 FROM alpine:3.13 AS prepare-data
 
 WORKDIR /usr/src
@@ -43,18 +55,26 @@ COPY ./prepare-data .
 
 RUN /usr/src/bin/zig build run -Drelease-fast -- star_data.bin const_data.bin const_meta.json
 
+#####################################
+# Build the server
+#####################################
+
 FROM alpine:3.13 AS build-server
 
 WORKDIR /usr/src
 
 COPY --from=zig /usr/src/bin /usr/src/bin
 
-COPY ./zig-server /usr/src/
+COPY ./zig-server .
 
 COPY --from=prepare-data /usr/src/star_data.bin .
 COPY --from=prepare-data /usr/src/const_data.bin .
 
-RUN /usr/src/bin/zig build
+RUN /usr/src/bin/zig build -Drelease-fast
+
+##################################################
+# Build the static files for the site
+##################################################
 
 FROM node:15-alpine AS build-web  
 
@@ -62,7 +82,6 @@ WORKDIR /usr/src
 
 COPY ./tsconfig.base.json .
 
-# Client Setup
 WORKDIR /usr/src/web
 
 COPY ./web/package*.json .
@@ -71,16 +90,21 @@ RUN npm install
 COPY ./web .
 RUN npm run build
 
+#############################################
+# Combine all the assets from the previous layers and
+# provide an entrypoint that starts the server
+#############################################
+
 FROM node:15-alpine
 
 WORKDIR /usr/src
 
 RUN mkdir web
 RUN mkdir server
-RUN mkdir prepare-data
+# RUN mkdir prepare-data
 
 # Copy over necessary files from build images
-COPY ./prepare-data/constellations ./prepare-data/constellations
+# COPY ./prepare-data/constellations ./prepare-data/constellations
 COPY ./web/assets/favicon.ico ./web/assets/favicon.ico
 
 COPY --from=build-web /usr/src/web/styles ./web/styles

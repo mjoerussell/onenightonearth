@@ -1,7 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const HttpVersion = @import("request.zig").HttpVersion;
+const HttpVersion = @import("Request.zig").HttpVersion;
 
 const Response = @This();
 

@@ -137,10 +137,12 @@ pub fn main() !void {
     // Write out all of the public packed or extern structs in standard interface format, and write out their
     // Sized<T> instances. This will allow them to be easily allocated and used from Typescript code.
     inline for (@typeInfo(imports).Struct.decls) |import_decl| {
-        inline for (@typeInfo(import_decl.data.Type).Struct.decls) |decl| {
+        const ImportDecl = @field(imports, import_decl.name);
+        inline for (@typeInfo(ImportDecl).Struct.decls) |decl| {
             comptime if (!decl.is_pub) continue;
-            switch (decl.data) {
-                .Type => |type_decl| switch (@typeInfo(type_decl)) {
+            const Decl = @field(ImportDecl, decl.name);
+            switch (@typeInfo(@TypeOf(Decl))) {
+                .Type => switch (@typeInfo(Decl)) {
                     .Struct => |struct_info| {
                         if (struct_info.layout == .Extern or struct_info.layout == .Packed) {
                             try writer.print("export type {s} = {{\n", .{decl.name});
@@ -171,21 +173,20 @@ pub fn main() !void {
     try writer.writeAll("export interface WasmModule {\n");
     try writer.writeAll("\tmemory: WebAssembly.Memory;\n");
     inline for (@typeInfo(imports).Struct.decls) |import_decl| {
-        inline for (@typeInfo(import_decl.data.Type).Struct.decls) |decl| {
+        const ImportDecl = @field(imports, import_decl.name);
+        inline for (@typeInfo(ImportDecl).Struct.decls) |decl| {
             comptime if (!decl.is_pub) continue;
-            switch (decl.data) {
-                .Fn => |func| {
-                    if (func.is_export) {
-                        const func_info = @typeInfo(func.fn_type).Fn;
+            const Decl = @field(ImportDecl, decl.name);
+            switch (@typeInfo(@TypeOf(Decl))) {
+                .Fn => |func_info| {
+                    // hack to get around missing support for func.is_export
+                    if (func_info.calling_convention == .C) {
+                        // const func_info = @typeInfo(func.fn_type).Fn;
                         try writer.print("\t{s}: (", .{decl.name});
                         if (func_info.args.len > 0) {
                             inline for (func_info.args) |fn_arg, arg_index| {
                                 if (fn_arg.arg_type) |arg_type| {
-                                    if (arg_index < func.arg_names.len) {
-                                        try writer.print("{s}: ", .{func.arg_names[arg_index]});
-                                    } else {
-                                        try writer.print("arg_{}: ", .{arg_index});
-                                    }
+                                    try writer.print("arg_{}: ", .{arg_index});
                                     try writeTypescriptTypeName(arg_type, writer);
                                     if (arg_index < func_info.args.len - 1) {
                                         try writer.writeAll(", ");
