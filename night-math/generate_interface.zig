@@ -51,6 +51,11 @@ fn writeTypescriptTypeName(comptime T: type, writer: anytype) !void {
 pub fn main() !void {
     const cwd = fs.cwd();
 
+    cwd.makePath("../web/src/wasm") catch |err| switch (err) {
+        error.PathAlreadyExists => {}, // we don't care if the path already exists, we want it to exist
+        else => return err,
+    };
+
     var out_file = try cwd.createFile("../web/src/wasm/wasm_module.ts", .{});
     defer out_file.close();
 
