@@ -16,7 +16,7 @@ const OneNightClient = @import("OneNightClient.zig");
 
 const is_windows = builtin.os.tag == .windows;
 // Only use std's evented io on non-windows targets
-pub const io_mode = if (is_windows) .blocking else .evented;
+// pub const io_mode = if (is_windows) .blocking else .evented;
 
 pub fn main() anyerror!void {
     std.log.info("Starting server", .{});
