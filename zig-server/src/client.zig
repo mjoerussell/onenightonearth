@@ -25,6 +25,8 @@ const WindowsClient = struct {
     loop: *NetworkLoop,
 
     pub fn init(loop: *NetworkLoop, socket: os.socket_t) !Client {
+        // The windows event loop uses IO completion ports, so we need to call this to register this socket with the
+        // port
         try loop.register(socket);
         return Client{
             .socket = socket,
@@ -33,6 +35,7 @@ const WindowsClient = struct {
     }
 
     pub fn deinit(client: *Client) void {
+        // Shutdown the socket before closing it to ensure that nobody is currently using the socket
         switch (os.windows.ws2_32.shutdown(client.socket, 1)) {
             0 => {
                 _ = os.windows.ws2_32.closesocket(client.socket);
@@ -47,6 +50,7 @@ const WindowsClient = struct {
         }
     }
 
+    /// Send data over the socket.
     pub fn send(client: Client, data_buffer: []const u8) winsock.SendError!usize {
         var resume_node = NetworkLoop.createResumeNode(@frame());
         suspend {
@@ -55,6 +59,7 @@ const WindowsClient = struct {
         return try winsock.wsaGetOverlappedResult(client.socket, &resume_node.overlapped);
     }
 
+    /// Recieve data from the socket.
     pub fn recv(client: Client, buffer: []u8) winsock.RecvError!usize {
         var resume_node = NetworkLoop.createResumeNode(@frame());
         suspend {

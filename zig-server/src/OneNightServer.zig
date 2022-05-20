@@ -74,6 +74,8 @@ pub fn accept(server: *OneNightServer, allocator: Allocator) !void {
     // just use the Connection like before (it will go to DefaultClient).
     var sock = if (builtin.os.tag == .linux) connection.stream.handle else connection;
 
+    // Create a new client and start handling its request. Store the suspended frame in handle_frame
+    // for later reference
     var client = try allocator.create(Client);
     client.* = try Client.init(allocator, &server.net_loop, sock);
     client.handle_frame = try allocator.create(@Frame(Client.handle));
@@ -83,17 +85,25 @@ pub fn accept(server: *OneNightServer, allocator: Allocator) !void {
 
     server.client_mutex.lock();
     defer server.client_mutex.unlock();
+
+    // Append the client to the server's client list.
     try server.clients.append(client);
 }
 
+/// Background "process" for cleaning up expired clients. Whenever the server has gone > 1sec without accepting a new connection
+/// this will remove and destroy all of the clients that have disconnected.
 fn cleanup(server: *OneNightServer, allocator: Allocator) void {
     const cleanup_interval = 1000 * std.time.ns_per_ms;
     while (server.running) {
+        // If no clients have connected since the last cleanup then do nothing. Otherwise
+        // get the timestamp of the last connection.
         const last_connection = server.last_connection orelse continue;
 
         if (server.timer.read() - last_connection >= cleanup_interval) {
             // Clean up old clients if it's been longer than the specified time since there's been
             // a connection
+            // Prevent new clients from being added until this cleanup is done
+            // Also don't start the cleanup if a new client is being added
             server.client_mutex.lock();
             defer server.client_mutex.unlock();
 
@@ -107,6 +117,8 @@ fn cleanup(server: *OneNightServer, allocator: Allocator) void {
                     allocator.destroy(client_to_remove);
                     clients_removed += 1;
                 } else {
+                    // Only increment the client array index if the current client wasn't removed. Otherwise clients
+                    // will be skipped because we're using swapRemove
                     client_index += 1;
                 }
             }

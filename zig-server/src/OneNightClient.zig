@@ -18,6 +18,7 @@ const Connection = switch (builtin.os.tag) {
     else => net.StreamServer.Connection,
 };
 
+// Used to map a URI to a handler function.
 const RequestHandler = fn (Allocator, http.Request) anyerror!http.Response;
 const route_handlers = std.ComptimeStringMap(RequestHandler, .{
     .{ "/", handleIndex },
@@ -58,6 +59,7 @@ pub fn close(client: *OneNightClient) void {
 }
 
 pub fn handle(client: *OneNightClient, file_source: FileSource) !void {   
+    // Each client will only handle 1 request/response (http1.1), so after handling is complete we'll close the connection
     defer client.close();
 
     var timer = Timer.start() catch unreachable;
@@ -66,13 +68,14 @@ pub fn handle(client: *OneNightClient, file_source: FileSource) !void {
 
     const allocator = client.arena.allocator();
     
+    // Don't need to explictly deinit because we'll be deiniting the arena allocator once this function completes
     var request_writer = std.ArrayList(u8).init(allocator);
     
     var reader = client.common_client.reader();
     var writer = client.common_client.writer();
 
-    var request_buffer: [150]u8 = undefined;
-
+    // Read incoming data into a temp buffer and then copy it into an arraylist-backed buffer
+    var request_buffer: [std.mem.page_size]u8 = undefined;
     var bytes_read: usize = try reader.read(request_buffer[0..]);
     while (bytes_read > 0) {
         try request_writer.writer().writeAll(request_buffer[0..bytes_read]);
@@ -82,6 +85,7 @@ pub fn handle(client: *OneNightClient, file_source: FileSource) !void {
         bytes_read = try reader.read(request_buffer[0..]);
     }
 
+    // Get a request instance for the recieved data
     var request = http.Request{ .data = request_writer.items };
     defer {
         const end_ts = timer.read();
@@ -89,27 +93,36 @@ pub fn handle(client: *OneNightClient, file_source: FileSource) !void {
         std.log.info("Thread {}: Handling request for {s} took {d:.6}ms", .{std.Thread.getCurrentId(), uri, (@intToFloat(f64, end_ts) - @intToFloat(f64, start_ts)) / std.time.ns_per_ms});
     }
 
+    // If the request uri has a registered handler, then use it to processs the request and generate the response
     if (route_handlers.get(request.uri() orelse "/")) |handler| {
+        // Get the response from the handler. If an error occurs, then get a 500 reponse
         var response = handler(allocator, request) catch |err| blk: {
             std.log.err("Error handling request at {s}: {}", .{request.uri().?, err});
             break :blk http.Response.initStatus(allocator, .internal_server_error);
         };
+        // Send the response
         try response.write(writer);
     } else {
+        // uri() shouldn't return null here because that would be handled above. However if this case is matched for some reason,
+        // then the request is definitely malformed and we should send a 400 error
         const uri = request.uri() orelse {
             var response = http.Response.initStatus(allocator, .bad_request);
             try response.write(writer);
             return;
         };
 
+        // If this doesn't match an 'api' (as defined in route_handlers) then we'll assume that the user is trying to fetch a file
+        // We'll use file_source to try to read the file. If there's an error, then we'll handle it appropriately.
         const file_data = file_source.getFile(allocator, uri) catch |err| switch (err) {
             error.FileNotFound => {
+                // The file either a) doesn't exist or b) is not one of the files registered in FileSource to be readable
                 std.log.warn("Client tried to get file {s}, but it could not be found", .{uri});
                 var response = http.Response.initStatus(allocator, .not_found);
                 try response.write(writer);
                 return;
             },
             else => {
+                // Some unknown error occurred, just send 500 back
                 std.log.err("Error when trying to get file {s}: {}", .{uri, err});
                 var response = http.Response.initStatus(allocator, .internal_server_error);
                 try response.write(writer);
@@ -117,6 +130,7 @@ pub fn handle(client: *OneNightClient, file_source: FileSource) !void {
             }
         };
 
+        // Start building the file response
         const content_type = getContentType(uri).?;
         
         var response = http.Response.init(allocator);    
@@ -124,10 +138,12 @@ pub fn handle(client: *OneNightClient, file_source: FileSource) !void {
         try response.header("Content-Type", content_type);
         response.body = file_data;
 
+        // Send the response
         try response.write(writer);
     }
 }
 
+/// Gets the content-type of a file using the file extension. Only supports css, html, js, wasm, and ico files currently
 fn getContentType(filename: []const u8) ?[]const u8 {
     if (std.mem.endsWith(u8, filename, ".css")) {
         return "text/css";
@@ -152,6 +168,8 @@ fn getContentType(filename: []const u8) ?[]const u8 {
     return null;
 }
 
+/// Handle the main index.html page. This is used instead of a FileSource file so that users can navigate to 
+/// onenightonearth.com instead of onenightonearth.com/index.html
 fn handleIndex(allocator: Allocator, request: http.Request) !http.Response {
     _ = request;
     const cwd = std.fs.cwd();
@@ -171,6 +189,7 @@ fn handleIndex(allocator: Allocator, request: http.Request) !http.Response {
     return response;
 }
 
+/// Handle the /stars endpoint. Returns the star data buffer as an octet-stream.
 fn handleStars(allocator: Allocator, request: http.Request) !http.Response {
     _ = request;
     var response = http.Response.init(allocator);
@@ -182,6 +201,7 @@ fn handleStars(allocator: Allocator, request: http.Request) !http.Response {
     return response;
 }
 
+/// Handle the /constellations endpoint. Returns the constellation data buffer as an octet-stream.
 fn handleConstellations(allocator: Allocator, request: http.Request) !http.Response {
     _ = request;
     var response = http.Response.init(allocator);
@@ -191,6 +211,7 @@ fn handleConstellations(allocator: Allocator, request: http.Request) !http.Respo
     return response;
 }
 
+/// Handle the /constellations/meta endpoint. Returns the constellation metadata as a JSON-encoded value.
 fn handleConstellationMetadata(allocator: Allocator, request: http.Request) !http.Response {
     _ = request;
     const cwd = std.fs.cwd();

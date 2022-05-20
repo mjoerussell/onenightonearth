@@ -8,6 +8,9 @@ pub const Server = switch (builtin.os.tag) {
     else => net.StreamServer,
 };
 
+/// A custom server that imitates the lowest-common-denominator of the net.StreamServer API.
+/// This is needed to set up overlapped io on the incoming sockets without using non-blocking io
+/// on the whole filesystem (the default event loop that would be used in that case doesn't work on windows).
 const WindowsServer = struct {
     handle: ?os.socket_t = null,
     listen_address: net.Address,
