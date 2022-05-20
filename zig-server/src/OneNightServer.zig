@@ -36,7 +36,7 @@ pub fn init(one_night: *OneNightServer, allocator: Allocator, address: std.net.A
 
     one_night.timer = Timer.start() catch unreachable;
 
-    if (is_windows) {
+    if (builtin.os.tag == .windows or builtin.os.tag == .linux) {
         try one_night.net_loop.init(allocator);
     }
 
@@ -69,8 +69,13 @@ pub fn accept(server: *OneNightServer, allocator: Allocator) !void {
 
     std.log.debug("Got connection", .{});
 
+    // Linux gets a StreamServer.Connection from accept(), but the LinuxClient expects a sockfd
+    // init argument. In that case we should get it from the Connection, but in other cases (macos)
+    // just use the Connection like before (it will go to DefaultClient).
+    var sock = if (builtin.os.tag == .linux) connection.stream.handle else connection;
+
     var client = try allocator.create(Client);
-    client.* = try Client.init(allocator, &server.net_loop, connection);
+    client.* = try Client.init(allocator, &server.net_loop, sock);
     client.handle_frame = try allocator.create(@Frame(Client.handle));
     client.handle_frame.* = async client.handle(server.file_source);
 
