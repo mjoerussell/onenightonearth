@@ -76,12 +76,8 @@ pub fn accept(server: *OneNightServer, allocator: Allocator) !void {
 
     // Create a new client and start handling its request. Store the suspended frame in handle_frame
     // for later reference
-    var client = try allocator.create(Client);
-    client.* = try Client.init(allocator, &server.net_loop, sock);
-    client.handle_frame = try allocator.create(@Frame(Client.handle));
-    client.handle_frame.* = async client.handle(server.file_source);
-
-    client.connected = true;
+    var client = try Client.init(allocator, &server.net_loop, sock);
+    client.run(server.file_source);
 
     server.client_mutex.lock();
     defer server.client_mutex.unlock();

@@ -35,7 +35,9 @@ handle_frame: *@Frame(OneNightClient.handle) = undefined,
 arena: std.heap.ArenaAllocator,
 connected: bool = false,
 
-pub fn init(allocator: Allocator, loop: *NetworkLoop, conn: Connection) !OneNightClient {
+pub fn init(allocator: Allocator, loop: *NetworkLoop, conn: Connection) !*OneNightClient {
+    var client = try allocator.create(OneNightClient);
+
     const common_client = switch (builtin.os.tag) {
         .windows, .linux => try CommonClient.init(loop, conn),
         else => CommonClient.init(conn),
@@ -43,10 +45,13 @@ pub fn init(allocator: Allocator, loop: *NetworkLoop, conn: Connection) !OneNigh
 
     if (builtin.os.tag != .windows and builtin.os.tag != .linux) _ = loop;
 
-    return OneNightClient{ 
-        .common_client = common_client,
-        .arena = std.heap.ArenaAllocator.init(allocator),
-    };
+    client.common_client = common_client;
+    client.arena = std.heap.ArenaAllocator.init(allocator);
+    client.connected = true;
+
+    client.handle_frame = try allocator.create(@Frame(OneNightClient.handle));
+
+    return client;
 }
 
 pub fn close(client: *OneNightClient) void {
@@ -58,7 +63,11 @@ pub fn close(client: *OneNightClient) void {
     client.connected = false;
 }
 
-pub fn handle(client: *OneNightClient, file_source: FileSource) !void {   
+pub fn run(client: *OneNightClient, file_source: FileSource) void {
+    client.handle_frame.* = async client.handle(file_source);
+}
+
+fn handle(client: *OneNightClient, file_source: FileSource) !void {   
     // Each client will only handle 1 request/response (http1.1), so after handling is complete we'll close the connection
     defer client.close();
 
