@@ -60,7 +60,7 @@ pub fn close(client: *OneNightClient) void {
         else => client.common_client.conn.stream.close(),
     }
     client.arena.deinit();
-    client.connected = false;
+    @atomicStore(bool, &client.connected, false, .SeqCst);
 }
 
 pub fn run(client: *OneNightClient, file_source: FileSource) void {
