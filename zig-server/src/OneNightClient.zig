@@ -13,9 +13,10 @@ const CommonClient = @import("client.zig").Client;
 const NetworkLoop = @import("client.zig").NetworkLoop;
 const FileSource = @import("FileSource.zig");
 
-const is_windows = builtin.os.tag == .windows;
-
-const Connection = if (is_windows) std.os.socket_t else net.StreamServer.Connection;
+const Connection = switch (builtin.os.tag) {
+    .windows, .linux => std.os.socket_t,
+    else => net.StreamServer.Connection,
+};
 
 const RequestHandler = fn (Allocator, http.Request) anyerror!http.Response;
 const route_handlers = std.ComptimeStringMap(RequestHandler, .{
@@ -34,11 +35,12 @@ arena: std.heap.ArenaAllocator,
 connected: bool = false,
 
 pub fn init(allocator: Allocator, loop: *NetworkLoop, conn: Connection) !OneNightClient {
-    const common_client = 
-        if (is_windows) try CommonClient.init(loop, conn) 
-        else CommonClient.init(conn);
+    const common_client = switch (builtin.os.tag) {
+        .windows, .linux => try CommonClient.init(loop, conn),
+        else => CommonClient.init(conn),
+    };
 
-    if (!is_windows) _ = loop;
+    if (builtin.os.tag != .windows and builtin.os.tag != .linux) _ = loop;
 
     return OneNightClient{ 
         .common_client = common_client,
@@ -47,10 +49,9 @@ pub fn init(allocator: Allocator, loop: *NetworkLoop, conn: Connection) !OneNigh
 }
 
 pub fn close(client: *OneNightClient) void {
-    if (is_windows) {
-        client.common_client.deinit();
-    } else {
-        client.common_client.conn.stream.close();
+    switch (builtin.os.tag) {
+        .windows, .linux => client.common_client.deinit(),
+        else => client.common_client.conn.stream.close(),
     }
     client.arena.deinit();
     client.connected = false;
