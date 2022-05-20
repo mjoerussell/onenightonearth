@@ -11,13 +11,6 @@ const NetworkLoop = client_lib.NetworkLoop;
 const OneNightServer = @import("OneNightServer.zig");
 const OneNightClient = @import("OneNightClient.zig");
 
-// @todo In debug mode, periodically check for file modifications to support some kind of hot reloading
-// @todo Linux net loop, or at least figure out why async io isn't working inside the contianer
-
-const is_windows = builtin.os.tag == .windows;
-// Only use std's evented io on non-windows targets
-// pub const io_mode = if (is_windows) .blocking else .evented;
-
 pub fn main() anyerror!void {
     std.log.info("Starting server", .{});
 
