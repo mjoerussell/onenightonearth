@@ -48,6 +48,9 @@ pub fn deinit(server: *OneNightServer, allocator: Allocator) void {
 /// Accept a new client connection and add it to the client list. Also starts handling the client request/response
 /// process.
 pub fn accept(server: *OneNightServer, allocator: Allocator) !void {
+    // Put the cleanup here at the very end of execution so that it gets run no matter
+    // what happens (if there are any errors or not)
+    defer server.cleanup(allocator);
     var connection = try server.server.accept();
     std.log.debug("Got connection", .{});
 
@@ -56,15 +59,12 @@ pub fn accept(server: *OneNightServer, allocator: Allocator) !void {
     // just use the Connection like before (it will go to DefaultClient).
     var sock = if (builtin.os.tag == .linux) connection.stream.handle else connection;
 
-    // Create a new client and start handling its request. Store the suspended frame in handle_frame
-    // for later reference
+    // Create a new client and start handling its request.
     var client = try Client.init(allocator, &server.net_loop, sock);
     client.run(server.file_source);
 
     // Append the client to the server's client list.
     try server.clients.append(client);
-
-    server.cleanup(allocator);
 }
 
 /// Background "process" for cleaning up expired clients. Whenever the server has gone > 1sec without accepting a new connection
