@@ -10,6 +10,18 @@ export class CanvasSettings {
     draw_asterisms: boolean;
     zodiac_only: boolean;
 
+    constructor(width: number, height: number) {
+        this.width = width;
+        this.height = height;
+        this.background_radius = 0.5 * Math.min(width, height);
+        this.zoom_factor = 1.0;
+        this.drag_speed = Renderer.DefaultDragSpeed;
+        this.draw_north_up = true;
+        this.draw_constellation_grid = false;
+        this.draw_asterisms = false;
+        this.zodiac_only = false;
+    }
+
     public toExtern(): ExternCanvasSettings {
         return {
             width: this.width,
@@ -59,16 +71,7 @@ export class Renderer {
         this.main_canvas.canvas.width = canvas_dim;
         this.main_canvas.canvas.height = canvas_dim;
 
-        this.settings = new CanvasSettings();
-        this.settings.width = this.main_canvas.canvas.width;
-        this.settings.height = this.main_canvas.canvas.height;
-        this.settings.background_radius = 0.5 * Math.min(this.main_canvas.canvas.width, this.main_canvas.canvas.height);
-        this.settings.zoom_factor = 1.0;
-        this.settings.drag_speed = Renderer.DefaultDragSpeed;
-        this.settings.draw_north_up = true;
-        this.settings.draw_constellation_grid = false;
-        this.settings.draw_asterisms = false;
-        this.settings.zodiac_only = false;
+        this.settings = new CanvasSettings(this.main_canvas.canvas.width, this.main_canvas.canvas.height);
     }
 
     /**

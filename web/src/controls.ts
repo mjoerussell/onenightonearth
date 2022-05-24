@@ -20,24 +20,7 @@ interface PinchState {
  * a simple interface for handling higher-level types of events, such as "map drag" or "timelapse".
  */
 export class Controls {
-    private date_input: HTMLInputElement;
-    private location_input: HTMLInputElement | null;
-
-    private time_travel_button: HTMLButtonElement | null;
-    private today_button: HTMLButtonElement | null;
-
-    private update_location_button: HTMLButtonElement | null;
-    private current_position_button: HTMLButtonElement | null;
-
-    private show_constellation_grid_input: HTMLInputElement | null;
-    private show_asterism_input: HTMLInputElement | null;
-    private show_only_zodiac_input: HTMLInputElement | null;
-
-    private constellation_info_displays: HTMLCollectionOf<HTMLDivElement> | null;
     private _constellation_name: string | null = null;
-    private select_constellation: HTMLSelectElement | null;
-
-    private extraContellationControlsContainer: HTMLDivElement | null;
 
     public renderer: Renderer;
     private canvas_resize_observer: ResizeObserver;
@@ -66,33 +49,17 @@ export class Controls {
     private resizeHandler: () => void = () => {};
 
     constructor() {
-        this.date_input = document.getElementById('dateInput') as HTMLInputElement;
-
-        this.location_input = document.getElementById('locationInput') as HTMLInputElement;
-        this.location_input.value = '0.0000, 0.0000';
-
-        this.time_travel_button = document.getElementById('timelapse') as HTMLButtonElement;
-        this.today_button = document.getElementById('today') as HTMLButtonElement;
-
-        this.update_location_button = document.getElementById('locationUpdate') as HTMLButtonElement;
-        this.current_position_button = document.getElementById('currentPosition') as HTMLButtonElement;
-
-        this.show_asterism_input = document.getElementById('showAsterism') as HTMLInputElement;
-        this.show_constellation_grid_input = document.getElementById('showGrid') as HTMLInputElement;
-        this.show_only_zodiac_input = document.getElementById('onlyZodiac') as HTMLInputElement;
-        this.extraContellationControlsContainer = document.getElementById('extraConstellationControls') as HTMLDivElement;
-        this.constellation_info_displays = document.getElementsByClassName('constellation-info') as HTMLCollectionOf<HTMLDivElement>;
-
-        this.select_constellation = document.getElementById('selectConstellation') as HTMLSelectElement;
-
         this.renderer = new Renderer('star-canvas');
 
-        this.renderer.draw_constellation_grid = this.show_constellation_grid_input?.checked ?? false;
-        this.renderer.draw_asterisms = this.show_asterism_input?.checked ?? false;
-        this.renderer.zodiac_only = this.show_only_zodiac_input?.checked ?? false;
-
-        if (this.extraContellationControlsContainer) {
-            this.extraContellationControlsContainer.style.display =
+        const location_input = document.getElementById('locationInput') as HTMLInputElement;
+        location_input.value = '0.0000, 0.0000';
+        location_input?.addEventListener('change', () => {
+            this.user_changed_location = true;
+        });
+        
+        const extraContellationControlsContainer = document.getElementById('extraConstellationControls') as HTMLDivElement;
+        if (extraContellationControlsContainer) {
+            extraContellationControlsContainer.style.display =
                 this.renderer.draw_asterisms || this.renderer.draw_constellation_grid ? 'block' : 'none';
         }
 
@@ -109,10 +76,6 @@ export class Controls {
             } else {
                 this.renderer.drag_speed = Renderer.DefaultDragSpeed;
             }
-        });
-
-        this.location_input?.addEventListener('change', () => {
-            this.user_changed_location = true;
         });
 
         const canvas_container = document.getElementById('canvas-container') as HTMLDivElement;
@@ -142,8 +105,9 @@ export class Controls {
      * @param handler The new date will be passed to this function.
      */
     onDateChange(handler: (_: Date) => void): void {
-        this.date_input?.addEventListener('change', () => {
-            const new_date = this.date_input?.valueAsDate;
+        const date_input = document.getElementById('dateInput') as HTMLInputElement;
+        date_input?.addEventListener('change', () => {
+            const new_date = date_input?.valueAsDate;
             if (new_date == null) {
                 return;
             }
@@ -158,7 +122,8 @@ export class Controls {
      * some reason.
      */
     onSetToday(handler: (current: Date, target: Date) => Date): void {
-        this.today_button?.addEventListener('click', () => {
+        const today_button = document.getElementById('today') as HTMLButtonElement;
+        today_button?.addEventListener('click', () => {
             let current = this.date;
             let target = new Date();
 
@@ -185,11 +150,13 @@ export class Controls {
      * @param handler Passes the new coordinate to the callback.
      */
     onLocationUpdate(handler: (_: Coord) => void): void {
-        this.update_location_button?.addEventListener('click', () => {
+        const update_location_button = document.getElementById('locationUpdate') as HTMLButtonElement;
+        const location_input = document.getElementById('locationInput') as HTMLInputElement;
+        update_location_button?.addEventListener('click', () => {
             if (this.user_changed_location) {
                 let new_latitude: number;
                 let new_longitude: number;
-                const input_value = this.location_input?.value ?? '0, 0';
+                const input_value = location_input?.value ?? '0, 0';
                 let coords = input_value.split(',');
                 if (coords.length === 1) {
                     coords = input_value.split(' ');
@@ -223,7 +190,8 @@ export class Controls {
      * @param handler Passes the user's current position to this callback.
      */
     onUseCurrentPosition(handler: (_: Coord) => void): void {
-        this.current_position_button?.addEventListener('click', () => {
+        const current_position_button = document.getElementById('currentPosition');
+        current_position_button?.addEventListener('click', () => {
             if ('geolocation' in navigator) {
                 navigator.geolocation.getCurrentPosition(position => {
                     const lat_rad = position.coords.latitude * (Math.PI / 180);
@@ -244,8 +212,9 @@ export class Controls {
      * passed in.
      */
     onTimelapse(handler: (next_date: Date) => Date): void {
-        this.time_travel_button?.addEventListener('click', () => {
-            this.time_travel_button!.innerText = this.timelapse_is_on ? 'Timelapse' : 'Stop';
+        const time_travel_button = document.getElementById('timelapse');
+        time_travel_button?.addEventListener('click', () => {
+            time_travel_button!.innerText = this.timelapse_is_on ? 'Timelapse' : 'Stop';
             if (this.timelapse_is_on) {
                 this.timelapse_is_on = false;
                 return;
@@ -385,42 +354,49 @@ export class Controls {
     }
 
     onChangeConstellationView(handler: () => void): void {
+        const show_asterism_input = document.getElementById('showAsterism') as HTMLInputElement;
+        const show_constellation_grid_input = document.getElementById('showGrid') as HTMLInputElement;
+        const show_only_zodiac_input = document.getElementById('onlyZodiac') as HTMLInputElement;
+        const extraContellationControlsContainer = document.getElementById('extraConstellationControls') as HTMLDivElement;
+
         const handleAllInputs = () => {
-            this.renderer.draw_asterisms = this.show_asterism_input?.checked ?? false;
-            this.renderer.draw_constellation_grid = this.show_constellation_grid_input?.checked ?? false;
-            this.renderer.zodiac_only = this.show_only_zodiac_input?.checked ?? false;
+            this.renderer.draw_asterisms = show_asterism_input?.checked ?? false;
+            this.renderer.draw_constellation_grid = show_constellation_grid_input?.checked ?? false;
+            this.renderer.zodiac_only = show_only_zodiac_input?.checked ?? false;
 
             if (!this.renderer.draw_asterisms && !this.renderer.draw_constellation_grid) {
                 this.constellation_name = '';
             }
 
-            if (this.extraContellationControlsContainer) {
-                this.extraContellationControlsContainer.style.display =
+            if (extraContellationControlsContainer) {
+                extraContellationControlsContainer.style.display =
                     this.renderer.draw_asterisms || this.renderer.draw_constellation_grid ? 'block' : 'none';
             }
 
             handler();
         };
 
-        this.show_constellation_grid_input?.addEventListener('change', () => handleAllInputs());
-        this.show_asterism_input?.addEventListener('change', () => handleAllInputs());
-        this.show_only_zodiac_input?.addEventListener('change', () => handleAllInputs());
+        show_constellation_grid_input?.addEventListener('change', () => handleAllInputs());
+        show_asterism_input?.addEventListener('change', () => handleAllInputs());
+        show_only_zodiac_input?.addEventListener('change', () => handleAllInputs());
     }
 
     setConstellations(constellations: Constellation[]): void {
-        if (this.select_constellation) {
+        const select_constellation = document.getElementById('selectConstellation') as HTMLSelectElement;
+        if (select_constellation) {
             for (const [index, c] of constellations.entries()) {
                 const c_option: HTMLOptionElement = document.createElement('option');
                 c_option.value = index.toString();
                 c_option.innerText = c.name;
-                this.select_constellation.appendChild(c_option);
+                select_constellation.appendChild(c_option);
             }
         }
     }
 
     onSelectConstellation(handler: (_: number) => void): void {
-        this.select_constellation?.addEventListener('change', _ => {
-            const index = parseInt(this.select_constellation!.value, 10);
+        const select_constellation = document.getElementById('selectConstellation') as HTMLSelectElement;
+        select_constellation?.addEventListener('change', _ => {
+            const index = parseInt(select_constellation!.value, 10);
             if (index >= 0) {
                 handler(index);
             }
@@ -436,13 +412,15 @@ export class Controls {
     }
 
     get date(): Date {
-        const current_date = this.date_input?.valueAsDate;
+        const date_input = document.getElementById('dateInput') as HTMLInputElement;
+        const current_date = date_input?.valueAsDate;
         return current_date ?? new Date();
     }
 
     set date(new_date: Date) {
-        if (this.date_input) {
-            this.date_input.valueAsDate = new_date;
+        const date_input = document.getElementById('dateInput') as HTMLInputElement;
+        if (date_input) {
+            date_input.valueAsDate = new_date;
         }
     }
 
@@ -451,11 +429,12 @@ export class Controls {
     }
 
     set latitude(value: number) {
+        const location_input = document.getElementById('locationInput') as HTMLInputElement;
         this.current_latitude = value;
-        if (this.location_input) {
-            const longitude = this.location_input.value.split(',')[1];
+        if (location_input) {
+            const longitude = location_input.value.split(',')[1];
             const lat_degrees = value * (180 / Math.PI);
-            this.location_input.value = `${lat_degrees.toPrecision(6)}, ${longitude}`;
+            location_input.value = `${lat_degrees.toPrecision(6)}, ${longitude}`;
         }
     }
 
@@ -464,11 +443,12 @@ export class Controls {
     }
 
     set longitude(value: number) {
+        const location_input = document.getElementById('locationInput') as HTMLInputElement;
         this.current_longitude = value;
-        if (this.location_input) {
-            const [latitude] = this.location_input.value.split(',');
+        if (location_input) {
+            const [latitude] = location_input.value.split(',');
             const long_degrees = value > Math.PI ? (value - 2 * Math.PI) * (180 / Math.PI) : value * (180 / Math.PI);
-            this.location_input.value = `${latitude}, ${long_degrees.toPrecision(6)}`;
+            location_input.value = `${latitude}, ${long_degrees.toPrecision(6)}`;
         }
     }
 
@@ -477,10 +457,11 @@ export class Controls {
     }
 
     set constellation_name(value: string) {
+        const constellation_info_displays = document.getElementsByClassName('constellation-info') as HTMLCollectionOf<HTMLDivElement>;
         this._constellation_name = value;
-        if (this.constellation_info_displays) {
-            for (let i = 0; i < this.constellation_info_displays.length; i += 1) {
-                const name_display = this.constellation_info_displays[i].getElementsByClassName('constellation-name')[0] as HTMLSpanElement;
+        if (constellation_info_displays) {
+            for (let i = 0; i < constellation_info_displays.length; i += 1) {
+                const name_display = constellation_info_displays[i].getElementsByClassName('constellation-name')[0] as HTMLSpanElement;
                 if (name_display != null) {
                     name_display.innerText = value;
                 }
