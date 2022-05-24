@@ -76,7 +76,8 @@ pub fn main() !void {
         \\    i8,
         \\    i16,
         \\    i32,
-        \\    i64,
+        \\    i64,  
+        \\    f16,
         \\    f32,
         \\    f64,
         \\}
@@ -97,6 +98,7 @@ pub fn main() !void {
         \\            return 1;
         \\        case WasmPrimative.u16:
         \\        case WasmPrimative.i16:
+        \\        case WasmPrimative.f16:
         \\            return 2;
         \\        case WasmPrimative.u32:
         \\        case WasmPrimative.i32:
