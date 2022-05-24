@@ -60,7 +60,8 @@ pub fn uri(request: Request) ?[]const u8 {
 }
 
 pub fn version(request: Request) ?HttpVersion {
-    var iter = std.mem.split(u8, request.data, " ");
+    const first_line_end = std.mem.indexOf(u8, request.data, "\r\n") orelse request.data.len;
+    var iter = std.mem.split(u8, request.data[0..first_line_end], " ");
     _ = iter.next() orelse return null;
     _ = iter.next() orelse return null;
     const version_str = iter.next() orelse return null;
