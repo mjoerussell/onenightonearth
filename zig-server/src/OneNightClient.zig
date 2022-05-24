@@ -102,24 +102,22 @@ fn handle(client: *OneNightClient, file_source: FileSource) !void {
         std.log.info("Thread {}: Handling request for {s} took {d:.6}ms", .{std.Thread.getCurrentId(), uri, (@intToFloat(f64, end_ts) - @intToFloat(f64, start_ts)) / std.time.ns_per_ms});
     }
 
+    const uri = request.uri() orelse {
+        var response = http.Response.initStatus(allocator, .bad_request);
+        try response.write(writer);
+        return;
+    };
+
     // If the request uri has a registered handler, then use it to processs the request and generate the response
-    if (route_handlers.get(request.uri() orelse "/")) |handler| {
+    if (route_handlers.get(uri)) |handler| {
         // Get the response from the handler. If an error occurs, then get a 500 reponse
         var response = handler(allocator, request) catch |err| blk: {
-            std.log.err("Error handling request at {s}: {}", .{request.uri().?, err});
+            std.log.err("Error handling request at {s}: {}", .{uri, err});
             break :blk http.Response.initStatus(allocator, .internal_server_error);
         };
         // Send the response
         try response.write(writer);
     } else {
-        // uri() shouldn't return null here because that would be handled above. However if this case is matched for some reason,
-        // then the request is definitely malformed and we should send a 400 error
-        const uri = request.uri() orelse {
-            var response = http.Response.initStatus(allocator, .bad_request);
-            try response.write(writer);
-            return;
-        };
-
         // If this doesn't match an 'api' (as defined in route_handlers) then we'll assume that the user is trying to fetch a file
         // We'll use file_source to try to read the file. If there's an error, then we'll handle it appropriately.
         const file_data = file_source.getFile(allocator, uri) catch |err| switch (err) {
@@ -205,6 +203,7 @@ fn handleStars(allocator: Allocator, request: http.Request) !http.Response {
     response.status = .ok;
     try response.header("Content-Type", "application/octet-stream");
     try response.header("Content-Length", star_data.len);
+    try response.header("Content-Encoding", "deflate");
     response.body = star_data;
 
     return response;

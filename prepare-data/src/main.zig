@@ -270,7 +270,7 @@ pub fn main() anyerror!void {
         shuffleStars(stars);
     }
 
-    try writeStarData(stars, star_out_filename);
+    try writeStarData(allocator, stars, star_out_filename);
 
     const constellations = try readConstellationFiles(allocator, "constellations/iau");
     defer {
@@ -334,7 +334,7 @@ fn readSaoCatalog(allocator: Allocator, catalog_filename: []const u8) ![]Star {
     return star_list.toOwnedSlice();
 }
 
-fn writeStarData(stars: []Star, out_filename: []const u8) !void {
+fn writeStarData(allocator: Allocator, stars: []Star, out_filename: []const u8) !void {
     const cwd = fs.cwd();
 
     const output_file = try cwd.createFile(out_filename, .{});
@@ -343,10 +343,16 @@ fn writeStarData(stars: []Star, out_filename: []const u8) !void {
     var output_buffered_writer = std.io.bufferedWriter(output_file.writer());
     var output_writer = output_buffered_writer.writer();
 
-    for (stars) |star| {
-        try output_writer.writeAll(std.mem.toBytes(star)[0..]);
-    }
+    var star_buffer = std.mem.sliceAsBytes(stars);
+    var compressing_writer = try std.compress.deflate.compressor(allocator, output_writer, .{ .level = .best_compression });
+    defer compressing_writer.deinit();
 
+    // for (stars) |star| {
+    _ = try compressing_writer.write(star_buffer);
+    
+    // }
+
+    try compressing_writer.flush();
     try output_buffered_writer.flush();
 }
 
@@ -465,7 +471,7 @@ fn writeConstellationData(constellations: []Constellation, allocator: Allocator,
 /// Randomize the order of the stars. This is so that, when the star data starts streaming in when the page begins loading, the
 /// stars populate in the sky in a natural-feeling way. Without this, stars would fill the canvas in a roughly bottom-up way.
 fn shuffleStars(stars: []Star) void {
-    const timer = std.time.Timer.start() catch unreachable;
+    var timer = std.time.Timer.start() catch unreachable;
     var rand = std.rand.DefaultPrng.init(timer.read());
 
     const fold_range_size = stars.len / 6;
