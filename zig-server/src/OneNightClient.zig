@@ -215,6 +215,7 @@ fn handleConstellations(allocator: Allocator, request: http.Request) !http.Respo
     var response = http.Response.init(allocator);
     try response.header("Content-Type", "application/octet-stream");
     try response.header("Content-Length", const_data.len);
+    try response.header("Content-Encoding", "deflate");
     response.body = const_data;
     return response;
 }

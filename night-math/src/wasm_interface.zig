@@ -105,12 +105,12 @@ pub export fn initializeResultData() [*]u8 {
 pub fn initializeConstellations(star_renderer: *StarRenderer, data: [*]u8) void {
     // Constellation data layout:
     // num_constellations | num_boundary_coords | num_asterism_coords | ...constellations | ...constellation_boundaries | ...constellation asterisms
-    // constellations size = num_constellations * { u32 u32 u8 } (num boundaries, num asterisms, is_zodiac)
+    // constellations size = num_constellations * { u8 u8 u8 } (num boundaries, num asterisms, is_zodiac)
     // constellation_boundaries size = num_boundary_coords * { f32 f32 }
     // constellation_asterisms size = num_asterism_coords * { f32 f32 }
     const ConstellationInfo = packed struct {
-        num_boundaries: u32,
-        num_asterisms: u32,
+        num_boundaries: u8,
+        num_asterisms: u8,
         is_zodiac: u8,
     };
 
