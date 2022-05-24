@@ -76,19 +76,12 @@ pub const Star = struct {
 pub const ExternStar = packed struct {
     right_ascension: i16,
     declination: i16,
-    brightness: i16,
+    brightness: u8,
     spec_type: SpectralType,
 
     pub fn getColor(star: ExternStar) Pixel {
         var base_color = star.spec_type.getColor();
-        base_color.a = blk: {
-            const brightness = FixedPoint.toFloat(star.brightness) + 0.15;
-            break :blk if (brightness >= 1.0)
-                255
-            else if (brightness <= 0) 
-                0
-            else @floatToInt(u8, brightness * 255.0);
-        };
+        base_color.a = star.brightness;
 
         return base_color;
     }

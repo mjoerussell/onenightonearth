@@ -192,7 +192,7 @@ pub const Constellation = struct {
 pub const Star = packed struct {
     right_ascension: i16,
     declination: i16,
-    brightness: i16,
+    brightness: u8,
     spec_type: SpectralType,
 
     fn parse(data: []const u8) !Star {
@@ -213,7 +213,17 @@ pub const Star = packed struct {
                     const brightest_value: f32 = -4.6;
                     const v_mag = std.fmt.parseFloat(f32, part) catch dimmest_visible;
                     const mag_display_factor = (dimmest_visible - (v_mag - brightest_value)) / dimmest_visible;
-                    star.brightness = FixedPoint.fromFloat(mag_display_factor);
+
+                    star.brightness = blk: {
+                        const b = mag_display_factor + 0.15;
+                        if (b >= 1.0) {
+                            break :blk 255;
+                        } else if (b <= 0.45) {
+                            break :blk 0;
+                        } else {
+                            break :blk @floatToInt(u8, b * 255.0);
+                        } 
+                    };
                 },
                 14 => {
                     if (part.len < 1) {
@@ -318,8 +328,8 @@ fn readSaoCatalog(allocator: Allocator, catalog_filename: []const u8) ![]Star {
             const line = read_buffer[line_start_index..line_end_index];
             if (std.mem.startsWith(u8, line, "SAO")) {
                 if (Star.parse(line)) |star| {
-                    if (star.brightness >= FixedPoint.fromFloat(0.3)) {
-                        star_list.appendAssumeCapacity(star);
+                    if (star.brightness > 0) {
+                        try star_list.append(star);
                     }
                 } else |_| {}
             }
@@ -350,10 +360,7 @@ fn writeStarData(allocator: Allocator, stars: []Star, out_filename: []const u8) 
     var compressing_writer = try std.compress.deflate.compressor(allocator, output_writer, .{ .level = .best_compression });
     defer compressing_writer.deinit();
 
-    // for (stars) |star| {
     _ = try compressing_writer.write(star_buffer);
-    
-    // }
 
     try compressing_writer.flush();
     try output_buffered_writer.flush();

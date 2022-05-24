@@ -90,7 +90,7 @@ export type ExternStar = {
 export const sizedExternStar: Sized<ExternStar> = {
 	right_ascension: WasmPrimative.i16,
 	declination: WasmPrimative.i16,
-	brightness: WasmPrimative.i16,
+	brightness: WasmPrimative.u8,
 	spec_type: WasmPrimative.u8,
 };
 
