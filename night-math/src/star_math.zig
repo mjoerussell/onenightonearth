@@ -21,15 +21,15 @@ pub const Coord = packed struct {
 };
 
 pub const SkyCoord = packed struct {
-    right_ascension: f32 = 0,
-    declination: f32 = 0,
+    right_ascension: i16 = 0,
+    declination: i16 = 0,
 
     pub fn getCoord(sky_coord: SkyCoord, observer_timestamp: i64) Coord {
         const partial_lst = getPartialLocalSiderealTime(observer_timestamp);
-        var longitude = sky_coord.right_ascension - partial_lst;
+        var longitude = FixedPoint.toFloat(sky_coord.right_ascension) - partial_lst;
 
         return Coord{
-            .latitude = sky_coord.declination,
+            .latitude = FixedPoint.toFloat(sky_coord.declination),
             .longitude = longitude
         };
     }
@@ -131,8 +131,8 @@ pub const Constellation = struct {
         var z: f32 = 0;
 
         for (constellation.boundaries) |b| {
-            const ra_f32 = @floatCast(f32, b.right_ascension);
-            const dec_f32 = @floatCast(f32, b.declination);
+            const ra_f32 = FixedPoint.toFloat(b.right_ascension);
+            const dec_f32 = FixedPoint.toFloat(b.declination);
             x += math.cos(dec_f32) * math.cos(ra_f32);
             y += math.cos(dec_f32) * math.sin(ra_f32);
             z += math.sin(dec_f32);
@@ -147,8 +147,8 @@ pub const Constellation = struct {
         const central_lat = math.atan2(f32, z, central_sqrt);
 
         return SkyCoord{
-            .right_ascension = @floatCast(f16, central_long),
-            .declination = @floatCast(f16, central_lat)
+            .right_ascension = FixedPoint.fromFloat(central_long),
+            .declination = FixedPoint.fromFloat(central_lat)
         };
     }
 };
@@ -269,7 +269,7 @@ pub const SpectralType = enum(u8) {
 /// Draw a star on the canvas
 pub fn projectStar(canvas: *Canvas, star: ExternStar, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
     const point = canvas.coordToPoint(
-        SkyCoord{ .right_ascension = FixedPoint.toFloat(star.right_ascension), .declination = FixedPoint.toFloat(star.declination) },
+        SkyCoord{ .right_ascension = star.right_ascension, .declination = star.declination },
         local_sidereal_time,
         sin_latitude,
         cos_latitude,

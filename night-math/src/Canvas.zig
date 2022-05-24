@@ -12,6 +12,9 @@ const SkyCoord = star_math.SkyCoord;
 const Star = star_math.Star;
 const ObserverPosition = star_math.ObserverPosition;
 
+const fixed_point = @import("fixed_point.zig");
+const FixedPoint = fixed_point.FixedPoint(i16, 12);
+
 const Canvas = @This();
 
 pub const Pixel = packed struct {
@@ -157,10 +160,13 @@ pub fn projectAndRenderStarsWide(canvas: *Canvas, sky_coords: std.MultiArrayList
 pub fn coordToPoint(canvas: Canvas, sky_coord: SkyCoord, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32, filter_below_horizon: bool) ?Point {
     const two_pi = comptime math.pi * 2.0;
 
-    const hour_angle = local_sidereal_time - sky_coord.right_ascension;
-    const sin_dec = math.sin(sky_coord.declination);
+    const right_ascension = FixedPoint.toFloat(sky_coord.right_ascension);
+    const declination = FixedPoint.toFloat(sky_coord.declination);
+
+    const hour_angle = local_sidereal_time - right_ascension;
+    const sin_dec = math.sin(declination);
     
-    const sin_alt = sin_dec * sin_latitude + math.cos(sky_coord.declination) * cos_latitude * math.cos(hour_angle);
+    const sin_alt = sin_dec * sin_latitude + math.cos(declination) * cos_latitude * math.cos(hour_angle);
     const altitude = math.asin(sin_alt);
     if (filter_below_horizon and altitude < 0) {
         return null;

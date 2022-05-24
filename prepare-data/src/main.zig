@@ -29,8 +29,8 @@ pub const SpectralType = enum(u8) {
 };
 
 pub const SkyCoord = packed struct {
-    right_ascension: f32,
-    declination: f32,
+    right_ascension: i16,
+    declination: i16,
 };
 
 pub const ConstellationInfo = packed struct {
@@ -141,8 +141,8 @@ pub const Constellation = struct {
                         var dec_value = try std.fmt.parseFloat(f32, declination);
 
                         const star_coord = SkyCoord{ 
-                            .right_ascension = degToRad(ra_value), 
-                            .declination = degToRad(dec_value),
+                            .right_ascension = FixedPoint.fromFloat(degToRad(ra_value)), 
+                            .declination = FixedPoint.fromFloat(degToRad(dec_value)),
                         };
 
                         try stars.put(star_name, star_coord);
@@ -172,8 +172,8 @@ pub const Constellation = struct {
                         const right_ascension = @intToFloat(f32, ra_hours * 15) + ((@intToFloat(f32, ra_minutes) / 60) * 15) + ((ra_seconds / 3600) * 15);
                         const dec_value = try std.fmt.parseFloat(f32, std.mem.trim(u8, declination, " "));
                         var boundary_coord = SkyCoord{
-                            .right_ascension = degToRad(right_ascension),
-                            .declination = degToRad(dec_value),
+                            .right_ascension = FixedPoint.fromFloat(degToRad(right_ascension)),
+                            .declination = FixedPoint.fromFloat(degToRad(dec_value)),
                         };
 
                         try boundary_list.append(boundary_coord);

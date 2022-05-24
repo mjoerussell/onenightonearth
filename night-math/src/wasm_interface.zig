@@ -18,6 +18,9 @@ const Coord = star_math.Coord;
 const ObserverPosition = star_math.ObserverPosition;
 const GreatCircle = star_math.GreatCircle;
 
+const fixed_point = @import("fixed_point.zig");
+const FixedPoint = fixed_point.FixedPoint(i16, 12);
+
 const allocator = std.heap.page_allocator;
 
 const num_waypoints = 150;
@@ -207,7 +210,7 @@ pub export fn findWaypoints(start_lat: f32, start_long: f32, end_lat: f32, end_l
 /// Given a sky coordinate and a timestamp, compute the Earth coordinate currently "below" that position. Puts the latitude and
 /// longitude into the result_data buffer.
 pub export fn getCoordForSkyCoord(right_ascension: f32, declination: f32, observer_timestamp: i64) void {
-    const sky_coord = SkyCoord{ .right_ascension = right_ascension, .declination = declination };
+    const sky_coord = SkyCoord{ .right_ascension = FixedPoint.fromFloat(right_ascension), .declination = FixedPoint.fromFloat(declination) };
     const coord = sky_coord.getCoord(observer_timestamp);
     setResult(coord.latitude, coord.longitude);
 }
@@ -216,7 +219,7 @@ pub export fn getCoordForSkyCoord(right_ascension: f32, declination: f32, observ
 /// irregularly shaped. The point is selected to make the constellation centered in the canvas.
 pub export fn getConstellationCentroid(star_renderer: *StarRenderer, constellation_index: u32) void {
     const centroid = if (constellation_index > star_renderer.constellations.len) SkyCoord{} else star_renderer.constellations[@intCast(usize, constellation_index)].centroid();
-    setResult(centroid.right_ascension, centroid.declination);
+    setResult(FixedPoint.toFloat(centroid.right_ascension), FixedPoint.toFloat(centroid.declination));
 }
 
 /// Set data in the result buffer so that it can be read in the JS side. Both values must be exactly 4 bytes long.
