@@ -9,7 +9,8 @@ export enum WasmPrimative {
     i8,
     i16,
     i32,
-    i64,
+    i64,  
+    f16,
     f32,
     f64,
 }
@@ -30,6 +31,7 @@ export const sizeOfPrimative = (data: WasmPrimative): number => {
             return 1;
         case WasmPrimative.u16:
         case WasmPrimative.i16:
+        case WasmPrimative.f16:
             return 2;
         case WasmPrimative.u32:
         case WasmPrimative.i32:
@@ -86,9 +88,9 @@ export type ExternStar = {
 };
 
 export const sizedExternStar: Sized<ExternStar> = {
-	right_ascension: WasmPrimative.f32,
-	declination: WasmPrimative.f32,
-	brightness: WasmPrimative.f32,
+	right_ascension: WasmPrimative.i16,
+	declination: WasmPrimative.i16,
+	brightness: WasmPrimative.i16,
 	spec_type: WasmPrimative.u8,
 };
 

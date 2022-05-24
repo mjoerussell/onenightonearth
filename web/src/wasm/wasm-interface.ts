@@ -39,7 +39,7 @@ export class WasmInterface {
         const const_view = new Uint8Array(this.memory, const_ptr);
         const_view.set(constellation_data);
 
-        const num_stars = star_data.byteLength / 13;
+        const num_stars = star_data.byteLength / wasm.sizeOf(wasm.sizedExternStar);
 
         this.settings_ptr = this.allocObject(canvas_settings, wasm.sizedExternCanvasSettings);
 

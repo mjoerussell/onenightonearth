@@ -12,6 +12,9 @@ const math_utils = @import("./math_utils.zig");
 const Point = math_utils.Point;
 const Line = math_utils.Line;
 
+const fixed_point = @import("fixed_point.zig");
+const FixedPoint = fixed_point.FixedPoint(i16, 12);
+
 pub const Coord = packed struct {
     latitude: f32,
     longitude: f32,
@@ -57,26 +60,29 @@ pub const Star = struct {
     pixel: Pixel,
 
     pub fn fromExternStar(ext_star: ExternStar) Star {
+        const right_ascension = FixedPoint.toFloat(ext_star.right_ascension);
+        const declination = FixedPoint.toFloat(ext_star.declination);
         return .{
-            .right_ascension = ext_star.right_ascension,
-            .declination = ext_star.declination,
-            .sin_declination = math.sin(ext_star.declination),
-            .cos_declination = math.cos(ext_star.declination),
+            .right_ascension = right_ascension,
+            .declination = declination,
+            .sin_declination = math.sin(declination),
+            .cos_declination = math.cos(declination),
             .pixel = ext_star.getColor(),
         };
     }
+
 };
 
 pub const ExternStar = packed struct {
-    right_ascension: f32,
-    declination: f32,
-    brightness: f32,
+    right_ascension: i16,
+    declination: i16,
+    brightness: i16,
     spec_type: SpectralType,
 
     pub fn getColor(star: ExternStar) Pixel {
         var base_color = star.spec_type.getColor();
         base_color.a = blk: {
-            const brightness = star.brightness + 0.15;
+            const brightness = FixedPoint.toFloat(star.brightness) + 0.15;
             break :blk if (brightness >= 1.0)
                 255
             else if (brightness <= 0) 
@@ -132,9 +138,11 @@ pub const Constellation = struct {
         var z: f32 = 0;
 
         for (constellation.boundaries) |b| {
-            x += math.cos(b.declination) * math.cos(b.right_ascension);
-            y += math.cos(b.declination) * math.sin(b.right_ascension);
-            z += math.sin(b.declination);
+            const ra_f32 = @floatCast(f32, b.right_ascension);
+            const dec_f32 = @floatCast(f32, b.declination);
+            x += math.cos(dec_f32) * math.cos(ra_f32);
+            y += math.cos(dec_f32) * math.sin(ra_f32);
+            z += math.sin(dec_f32);
         }
 
         x /= @intToFloat(f32, constellation.boundaries.len);
@@ -146,8 +154,8 @@ pub const Constellation = struct {
         const central_lat = math.atan2(f32, z, central_sqrt);
 
         return SkyCoord{
-            .right_ascension = central_long,
-            .declination = central_lat
+            .right_ascension = @floatCast(f16, central_long),
+            .declination = @floatCast(f16, central_lat)
         };
     }
 };
@@ -268,7 +276,7 @@ pub const SpectralType = enum(u8) {
 /// Draw a star on the canvas
 pub fn projectStar(canvas: *Canvas, star: ExternStar, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
     const point = canvas.coordToPoint(
-        SkyCoord{ .right_ascension = star.right_ascension, .declination = star.declination },
+        SkyCoord{ .right_ascension = FixedPoint.toFloat(star.right_ascension), .declination = FixedPoint.toFloat(star.declination) },
         local_sidereal_time,
         sin_latitude,
         cos_latitude,
