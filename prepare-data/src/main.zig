@@ -2,6 +2,9 @@ const std = @import("std");
 const fs = std.fs;
 const Allocator = std.mem.Allocator;
 
+const fp = @import("fixed_point.zig");
+const FixedPoint = fp.FixedPoint(i16, 12);
+
 /// A standard degree-to-radian conversion function.
 pub fn degToRad(degrees: anytype) @TypeOf(degrees) {
     return degrees * (std.math.pi / 180.0);
@@ -134,13 +137,13 @@ pub const Constellation = struct {
                         const right_ascension = std.mem.trim(u8, parts.next().?, " ");
                         const declination = std.mem.trim(u8, parts.next().?, " ");
 
-                        var star_coord = SkyCoord{ 
-                            .right_ascension = try std.fmt.parseFloat(f32, right_ascension), 
-                            .declination = try std.fmt.parseFloat(f32, declination)
-                        };
+                        var ra_value = try std.fmt.parseFloat(f32, right_ascension);
+                        var dec_value = try std.fmt.parseFloat(f32, declination);
 
-                        star_coord.right_ascension = degToRad(star_coord.right_ascension);
-                        star_coord.declination = degToRad(star_coord.declination);
+                        const star_coord = SkyCoord{ 
+                            .right_ascension = degToRad(ra_value), 
+                            .declination = degToRad(dec_value),
+                        };
 
                         try stars.put(star_name, star_coord);
                     },
@@ -167,14 +170,11 @@ pub const Constellation = struct {
                         const ra_seconds = try std.fmt.parseFloat(f32, right_ascension_parts.next().?);
 
                         const right_ascension = @intToFloat(f32, ra_hours * 15) + ((@intToFloat(f32, ra_minutes) / 60) * 15) + ((ra_seconds / 3600) * 15);
-
+                        const dec_value = try std.fmt.parseFloat(f32, std.mem.trim(u8, declination, " "));
                         var boundary_coord = SkyCoord{
-                            .right_ascension = right_ascension,
-                            .declination = try std.fmt.parseFloat(f32, std.mem.trim(u8, declination, " ")),
+                            .right_ascension = degToRad(right_ascension),
+                            .declination = degToRad(dec_value),
                         };
-
-                        boundary_coord.right_ascension = degToRad(boundary_coord.right_ascension);
-                        boundary_coord.declination = degToRad(boundary_coord.declination);
 
                         try boundary_list.append(boundary_coord);
                     },
@@ -190,9 +190,9 @@ pub const Constellation = struct {
 };
 
 pub const Star = packed struct {
-    right_ascension: f32,
-    declination: f32,
-    brightness: f32,
+    right_ascension: i16,
+    declination: i16,
+    brightness: i16,
     spec_type: SpectralType,
 
     fn parse(data: []const u8) !Star {
@@ -200,17 +200,20 @@ pub const Star = packed struct {
 
         var parts_iter = std.mem.split(u8, data, "|");
         var part_index: u8 = 0;
+
+        var right_ascension: f32 = 0;
+        var declination: f32 = 0;
         while (parts_iter.next()) |part| : (part_index += 1) {
             if (part_index > 14) break;
             switch (part_index) {
-                1 => star.right_ascension = try std.fmt.parseFloat(f32, part),
-                5 => star.declination = try std.fmt.parseFloat(f32, part),
+                1 => right_ascension = try std.fmt.parseFloat(f32, part),
+                5 => declination = try std.fmt.parseFloat(f32, part),
                 13 => {
                     const dimmest_visible: f32 = 18.6;
                     const brightest_value: f32 = -4.6;
                     const v_mag = std.fmt.parseFloat(f32, part) catch dimmest_visible;
                     const mag_display_factor = (dimmest_visible - (v_mag - brightest_value)) / dimmest_visible;
-                    star.brightness = mag_display_factor;
+                    star.brightness = FixedPoint.fromFloat(mag_display_factor);
                 },
                 14 => {
                     if (part.len < 1) {
@@ -232,8 +235,8 @@ pub const Star = packed struct {
             }
         }
 
-        star.right_ascension = degToRad(star.right_ascension);
-        star.declination = degToRad(star.declination);
+        star.right_ascension = FixedPoint.fromFloat(degToRad(right_ascension));
+        star.declination = FixedPoint.fromFloat(degToRad(declination));
 
         return star;
     }
@@ -315,7 +318,7 @@ fn readSaoCatalog(allocator: Allocator, catalog_filename: []const u8) ![]Star {
             const line = read_buffer[line_start_index..line_end_index];
             if (std.mem.startsWith(u8, line, "SAO")) {
                 if (Star.parse(line)) |star| {
-                    if (star.brightness >= 0.3) {
+                    if (star.brightness >= FixedPoint.fromFloat(0.3)) {
                         star_list.appendAssumeCapacity(star);
                     }
                 } else |_| {}
