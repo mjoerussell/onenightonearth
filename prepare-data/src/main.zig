@@ -278,11 +278,6 @@ pub fn main() anyerror!void {
     const end = timer.read();
     std.debug.print("Parsing took {d:.4} ms\n", .{(end - start) / 1_000_000});
 
-    var shuffle_count: usize = 0;
-    while (shuffle_count < 1000) : (shuffle_count += 1) {
-        shuffleStars(stars);
-    }
-
     try writeStarData(allocator, stars, star_out_filename);
 
     const constellations = try readConstellationFiles(allocator, "constellations/iau");
@@ -428,7 +423,6 @@ fn writeConstellationData(constellations: []Constellation, allocator: Allocator,
     defer constellation_metadata_out_file.close();
 
     var const_out_buffered_writer = std.io.bufferedWriter(constellation_out_file.writer());
-    // var const_out_writer = const_out_buffered_writer.writer();
 
     var const_out_writer = try std.compress.deflate.compressor(allocator, const_out_buffered_writer.writer(), .{ .level = .best_compression });
     defer const_out_writer.deinit();
@@ -480,43 +474,4 @@ fn writeConstellationData(constellations: []Constellation, allocator: Allocator,
     try const_out_writer.flush();
     try const_out_buffered_writer.flush();
     try const_meta_buffered_writer.flush();
-}
-
-/// Randomize the order of the stars. This is so that, when the star data starts streaming in when the page begins loading, the
-/// stars populate in the sky in a natural-feeling way. Without this, stars would fill the canvas in a roughly bottom-up way.
-fn shuffleStars(stars: []Star) void {
-    var timer = std.time.Timer.start() catch unreachable;
-    var rand = std.rand.DefaultPrng.init(timer.read());
-
-    const fold_range_size = stars.len / 6;
-
-    const fold_low_start = rand.random().intRangeAtMost(usize, 0, stars.len / 2);
-    const fold_high_start = rand.random().intRangeAtMost(usize, stars.len / 2, stars.len - fold_range_size);
-
-    var fold_index: usize = 0;
-    while (fold_index <= fold_range_size) : (fold_index += 1) {
-        const fold_low_index = fold_low_start + fold_index;
-        const fold_high_index = fold_high_start + fold_index;
-        std.mem.swap(Star, &stars[fold_low_index], &stars[fold_high_index]);
-    }
-
-    var low_index: usize = 0;
-    var high_index: usize = stars.len - 1;
-    while (low_index < high_index) : ({ low_index += 1; high_index -= 1; }) {
-        const low_bias: isize = rand.random().intRangeLessThan(isize, -5, 5);
-        const high_bias: isize = rand.random().intRangeLessThan(isize, -5, 5);
-
-        const low_swap_index = if (@intCast(isize, low_index) + low_bias < 0) 
-            low_index
-        else
-            @intCast(usize, @intCast(isize, low_index) + low_bias);
-
-        const high_swap_index = if (@intCast(isize, high_index) + high_bias >= stars.len) 
-            high_index
-        else
-            @intCast(usize, @intCast(isize, high_index) + high_bias);
-
-        std.mem.swap(Star, &stars[low_swap_index], &stars[high_swap_index]);
-    }
-
 }
