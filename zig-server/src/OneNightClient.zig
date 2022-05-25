@@ -143,6 +143,7 @@ fn handle(client: *OneNightClient, file_source: FileSource) !void {
         var response = http.Response.init(allocator);    
         try response.header("Content-Length", file_data.len);
         try response.header("Content-Type", content_type);
+        try response.header("Content-Encoding", "deflate");
         response.body = file_data;
 
         // Send the response

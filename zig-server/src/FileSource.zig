@@ -34,13 +34,14 @@ pub fn init(allocator: Allocator) !FileSource {
         };
     }
 
-    const cwd = fs.cwd();
+    // const cwd = fs.cwd();
     var file_source: FileSource = undefined;
     file_source.preloaded_files = std.StringHashMap([]const u8).init(allocator);
     inline for (FileSource.allowed_paths) |path| {
-        var file = cwd.openFile(FileSource.relative_dir ++ path, .{}) catch return error.OpenError;
-        defer file.close();
-        const file_content = try file.readToEndAlloc(allocator, std.math.maxInt(u32));
+        // var file = cwd.openFile(FileSource.relative_dir ++ path, .{}) catch return error.OpenError;
+        // defer file.close();
+        // const file_content = try file.readToEndAlloc(allocator, std.math.maxInt(u32));
+        const file_content = try readAndCompress(allocator, FileSource.relative_dir ++ path);
         try file_source.preloaded_files.putNoClobber(path, file_content);
         std.log.info("Loaded file " ++ path, .{});
     }
@@ -55,12 +56,13 @@ pub fn getFile(file_source: FileSource, allocator: Allocator, file_path: []const
     const clean_path = if (file_path[0] == '/') file_path[1..] else file_path;
     if (builtin.mode == .Debug) {
         _ = file_source;
-        const cwd = fs.cwd();
+        // const cwd = fs.cwd();
         inline for (FileSource.allowed_paths) |path| {
             if (std.mem.eql(u8, path, clean_path)) {
-                var file = cwd.openFile(FileSource.relative_dir ++ path, .{}) catch return error.OpenError;
-                defer file.close();
-                return try file.readToEndAlloc(allocator, std.math.maxInt(u32));
+                return try readAndCompress(allocator, FileSource.relative_dir ++ path);
+                // var file = cwd.openFile(FileSource.relative_dir ++ path, .{}) catch return error.OpenError;
+                // defer file.close();
+                // return try file.readToEndAlloc(allocator, std.math.maxInt(u32));
             }
         }
 
@@ -69,4 +71,29 @@ pub fn getFile(file_source: FileSource, allocator: Allocator, file_path: []const
         _ = allocator;
         return file_source.preloaded_files.get(clean_path) orelse return error.FileNotFound;
     }
+}
+
+fn readAndCompress(allocator: Allocator, filename: []const u8) ![]const u8 {
+    const cwd = fs.cwd();
+    
+    var file = try cwd.openFile(filename, .{});
+    defer file.close();
+
+    var read_buffer: [std.mem.page_size]u8 = undefined;
+
+    var output = std.ArrayList(u8).init(allocator);
+    errdefer output.deinit();
+
+    var compressor = try std.compress.deflate.compressor(allocator, output.writer(), .{ .level = .level_5 });
+    defer compressor.deinit();
+
+    var bytes_read = try file.readAll(&read_buffer);
+    while (bytes_read > 0) {
+        _ = try compressor.write(read_buffer[0..bytes_read]);
+        if (bytes_read < read_buffer.len) break;
+        bytes_read = try file.readAll(&read_buffer);
+    }
+
+    try compressor.flush();
+    return output.toOwnedSlice();
 }
