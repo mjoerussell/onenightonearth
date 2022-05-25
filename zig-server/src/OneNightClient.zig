@@ -233,6 +233,7 @@ fn handleConstellationMetadata(allocator: Allocator, request: http.Request) !htt
     response.status = .ok;
     try response.header("Content-Type", "application/json");
     try response.header("Content-Length", index_data.len);
+    try response.header("Content-Encoding", "deflate");
     response.body = index_data;
 
     return response;

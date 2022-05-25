@@ -5,6 +5,8 @@ const Allocator = std.mem.Allocator;
 const fp = @import("fixed_point.zig");
 const FixedPoint = fp.FixedPoint(i16, 12);
 
+const CompressedFileWriter = @import("CompressedFileWriter.zig");
+
 /// A standard degree-to-radian conversion function.
 pub fn degToRad(degrees: anytype) @TypeOf(degrees) {
     return degrees * (std.math.pi / 180.0);
@@ -270,13 +272,7 @@ pub fn main() anyerror!void {
     const const_out_filename = args[2];
     const const_out_metadata_filename = args[3];
 
-    var timer = std.time.Timer.start() catch unreachable;
-    const start = timer.read();
-
     var stars = try readSaoCatalog(allocator, "sao_catalog");
-
-    const end = timer.read();
-    std.debug.print("Parsing took {d:.4} ms\n", .{(end - start) / 1_000_000});
 
     try writeStarData(allocator, stars, star_out_filename);
 
@@ -286,7 +282,8 @@ pub fn main() anyerror!void {
         allocator.free(constellations);
     }
 
-    try writeConstellationData(constellations, allocator, const_out_filename, const_out_metadata_filename);
+    try writeConstellationData(allocator, constellations, const_out_filename);
+    try writeConstellationMetadata(allocator, constellations, const_out_metadata_filename);
 }
 
 fn readSaoCatalog(allocator: Allocator, catalog_filename: []const u8) ![]Star {
@@ -343,22 +340,13 @@ fn readSaoCatalog(allocator: Allocator, catalog_filename: []const u8) ![]Star {
 }
 
 fn writeStarData(allocator: Allocator, stars: []Star, out_filename: []const u8) !void {
-    const cwd = fs.cwd();
+    var cfw = try CompressedFileWriter.init(allocator, out_filename);
+    defer cfw.deinit();
 
-    const output_file = try cwd.createFile(out_filename, .{});
-    defer output_file.close();
+    var writer = cfw.writer();
 
-    var output_buffered_writer = std.io.bufferedWriter(output_file.writer());
-    var output_writer = output_buffered_writer.writer();
-
-    var star_buffer = std.mem.sliceAsBytes(stars);
-    var compressing_writer = try std.compress.deflate.compressor(allocator, output_writer, .{ .level = .best_compression });
-    defer compressing_writer.deinit();
-
-    _ = try compressing_writer.write(star_buffer);
-
-    try compressing_writer.flush();
-    try output_buffered_writer.flush();
+    var bytes = std.mem.sliceAsBytes(stars);
+    _ = try writer.write(bytes);
 }
 
 /// Read and parse all of the constellation files in a given directory.
@@ -413,23 +401,12 @@ fn readConstellationFiles(allocator: Allocator, constellation_dir_name: []const 
     return constellations.toOwnedSlice();
 }
 
-fn writeConstellationData(constellations: []Constellation, allocator: Allocator, const_out_filename: []const u8, const_out_metadata_filename: []const u8) !void {
-    const cwd = fs.cwd();
+fn writeConstellationData(allocator: Allocator, constellations: []Constellation, const_out_filename: []const u8) !void {
+    var cfw = try CompressedFileWriter.init(allocator, const_out_filename);
+    defer cfw.deinit();
 
-    const constellation_out_file = try cwd.createFile(const_out_filename, .{});
-    defer constellation_out_file.close();
+    var writer = cfw.writer();
 
-    const constellation_metadata_out_file = try cwd.createFile(const_out_metadata_filename, .{});
-    defer constellation_metadata_out_file.close();
-
-    var const_out_buffered_writer = std.io.bufferedWriter(constellation_out_file.writer());
-
-    var const_out_writer = try std.compress.deflate.compressor(allocator, const_out_buffered_writer.writer(), .{ .level = .best_compression });
-    defer const_out_writer.deinit();
-
-    var const_meta_buffered_writer = std.io.bufferedWriter(constellation_metadata_out_file.writer());
-    var const_meta_writer = const_meta_buffered_writer.writer();
-    
     var num_boundaries: u32 = 0;
     var num_asterisms: u32 = 0;
     for (constellations) |constellation| {
@@ -437,27 +414,34 @@ fn writeConstellationData(constellations: []Constellation, allocator: Allocator,
         num_asterisms += @intCast(u32, constellation.asterism.len);
     }
 
-    _ = try const_out_writer.write(std.mem.toBytes(@intCast(u32, constellations.len))[0..]);
-    _ = try const_out_writer.write(std.mem.toBytes(num_boundaries)[0..]);
-    _ = try const_out_writer.write(std.mem.toBytes(num_asterisms)[0..]);
+    _ = try writer.write(std.mem.toBytes(@intCast(u32, constellations.len))[0..]);
+    _ = try writer.write(std.mem.toBytes(num_boundaries)[0..]);
+    _ = try writer.write(std.mem.toBytes(num_asterisms)[0..]);
 
     for (constellations) |constellation| {
         const info = constellation.getInfo();
-        _ = try const_out_writer.write(std.mem.toBytes(info)[0..]);
+        _ = try writer.write(std.mem.toBytes(info)[0..]);
     }
 
     for (constellations) |constellation| {
         for (constellation.boundaries) |boundary_coord| {
-            _ = try const_out_writer.write(std.mem.toBytes(boundary_coord)[0..]);
+            _ = try writer.write(std.mem.toBytes(boundary_coord)[0..]);
         }
     }
     
     for (constellations) |constellation| {
         for (constellation.asterism) |asterism_coord| {
-            _ = try const_out_writer.write(std.mem.toBytes(asterism_coord)[0..]);
+            _ = try writer.write(std.mem.toBytes(asterism_coord)[0..]);
         }
     }
+}
 
+fn writeConstellationMetadata(allocator: Allocator, constellations: []Constellation, filename: []const u8) !void {
+    var cfw = try CompressedFileWriter.init(allocator, filename);
+    defer cfw.deinit();
+
+    var writer = cfw.writer();
+    
     var metadata_json = std.ArrayList(std.json.Value).init(allocator);
     for (constellations) |constellation| {
         var c_map = std.json.ObjectMap.init(allocator);
@@ -467,11 +451,6 @@ fn writeConstellationData(constellations: []Constellation, allocator: Allocator,
         const val = std.json.Value{ .Object = c_map };
         try metadata_json.append(val);
     }
-
     const metadata = std.json.Value{ .Array = metadata_json };
-    try metadata.jsonStringify(.{}, const_meta_writer);
-
-    try const_out_writer.flush();
-    try const_out_buffered_writer.flush();
-    try const_meta_buffered_writer.flush();
+    try metadata.jsonStringify(.{}, writer);
 }
