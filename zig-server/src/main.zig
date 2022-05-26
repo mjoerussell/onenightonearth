@@ -28,7 +28,7 @@ pub fn main() anyerror!void {
     while (true) {
         server.accept(allocator) catch {};
         if (builtin.single_threaded) {
-            server.net_loop.getCompletion() catch continue;
+            server.event_loop.getCompletion() catch continue;
         }
     }
 }
