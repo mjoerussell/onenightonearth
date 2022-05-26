@@ -101,10 +101,8 @@ WORKDIR /usr/src
 
 RUN mkdir web
 RUN mkdir server
-# RUN mkdir prepare-data
 
 # Copy over necessary files from build images
-# COPY ./prepare-data/constellations ./prepare-data/constellations
 COPY ./web/assets/favicon.ico ./web/assets/favicon.ico
 
 COPY --from=build-web /usr/src/web/styles ./web/styles
@@ -115,8 +113,6 @@ COPY --from=build-server /usr/src/zig-out/bin/zig-server /usr/src/server
 
 COPY --from=night-math /usr/web/dist/wasm ./web/dist/wasm
 
-# COPY --from=prepare-data /usr/src/star_data.bin ./server/star_data.bin
-# COPY --from=prepare-data /usr/src/const_data.bin ./server/const_data.bin
 COPY --from=prepare-data /usr/src/const_meta.json ./server/const_meta.json
 
 WORKDIR /usr/src/server
