@@ -44,14 +44,13 @@ If you don't have Docker, or would rather run the app directly, there's a few st
 **On First Run Only:**
 
 1. Run `cd web && npm install`
-2. Run `cd server && npm install`
-3. Run `cd prepare-data && zig build run -Drelease-fast -- ../server/star_data.bin ../server/const_data.bin`
+2. *(Optional)* To run using the node backend, run `cd server && npm install`
+3. Run `cd prepare-data && zig build run -Drelease-fast -- ../zig-server/star_data.bin ../zig-server/const_data.bin ../zig-server/const_meta.json`. This will create all of the data files that the server needs in order to run.
 
 **Each Run:**
 
-1. In one terminal, run `cd server && npm start`.
-2. In another terminal, run `cd web && npm run build`. Do this every time you want to view changes you've made to the frontend code.
-3. In the same terminal from 2. (or a different one if you prefer, doesn't really matter) run `cd public/one-lib && zig build`. Do this
-   every time you want to make changes to the WASM code.
+1. In one terminal, run `cd zig-server && zig build run`.
+2. Run `cd night-math && zig build -Drelease-fast`. This will create the WASM module as well as the module TS interfaces.
+3. In another terminal, run `cd web && npm start`.
 
 Now you're ready! Like before, visit `localhost:8080` to view the site.
