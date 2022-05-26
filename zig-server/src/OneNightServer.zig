@@ -11,6 +11,11 @@ const FileSource = @import("FileSource.zig");
 
 const ClientList = std.ArrayList(*Client);
 
+const has_custom_impl = switch (builtin.os.tag) {
+    .windows, .linux => true,
+    else => false,
+};
+
 server: Server,
 net_loop: NetworkLoop = undefined,
 
@@ -20,12 +25,12 @@ file_source: FileSource,
 
 /// Starting listening on the given address and initialize other server resources.
 pub fn init(one_night: *OneNightServer, allocator: Allocator, address: std.net.Address) !void {
-    one_night.server = Server.init(.{});
+    one_night.server = if (has_custom_impl) Server{} else Server.init(.{});
     try one_night.server.listen(address);
     errdefer one_night.server.deinit();
 
-    if (builtin.os.tag == .windows or builtin.os.tag == .linux) {
-        try one_night.net_loop.init(allocator, .{ .extra_thread_count = 0 });
+    if (has_custom_impl) {
+        try one_night.net_loop.init(allocator, .{ });
     }
 
     one_night.clients = ClientList.init(allocator);
@@ -38,7 +43,7 @@ pub fn deinit(server: *OneNightServer, allocator: Allocator) void {
         allocator.destroy(client);
     }
     server.clients.deinit();
-    if (builtin.os.tag == .windows or builtin.os.tag == .linux) {
+    if (has_custom_impl) {
         server.net_loop.deinit();
     }
 
@@ -53,13 +58,10 @@ pub fn accept(server: *OneNightServer, allocator: Allocator) !void {
     defer server.cleanup(allocator);
     var connection = try server.server.accept();
 
-    // Linux gets a StreamServer.Connection from accept(), but the LinuxClient expects a sockfd
-    // init argument. In that case we should get it from the Connection, but in other cases (macos)
-    // just use the Connection like before (it will go to DefaultClient).
-    var sock = if (builtin.os.tag == .linux) connection.stream.handle else connection;
+    std.log.info("Got connection", .{});
 
     // Create a new client and start handling its request.
-    var client = try Client.init(allocator, &server.net_loop, sock);
+    var client = try Client.init(allocator, &server.net_loop, connection);
     client.run(server.file_source);
 
     // Append the client to the server's client list.

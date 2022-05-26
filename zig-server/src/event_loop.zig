@@ -14,7 +14,7 @@ pub const EventLoop = switch (builtin.os.tag) {
 };
 
 pub const EventLoopOptions = struct {
-    extra_thread_count: usize = switch (builtin.os.tag) {
+    extra_thread_count: usize = if (builtin.single_threaded) 0 else switch (builtin.os.tag) {
         .windows => 4,
         else => 1,
     },
@@ -55,7 +55,7 @@ const WindowsEventLoop = struct {
 
     fn run(loop: *WindowsEventLoop) !void {
         while (@atomicLoad(bool, &loop.is_running, .Acquire)) {
-            try loop.getCompletion();
+            loop.getCompletion() catch {};
         }
     }
 
@@ -108,38 +108,47 @@ const LinuxEventLoop = struct {
         is_resumed: bool = false,
     };
 
-    worker_threads: []std.Thread,
+    worker_threads: ?[]std.Thread,
     io_uring: linux.IO_Uring,
     is_running: bool = false,
 
-    pub fn init(loop: *LinuxEventLoop, allocator: Allocator) !void {
+    pub fn init(loop: *LinuxEventLoop, allocator: Allocator, comptime options: EventLoopOptions) !void {
         loop.is_running = true;
         loop.io_uring = try linux.IO_Uring.init(1024, 0);
 
-        loop.worker_threads = try allocator.alloc(std.Thread, 1);
-        for (loop.worker_threads) |*thread| {
-            thread.* = try std.Thread.spawn(.{}, LinuxEventLoop.run, .{loop});
+        if (options.extra_thread_count > 0) {
+            loop.worker_threads = try allocator.alloc(std.Thread, options.extra_thread_count);
+            for (loop.worker_threads.?) |*thread| {
+                thread.* = try std.Thread.spawn(.{}, LinuxEventLoop.run, .{loop});
+            }
         }
     }
 
     pub fn deinit(loop: *LinuxEventLoop, allocator: Allocator) void {
         @atomicStore(bool, &loop.is_running, false, .SeqCst);
-        for (loop.worker_threads) |*thread| {
-            thread.join();
+        if (loop.worker_threads) |workers| {
+            for (workers) |*thread| thread.join();
+            allocator.free(workers);
         }
-        allocator.free(loop.worker_threads);
         loop.io_uring.deinit();
     }
 
     fn run(loop: *LinuxEventLoop) !void {
         while (@atomicLoad(bool, &loop.is_running, .Acquire)) {
-            const cqe = loop.io_uring.copy_cqe() catch continue;
-            switch (cqe.err()) {
+            try loop.getCompletion();    
+        }
+    }
+
+    pub fn getCompletion(loop: *LinuxEventLoop) !void {
+        var cqes: [1]linux.io_uring_cqe = undefined;
+        const count = try loop.io_uring.copy_cqes(&cqes, 0);
+        if (count > 0) {
+            switch (cqes[0].err()) {
                 .SUCCESS => {
-                    var resume_node = @intToPtr(?*ResumeNode, @intCast(usize, cqe.user_data));
+                    var resume_node = @intToPtr(?*ResumeNode, @intCast(usize, cqes[0].user_data));
                     if (resume_node) |rn| {
                         // cqe.res can't be negative because cqe.err() only returns .SUCCESS if cqe.res >= 0
-                        rn.bytes_worked = @intCast(usize, cqe.res);
+                        rn.bytes_worked = @intCast(usize, cqes[0].res);
                         if (@cmpxchgStrong(bool, &rn.is_resumed, false, true, .SeqCst, .SeqCst) == null) {
                             resume rn.frame;
                         }

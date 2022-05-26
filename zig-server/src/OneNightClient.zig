@@ -64,6 +64,7 @@ pub fn close(client: *OneNightClient) void {
 }
 
 pub fn run(client: *OneNightClient, file_source: FileSource) void {
+    std.log.debug("Run client", .{});
     client.handle_frame.* = async client.handle(file_source);
 }
 

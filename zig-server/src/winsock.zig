@@ -59,7 +59,8 @@ pub fn wsaRecv(socket: os.socket_t, buffer: []u8, overlapped: *windows.OVERLAPPE
         // };
     }
 
-    return switch (windows.ws2_32.WSAGetLastError()) {
+    const last_error = windows.ws2_32.WSAGetLastError();
+    return switch (last_error) {
         .WSA_IO_PENDING => error.IoPending,
         .WSAEWOULDBLOCK => error.WouldBlock,
         .WSAECONNRESET => error.ConnectionReset,

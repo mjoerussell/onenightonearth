@@ -16,7 +16,7 @@ pub fn build(b: *std.build.Builder) void {
     exe.setBuildMode(mode);
     exe.install();
 
-    exe.single_threaded = true;
+    // exe.single_threaded = true;
 
     exe.addPackagePath("http", "http/src/lib.zig");
 
