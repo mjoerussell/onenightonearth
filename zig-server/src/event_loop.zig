@@ -130,9 +130,25 @@ const LinuxEventLoop = struct {
     pub fn init(loop: *LinuxEventLoop, allocator: Allocator, comptime options: EventLoopOptions) !void {
         loop.is_running = true;
         // This values for entries is arbitrary, currently. The only qualifier being intentionally met is that it's a power of 2
-        loop.io_uring = linux.IO_Uring.init(1024, 0) catch |err| {
-            std.log.err("Error occurred while trying to initialize io_uring: {}", .{err});
-            return err;
+        var entries: u16 = 1024;
+        // Keep trying to initialize IO_Uring with a smaller and smaller "entries" value until every possible value has been exhausted.
+        loop.io_uring = while (entries >= 1) {
+            if (linux.IO_Uring.init(@intCast(u13, entries), 0)) |ring| {
+                break ring;
+            } else |err| switch (err) {
+                error.SystemResources => {
+                    std.log.warn("Could not initialize io_uring with {} entries.", .{entries});
+                    entries /= 2;
+                    continue;
+                },
+                else => {
+                    std.log.err("Error while initializing io_uring: {}", .{err});
+                    return err;
+                }
+            }
+        } else {
+            std.log.err("Could not initialize io_uring with even 1 entry. Aborting...", .{});
+            return error.SystemResources;
         };
 
         if (options.extra_thread_count > 0) {
