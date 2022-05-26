@@ -129,16 +129,18 @@ pub fn wsaGetOverlappedResult(socket: os.socket_t, overlapped: *windows.OVERLAPP
 
 pub fn getQueuedCompletionStatus(completion_port: os.windows.HANDLE, completion_key: *os.windows.ULONG_PTR, lp_overlapped: *?*os.windows.OVERLAPPED) !u32 {
     var bytes_transferred: u32 = 0;
-    const result = os.windows.kernel32.GetQueuedCompletionStatus(completion_port, &bytes_transferred, completion_key, lp_overlapped, os.windows.INFINITE);
+    const result = os.windows.kernel32.GetQueuedCompletionStatus(completion_port, &bytes_transferred, completion_key, lp_overlapped, 0);
     if (result == os.windows.TRUE) {
         return bytes_transferred;
     }
+
+    if (lp_overlapped.* == null) return error.WouldBlock;
     
     return switch (os.windows.kernel32.GetLastError()) {
         .NETNAME_DELETED => error.ConnectionReset,
         .CONNECTION_ABORTED => error.ConnectionAborted,
         .NO_NETWORK => error.NetworkDown,
-        .ABANDONED_WAIT_0 => error.Aborted,
+        .ABANDONED_WAIT_0 => error.Abandoned,
         .OPERATION_ABORTED => error.Cancelled,
         .HANDLE_EOF => error.Eof,
         else => error.GeneralError,
