@@ -7,6 +7,8 @@ const Allocator = std.mem.Allocator;
 
 const winsock = @import("winsock.zig");
 
+/// Async event management abstraction for Windows/Linux platforms. Provides a common API for handling async operations.
+/// Uses IO_Uring on Linux and IO Completion Ports on Windows.
 pub const EventLoop = switch (builtin.os.tag) {
     .windows => WindowsEventLoop,
     .linux => LinuxEventLoop,
@@ -16,6 +18,9 @@ pub const EventLoop = switch (builtin.os.tag) {
 pub const EventLoopOptions = struct {
     extra_thread_count: usize = if (builtin.single_threaded) 0 else switch (builtin.os.tag) {
         .windows => 4,
+        // The default worker thread count on Linux is 0 because I was having issues with double-resuming frames with multiple
+        // threads concurrently dequeueing from io_uring. Not sure if I'm using io_uring incorrectly, or if that's normal and I need to
+        // implement some kind of locking around it
         else => 1,
     },
 };
@@ -28,9 +33,11 @@ const WindowsEventLoop = struct {
     };
 
     worker_threads: ?[]std.Thread = null,
-    io_port: windows.HANDLE,
+    io_port: windows.HANDLE = undefined,
     is_running: bool = false,
 
+    /// Initialize the event loop by creating a new IO completion port. If `options.extra_thread_count` > 0, then some worker threads
+    /// will be allocated and spawned. 
     pub fn init(loop: *WindowsEventLoop, allocator: Allocator, comptime options: EventLoopOptions) !void {
         loop.is_running = true;
         loop.io_port = try windows.CreateIoCompletionPort(windows.INVALID_HANDLE_VALUE, null, undefined, undefined);
@@ -52,13 +59,16 @@ const WindowsEventLoop = struct {
         }
         os.windows.CloseHandle(loop.io_port);
     }
-
+    
+    /// Thread function for the worker threads. Continuously tries to get a new async event completion.
     fn run(loop: *WindowsEventLoop) !void {
         while (@atomicLoad(bool, &loop.is_running, .Acquire)) {
             loop.getCompletion() catch {};
         }
     }
 
+    /// Get a new completion event if one is available. If one is found, then resume the async frame associated with the event to continue
+    /// whatever process was suspended.
     pub fn getCompletion(loop: *WindowsEventLoop) !void {
         var completion_key: usize = undefined;
         var overlapped: ?*windows.OVERLAPPED = undefined;
@@ -79,10 +89,13 @@ const WindowsEventLoop = struct {
         }
     }
 
+    /// Create an association between a socket and the event loop's IO completion port. This function **must be called** before starting
+    /// any overlapped IO processes on the socket, otherwise the io port will not be signaled when they are complete.
     pub fn register(loop: *WindowsEventLoop, socket: os.socket_t) !void {
         _ = try windows.CreateIoCompletionPort(socket, loop.io_port, undefined, 0);
     }
 
+    /// Initialize a ResumeNode with the given frame and a default OVERLAPPED structure.
     pub inline fn createResumeNode(frame: anyframe) ResumeNode {
         return .{ 
             .frame = frame,
@@ -112,8 +125,11 @@ const LinuxEventLoop = struct {
     io_uring: linux.IO_Uring,
     is_running: bool = false,
 
+    /// Initialize the event loop by creating a new IO_uring instance. If `options.extra_thread_count` > 0, also allocates and spawns 
+    /// some worker threads.
     pub fn init(loop: *LinuxEventLoop, allocator: Allocator, comptime options: EventLoopOptions) !void {
         loop.is_running = true;
+        // This values for entries is arbitrary, currently. The only qualifier being intentionally met is that it's a power of 2
         loop.io_uring = try linux.IO_Uring.init(1024, 0);
 
         if (options.extra_thread_count > 0) {
@@ -133,14 +149,18 @@ const LinuxEventLoop = struct {
         loop.io_uring.deinit();
     }
 
+    /// Thread function for the worker threads. Continuously tries to dequeue a completion event.
     fn run(loop: *LinuxEventLoop) !void {
         while (@atomicLoad(bool, &loop.is_running, .Acquire)) {
             try loop.getCompletion();    
         }
     }
 
+    /// Dequeue a completion event, if one is available. If none are available then this returns immediately. If one is found, then it tries to
+    /// acquire the async frame associated with the ResumeNode and try to resume it.
     pub fn getCompletion(loop: *LinuxEventLoop) !void {
-        var cqes: [1]linux.io_uring_cqe = undefined;
+        var cqes: [1]linux.io_uring_cqe = undefined;    
+        // Wait for 0 completion queue events so we don't block in single-threaded mode
         const count = try loop.io_uring.copy_cqes(&cqes, 0);
         if (count > 0) {
             switch (cqes[0].err()) {

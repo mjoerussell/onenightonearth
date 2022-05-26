@@ -6,7 +6,7 @@ const OneNightServer = @This();
 
 const Client = @import("OneNightClient.zig");
 const Server = @import("server.zig").Server;
-const NetworkLoop = @import("client.zig").NetworkLoop;
+const EventLoop = @import("event_loop.zig").EventLoop;
 const FileSource = @import("FileSource.zig");
 
 const ClientList = std.ArrayList(*Client);
@@ -17,7 +17,7 @@ const has_custom_impl = switch (builtin.os.tag) {
 };
 
 server: Server,
-net_loop: NetworkLoop = undefined,
+event_loop: EventLoop = undefined,
 
 clients: ClientList,
 
@@ -30,7 +30,7 @@ pub fn init(one_night: *OneNightServer, allocator: Allocator, address: std.net.A
     errdefer one_night.server.deinit();
 
     if (has_custom_impl) {
-        try one_night.net_loop.init(allocator, .{ });
+        try one_night.event_loop.init(allocator, .{ });
     }
 
     one_night.clients = ClientList.init(allocator);
@@ -44,7 +44,7 @@ pub fn deinit(server: *OneNightServer, allocator: Allocator) void {
     }
     server.clients.deinit();
     if (has_custom_impl) {
-        server.net_loop.deinit();
+        server.event_loop.deinit();
     }
 
     server.server.deinit();
@@ -61,7 +61,7 @@ pub fn accept(server: *OneNightServer, allocator: Allocator) !void {
     std.log.info("Got connection", .{});
 
     // Create a new client and start handling its request.
-    var client = try Client.init(allocator, &server.net_loop, connection);
+    var client = try Client.init(allocator, &server.event_loop, connection);
     client.run(server.file_source);
 
     // Append the client to the server's client list.

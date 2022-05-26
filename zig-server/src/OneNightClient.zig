@@ -10,7 +10,7 @@ const http = @import("http");
 const OneNightClient = @This();
 
 const CommonClient = @import("client.zig").Client;
-const NetworkLoop = @import("client.zig").NetworkLoop;
+const EventLoop = @import("event_loop.zig").EventLoop;
 const FileSource = @import("FileSource.zig");
 
 const Connection = switch (builtin.os.tag) {
@@ -35,15 +35,15 @@ handle_frame: *@Frame(OneNightClient.handle) = undefined,
 arena: std.heap.ArenaAllocator,
 connected: bool = false,
 
-pub fn init(allocator: Allocator, loop: *NetworkLoop, conn: Connection) !*OneNightClient {
+pub fn init(allocator: Allocator, event_loop: *EventLoop, conn: Connection) !*OneNightClient {
     var client = try allocator.create(OneNightClient);
 
     const common_client = switch (builtin.os.tag) {
-        .windows, .linux => try CommonClient.init(loop, conn),
+        .windows, .linux => try CommonClient.init(event_loop, conn),
         else => CommonClient.init(conn),
     };
 
-    if (builtin.os.tag != .windows and builtin.os.tag != .linux) _ = loop;
+    if (builtin.os.tag != .windows and builtin.os.tag != .linux) _ = event_loop;
 
     client.common_client = common_client;
     client.arena = std.heap.ArenaAllocator.init(allocator);
@@ -64,7 +64,6 @@ pub fn close(client: *OneNightClient) void {
 }
 
 pub fn run(client: *OneNightClient, file_source: FileSource) void {
-    std.log.debug("Run client", .{});
     client.handle_frame.* = async client.handle(file_source);
 }
 
