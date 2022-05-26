@@ -70,7 +70,7 @@ COPY ./zig-server .
 COPY --from=prepare-data /usr/src/star_data.bin .
 COPY --from=prepare-data /usr/src/const_data.bin .
 
-RUN /usr/src/bin/zig build -Drelease-fast
+RUN /usr/src/bin/zig build -Drelease-fast -Dsingle-threaded
 
 ##################################################
 # Build the static files for the site

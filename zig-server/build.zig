@@ -11,12 +11,14 @@ pub fn build(b: *std.build.Builder) void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const mode = b.standardReleaseOptions();
 
+    const is_single_threaded = b.option(bool, "single-threaded", "Build in single-threaded mode?");
+
     const exe = b.addExecutable("zig-server", "src/main.zig");
     exe.setTarget(target);
     exe.setBuildMode(mode);
     exe.install();
 
-    // exe.single_threaded = true;
+    exe.single_threaded = is_single_threaded orelse false;
 
     exe.addPackagePath("http", "http/src/lib.zig");
 

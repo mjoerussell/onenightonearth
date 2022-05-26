@@ -23,6 +23,7 @@ pub fn main() anyerror!void {
     defer server.deinit(allocator);
 
     std.log.info("Listening on port {}", .{ port });
+    std.log.info("Build is single threaded: {}", .{builtin.single_threaded});
 
     while (true) {
         server.accept(allocator) catch {};
