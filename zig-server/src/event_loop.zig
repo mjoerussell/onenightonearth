@@ -130,7 +130,10 @@ const LinuxEventLoop = struct {
     pub fn init(loop: *LinuxEventLoop, allocator: Allocator, comptime options: EventLoopOptions) !void {
         loop.is_running = true;
         // This values for entries is arbitrary, currently. The only qualifier being intentionally met is that it's a power of 2
-        loop.io_uring = try linux.IO_Uring.init(1024, 0);
+        loop.io_uring = linux.IO_Uring.init(1024, 0) catch |err| {
+            std.log.err("Error occurred while trying to initialize io_uring: {}", .{err});
+            return err;
+        };
 
         if (options.extra_thread_count > 0) {
             loop.worker_threads = try allocator.alloc(std.Thread, options.extra_thread_count);
