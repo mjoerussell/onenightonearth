@@ -25,6 +25,9 @@ pub fn main() anyerror!void {
     std.log.info("Listening on port {}", .{ port });
 
     while (true) {
-        server.accept(allocator) catch continue;
+        server.accept(allocator) catch {};
+        if (builtin.single_threaded) {
+            server.net_loop.getCompletion() catch continue;
+        }
     }
 }

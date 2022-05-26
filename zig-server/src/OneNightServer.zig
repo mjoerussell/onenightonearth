@@ -25,7 +25,7 @@ pub fn init(one_night: *OneNightServer, allocator: Allocator, address: std.net.A
     errdefer one_night.server.deinit();
 
     if (builtin.os.tag == .windows or builtin.os.tag == .linux) {
-        try one_night.net_loop.init(allocator);
+        try one_night.net_loop.init(allocator, .{ .extra_thread_count = 0 });
     }
 
     one_night.clients = ClientList.init(allocator);
@@ -52,7 +52,6 @@ pub fn accept(server: *OneNightServer, allocator: Allocator) !void {
     // what happens (if there are any errors or not)
     defer server.cleanup(allocator);
     var connection = try server.server.accept();
-    std.log.debug("Got connection", .{});
 
     // Linux gets a StreamServer.Connection from accept(), but the LinuxClient expects a sockfd
     // init argument. In that case we should get it from the Connection, but in other cases (macos)
@@ -70,7 +69,6 @@ pub fn accept(server: *OneNightServer, allocator: Allocator) !void {
 /// Background "process" for cleaning up expired clients. Whenever the server has gone > 1sec without accepting a new connection
 /// this will remove and destroy all of the clients that have disconnected.
 fn cleanup(server: *OneNightServer, allocator: Allocator) void {
-    var clients_removed: usize = 0;
     var client_index: usize = 0;
     while (client_index < server.clients.items.len) {
         var client = server.clients.items[client_index];
@@ -78,14 +76,11 @@ fn cleanup(server: *OneNightServer, allocator: Allocator) void {
             var client_to_remove = server.clients.swapRemove(client_index);
             allocator.destroy(client_to_remove.handle_frame);
             allocator.destroy(client_to_remove);
-            clients_removed += 1;
         } else {
             // Only increment the client array index if the current client wasn't removed. Otherwise clients
             // will be skipped because we're using swapRemove
             client_index += 1;
         }
     }
-
-    std.log.debug("Cleaned up {} clients", .{clients_removed});
 }
 

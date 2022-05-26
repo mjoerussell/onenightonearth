@@ -13,6 +13,13 @@ pub const EventLoop = switch (builtin.os.tag) {
     else => @compileError("OS Not Supported"),
 };
 
+pub const EventLoopOptions = struct {
+    extra_thread_count: usize = switch (builtin.os.tag) {
+        .windows => 4,
+        else => 1,
+    },
+};
+
 const WindowsEventLoop = struct {
     pub const ResumeNode = struct {
         frame: anyframe,
@@ -20,45 +27,54 @@ const WindowsEventLoop = struct {
         is_resumed: bool = false,
     };
 
-    worker_threads: []std.Thread,
+    worker_threads: ?[]std.Thread = null,
     io_port: windows.HANDLE,
     is_running: bool = false,
 
-    pub fn init(loop: *WindowsEventLoop, allocator: Allocator) !void {
+    pub fn init(loop: *WindowsEventLoop, allocator: Allocator, comptime options: EventLoopOptions) !void {
         loop.is_running = true;
         loop.io_port = try windows.CreateIoCompletionPort(windows.INVALID_HANDLE_VALUE, null, undefined, undefined);
-    
-        loop.worker_threads = try allocator.alloc(std.Thread, std.Thread.getCpuCount() catch 4);
-        for (loop.worker_threads) |*thread| {
-            thread.* = try std.Thread.spawn(.{}, WindowsEventLoop.run, .{loop});
+
+        if (options.extra_thread_count > 0) {
+            loop.worker_threads = try allocator.alloc(std.Thread, options.extra_thread_count);
+            for (loop.worker_threads.?) |*thread| {
+                thread.* = try std.Thread.spawn(.{}, WindowsEventLoop.run, .{loop});
+            }
         }
     }
 
     pub fn deinit(loop: *WindowsEventLoop, allocator: Allocator) void {
         @atomicStore(bool, &loop.is_running, false, .Acquire);
         // loop.is_running = false;
-        for (loop.worker_threads) |*thread| {
-            thread.join();
+        if (loop.worker_threads) |workers| {
+            for (workers) |*thread| thread.join();
+            allocator.free(workers);
         }
-        allocator.free(loop.worker_threads);
         os.windows.CloseHandle(loop.io_port);
     }
 
     fn run(loop: *WindowsEventLoop) !void {
         while (@atomicLoad(bool, &loop.is_running, .Acquire)) {
-            var completion_key: usize = undefined;
-            var overlapped: ?*windows.OVERLAPPED = undefined;
-            _ = winsock.getQueuedCompletionStatus(loop.io_port, &completion_key, &overlapped) catch |err| switch (err) {
-                error.Aborted => return,
-                error.Eof => {},
-                else => continue,
-            };
+            try loop.getCompletion();
+        }
+    }
 
-            if (overlapped) |o| {
-                var resume_node = @fieldParentPtr(ResumeNode, "overlapped", o);
-                if (@cmpxchgStrong(bool, &resume_node.is_resumed, false, true, .SeqCst, .SeqCst) == null) {
-                    resume resume_node.frame;
-                }
+    pub fn getCompletion(loop: *WindowsEventLoop) !void {
+        var completion_key: usize = undefined;
+        var overlapped: ?*windows.OVERLAPPED = undefined;
+        _ = winsock.getQueuedCompletionStatus(loop.io_port, &completion_key, &overlapped) catch |err| switch (err) {
+            error.WouldBlock => {},
+            error.Eof => {},
+            else => {
+                std.log.warn("Unexpected error when getting queued completion status: {}", .{err});
+                return;
+            },
+        };
+
+        if (overlapped) |o| {
+            var resume_node = @fieldParentPtr(ResumeNode, "overlapped", o);
+            if (@cmpxchgStrong(bool, &resume_node.is_resumed, false, true, .SeqCst, .SeqCst) == null) {
+                resume resume_node.frame;
             }
         }
     }
@@ -100,7 +116,6 @@ const LinuxEventLoop = struct {
         loop.is_running = true;
         loop.io_uring = try linux.IO_Uring.init(1024, 0);
 
-        // loop.worker_threads = try allocator.alloc(std.Thread, std.Thread.getCpuCount() catch 4);
         loop.worker_threads = try allocator.alloc(std.Thread, 1);
         for (loop.worker_threads) |*thread| {
             thread.* = try std.Thread.spawn(.{}, LinuxEventLoop.run, .{loop});
