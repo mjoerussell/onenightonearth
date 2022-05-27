@@ -46,6 +46,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const controls = new Controls();
     controls.date = new Date();
 
+    fetch('/constellations/meta')
+        .then(c => c.json())
+        .then(const_res => {
+            constellations = const_res;
+            controls.setConstellations(constellations);
+        });
+
     WebAssembly.instantiateStreaming(fetch('./dist/wasm/night-math.wasm'), {
         env: {
             consoleLog: (msg_ptr: number, msg_len: number) => {
@@ -75,8 +82,6 @@ document.addEventListener('DOMContentLoaded', () => {
         );
 
         renderStars(controls);
-        constellations = await fetch('/constellations/meta').then(c => c.json());
-        controls.setConstellations(constellations);
         controls.startDetectingResize();
     });
 
