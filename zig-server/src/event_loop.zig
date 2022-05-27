@@ -7,6 +7,8 @@ const Allocator = std.mem.Allocator;
 
 const winsock = @import("winsock.zig");
 
+const is_single_threaded = builtin.single_threaded;
+
 /// Async event management abstraction for Windows/Linux platforms. Provides a common API for handling async operations.
 /// Uses IO_Uring on Linux and IO Completion Ports on Windows.
 pub const EventLoop = switch (builtin.os.tag) {
@@ -16,7 +18,7 @@ pub const EventLoop = switch (builtin.os.tag) {
 };
 
 pub const EventLoopOptions = struct {
-    extra_thread_count: usize = if (builtin.single_threaded) 0 else switch (builtin.os.tag) {
+    extra_thread_count: usize = if (is_single_threaded) 0 else switch (builtin.os.tag) {
         .windows => 4,
         // The default worker thread count on Linux is 0 because I was having issues with double-resuming frames with multiple
         // threads concurrently dequeueing from io_uring. Not sure if I'm using io_uring incorrectly, or if that's normal and I need to
@@ -72,7 +74,11 @@ const WindowsEventLoop = struct {
     pub fn getCompletion(loop: *WindowsEventLoop) !void {
         var completion_key: usize = undefined;
         var overlapped: ?*windows.OVERLAPPED = undefined;
-        _ = winsock.getQueuedCompletionStatus(loop.io_port, &completion_key, &overlapped) catch |err| switch (err) {
+        // If getCompletion is being run on worker threads, then they can block forever (time_to_block = null)
+        // while waiting for new events. If this is running in the main thread, then it needs to exit immediately
+        // (time_to_block = 0) so that the main loop doesn't get blocked
+        const should_block = !is_single_threaded;
+        _ = winsock.getQueuedCompletionStatus(loop.io_port, &completion_key, &overlapped, should_block) catch |err| switch (err) {
             error.WouldBlock => {},
             error.Eof => {},
             else => {
@@ -180,7 +186,8 @@ const LinuxEventLoop = struct {
     pub fn getCompletion(loop: *LinuxEventLoop) !void {
         var cqes: [1]linux.io_uring_cqe = undefined;    
         // Wait for 0 completion queue events so we don't block in single-threaded mode
-        const count = try loop.io_uring.copy_cqes(&cqes, 0);
+        const wait_count: u32 = if (is_single_threaded) 0 else 1;
+        const count = try loop.io_uring.copy_cqes(&cqes, wait_count);
         if (count > 0) {
             switch (cqes[0].err()) {
                 .SUCCESS => {
