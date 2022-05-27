@@ -128,9 +128,16 @@ pub fn wsaGetOverlappedResult(socket: os.socket_t, overlapped: *windows.OVERLAPP
     };
 }
 
-pub fn getQueuedCompletionStatus(completion_port: os.windows.HANDLE, completion_key: *os.windows.ULONG_PTR, lp_overlapped: *?*os.windows.OVERLAPPED) !u32 {
+pub fn getQueuedCompletionStatus(completion_port: os.windows.HANDLE, completion_key: *os.windows.ULONG_PTR, lp_overlapped: *?*os.windows.OVERLAPPED, should_block: bool) !u32 {
     var bytes_transferred: u32 = 0;
-    const result = os.windows.kernel32.GetQueuedCompletionStatus(completion_port, &bytes_transferred, completion_key, lp_overlapped, 0);
+    const result = os.windows.kernel32.GetQueuedCompletionStatus(
+        completion_port, 
+        &bytes_transferred, 
+        completion_key, 
+        lp_overlapped, 
+        if (should_block) windows.INFINITE else 0
+    );
+
     if (result == os.windows.TRUE) {
         return bytes_transferred;
     }
