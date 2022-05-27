@@ -56,7 +56,7 @@ pub fn accept(server: *OneNightServer, allocator: Allocator) !void {
     // Put the cleanup here at the very end of execution so that it gets run no matter
     // what happens (if there are any errors or not)
     defer server.cleanup(allocator);
-    var connection = try server.server.accept();
+    const connection = try server.server.accept();
 
     std.log.info("Got connection", .{});
 
