@@ -11,6 +11,8 @@ pub const Server = switch (builtin.os.tag) {
 
 pub const AcceptError = error{WouldBlock, ConnectError};
 
+const is_single_threaded = builtin.single_threaded;
+
 /// A custom server that imitates the lowest-common-denominator of the net.StreamServer API.
 /// This is needed to set up overlapped io on the incoming sockets without using non-blocking io
 /// on the whole filesystem (the default event loop that would be used in that case doesn't work on windows).
@@ -31,9 +33,12 @@ const WindowsServer = struct {
         const socket = try os.windows.WSASocketW(@intCast(i32, address.any.family), @as(i32, os.SOCK.STREAM), @as(i32, os.IPPROTO.TCP), null, 0, flags);
         errdefer os.windows.closesocket(socket) catch unreachable;
 
-        // Make the socket non-blocking
-        var io_mode: u32 = 1;
-        _ = os.windows.ws2_32.ioctlsocket(socket, os.windows.ws2_32.FIONBIO, &io_mode);
+        if (is_single_threaded) {
+            // Make the socket non-blocking so that we don't get blocked on accept() in single-threaded mode
+            var io_mode: u32 = 1;
+            _ = os.windows.ws2_32.ioctlsocket(socket, os.windows.ws2_32.FIONBIO, &io_mode);
+        }
+
         server.handle = socket;
         errdefer server.deinit();
 
@@ -70,7 +75,11 @@ const LinuxServer = struct {
     }
 
     pub fn listen(server: *Server, address: net.Address) !void {
-        const socket_flags = os.SOCK.STREAM | os.SOCK.CLOEXEC | os.SOCK.NONBLOCK;
+        // Only create the socket in non-blocking mode if the server is running single threaded.
+        // In multithreaded mode, we want to block on accept() while the worker threads handle the existing
+        // connections
+        const non_block_flag = if (is_single_threaded) os.SOCK.NONBLOCK else 0;
+        const socket_flags = os.SOCK.STREAM | os.SOCK.CLOEXEC | non_block_flag;
 
         const socket = try os.socket(address.any.family, socket_flags, os.IPPROTO.TCP);
         server.handle = socket;
