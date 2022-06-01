@@ -7,10 +7,11 @@ const math_utils = @import("./math_utils.zig");
 const Point = math_utils.Point;
 const Line = math_utils.Line;
 
+const Star = @import("Star.zig");
 const star_math = @import("./star_math.zig");
 const SkyCoord = star_math.SkyCoord;
-const Star = star_math.Star;
 const ObserverPosition = star_math.ObserverPosition;
+const Constellation = star_math.Constellation;
 
 const fixed_point = @import("fixed_point.zig");
 const FixedPoint = fixed_point.FixedPoint(i16, 12);
@@ -218,6 +219,47 @@ pub fn isInsideCircle(self: Canvas, point: Point) bool {
     };
 
     return point.getDist(center) <= self.settings.background_radius;
+}
+
+/// Draw the boundaries of a constellation.
+pub fn drawGrid(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
+    var iter = constellation.boundary_iter();
+    while (iter.next()) |bound| {
+        const point_a = canvas.coordToPoint(bound[0], local_sidereal_time, sin_latitude, cos_latitude, false).?;
+        const point_b = canvas.coordToPoint(bound[1], local_sidereal_time, sin_latitude, cos_latitude, false).?;
+
+        if (!canvas.isInsideCircle(point_a) and !canvas.isInsideCircle(point_b)) {
+            continue;
+        }
+
+        var line_index: f32 = 0;
+        while (line_index < @intToFloat(f32, line_width)) : (line_index += 1) {
+            const start = Point{ .x = point_a.x + line_index, .y = point_a.y + line_index };
+            const end = Point{ .x = point_b.x + line_index, .y = point_b.y + line_index };
+            canvas.drawLine(Line{ .a = start, .b = end }, color);
+        }
+        
+    }
+}
+
+/// Draw the asterism (pattern) of a constellation.
+pub fn drawAsterism(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
+    var branch_index: usize = 0;
+    while (branch_index < constellation.asterism.len - 1) : (branch_index += 2) {
+        const point_a = canvas.coordToPoint(constellation.asterism[branch_index], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
+        const point_b = canvas.coordToPoint(constellation.asterism[branch_index + 1], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
+
+        if (!canvas.isInsideCircle(point_a) and !canvas.isInsideCircle(point_b)) {
+            continue;
+        }
+        
+        var line_index: f32 = 0;
+        while (line_index < @intToFloat(f32, line_width)) : (line_index += 1) {
+            const start = Point{ .x = point_a.x + line_index, .y = point_a.y + line_index };
+            const end = Point{ .x = point_b.x + line_index, .y = point_b.y + line_index };
+            canvas.drawLine(Line{ .a = start, .b = end }, color);
+        }
+    }
 }
 
 pub fn drawLine(self: *Canvas, line: Line, color: Pixel) void {

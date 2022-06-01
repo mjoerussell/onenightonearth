@@ -9,6 +9,9 @@ const Pixel = Canvas.Pixel;
 
 const star_math = @import("star_math.zig");
 const ObserverPosition = star_math.ObserverPosition;
+const Constellation = star_math.Constellation;
+
+const Star = @import("Star.zig");
 
 const StarRenderer = @This();
 
@@ -17,7 +20,7 @@ canvas: Canvas,
 // observer_longitude: f32,
 // observer_timestamp: i64,
 
-stars: std.MultiArrayList(star_math.Star),
+stars: std.MultiArrayList(Star),
 constellations: []star_math.Constellation,
 
 pub fn run(renderer: *StarRenderer, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
@@ -26,6 +29,8 @@ pub fn run(renderer: *StarRenderer, observer_latitude: f32, observer_longitude: 
     const sin_latitude = std.math.sin(observer_latitude);
     const cos_latitude = std.math.cos(observer_latitude);
 
+    const line_color = Pixel.rgba(255, 245, 194, 175);
+
     renderer.canvas.projectAndRenderStarsWide(renderer.stars, local_sidereal_time, sin_latitude, cos_latitude);
 
     if (renderer.canvas.settings.draw_constellation_grid or renderer.canvas.settings.draw_asterisms) {
@@ -33,10 +38,10 @@ pub fn run(renderer: *StarRenderer, observer_latitude: f32, observer_longitude: 
             if (renderer.canvas.settings.zodiac_only and !constellation.is_zodiac) continue;
             
             if (renderer.canvas.settings.draw_constellation_grid) {
-                star_math.projectConstellationGrid(&renderer.canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, local_sidereal_time, sin_latitude, cos_latitude);
+                renderer.canvas.drawGrid(constellation, line_color, 1, local_sidereal_time, sin_latitude, cos_latitude);
             }
             if (renderer.canvas.settings.draw_asterisms) {
-                star_math.projectConstellationAsterism(&renderer.canvas, constellation, Pixel.rgba(255, 245, 194, 155), 1, local_sidereal_time, sin_latitude, cos_latitude);
+                renderer.canvas.drawAsterism(constellation, line_color, 1, local_sidereal_time, sin_latitude, cos_latitude);
             }
         }
     }

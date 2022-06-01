@@ -52,40 +52,40 @@ fn getPartialLocalSiderealTime(timestamp: i64) f32 {
     return @floatCast(f32, math_utils.floatMod(lst, 2 * math.pi));
 }
 
-pub const Star = struct {
-    right_ascension: f32,
-    declination: f32,
-    sin_declination: f32,
-    cos_declination: f32,
-    pixel: Pixel,
+// pub const Star = struct {
+//     right_ascension: f32,
+//     declination: f32,
+//     sin_declination: f32,
+//     cos_declination: f32,
+//     pixel: Pixel,
 
-    pub fn fromExternStar(ext_star: ExternStar) Star {
-        const right_ascension = FixedPoint.toFloat(ext_star.right_ascension);
-        const declination = FixedPoint.toFloat(ext_star.declination);
-        return .{
-            .right_ascension = right_ascension,
-            .declination = declination,
-            .sin_declination = math.sin(declination),
-            .cos_declination = math.cos(declination),
-            .pixel = ext_star.getColor(),
-        };
-    }
+//     pub fn fromExternStar(ext_star: ExternStar) Star {
+//         const right_ascension = FixedPoint.toFloat(ext_star.right_ascension);
+//         const declination = FixedPoint.toFloat(ext_star.declination);
+//         return .{
+//             .right_ascension = right_ascension,
+//             .declination = declination,
+//             .sin_declination = math.sin(declination),
+//             .cos_declination = math.cos(declination),
+//             .pixel = ext_star.getColor(),
+//         };
+//     }
 
-};
+// };
 
-pub const ExternStar = packed struct {
-    right_ascension: i16,
-    declination: i16,
-    brightness: u8,
-    spec_type: SpectralType,
+// pub const ExternStar = packed struct {
+//     right_ascension: i16,
+//     declination: i16,
+//     brightness: u8,
+//     spec_type: SpectralType,
 
-    pub fn getColor(star: ExternStar) Pixel {
-        var base_color = star.spec_type.getColor();
-        base_color.a = star.brightness;
+//     pub fn getColor(star: ExternStar) Pixel {
+//         var base_color = star.spec_type.getColor();
+//         base_color.a = @intCast(u8, std.math.clamp(@intCast(u16, star.brightness) + 30, 0, @as(u16, 255)));
 
-        return base_color;
-    }
-};
+//         return base_color;
+//     }
+// };
 
 pub const Constellation = struct {
     /// Iterate over the boundaries two at a time. The iteration goes like this:
@@ -152,10 +152,6 @@ pub const Constellation = struct {
         };
     }
 };
-
-// @todo It's possible that the reason for the contellation flickering is that the constellations at the end of the list
-// aren't getting drawn before the next draw cycle starts. That could explain why they happen towards the middle of the screen,
-// since the constellations are ordered in a roughly clockwise-by-longitude way. Needs more investigation though
 
 /// A Great Circle is a circle that intersects the center of a sphere. The path along a great circle is the shortest path between
 /// two points on the surface of a sphere.
@@ -228,100 +224,43 @@ pub fn GreatCircle(comptime num_waypoints: usize) type {
     };
 }
 
-/// Each star has a spectral type based on its temperature. Each spectral type category emits a different
-/// color of light.
-pub const SpectralType = enum(u8) {
-    /// > 30,000 K
-    O,
-    /// 10,000 K <> 30,000 K
-    B,
-    /// 7,500 K <> 10,000 K
-    A,
-    /// 6,000 K <> 7,500 K
-    F,
-    /// 5,200 K <> 6,000 K
-    G,
-    /// 3,700 K <> 5,200 K
-    K,
-    /// 2,400 K <> 3,700 K
-    M,
+// /// Each star has a spectral type based on its temperature. Each spectral type category emits a different
+// /// color of light.
+// pub const SpectralType = enum(u8) {
+//     /// > 30,000 K
+//     O,
+//     /// 10,000 K <> 30,000 K
+//     B,
+//     /// 7,500 K <> 10,000 K
+//     A,
+//     /// 6,000 K <> 7,500 K
+//     F,
+//     /// 5,200 K <> 6,000 K
+//     G,
+//     /// 3,700 K <> 5,200 K
+//     K,
+//     /// 2,400 K <> 3,700 K
+//     M,
 
-    pub fn getColor(spec: SpectralType) Pixel {
-        return switch (spec) {
-            // Blue
-            .O => Pixel.rgb(2, 89, 156),
-            // Blue-white
-            .B => Pixel.rgb(129, 212, 247),
-            // White
-            .A => Pixel.rgb(255, 255, 255),
-            // Yellow-white
-            .F => Pixel.rgb(254, 255, 219),
-            // Yellow
-            .G => Pixel.rgb(253, 255, 112),
-            // Orange
-            .K => Pixel.rgb(240, 129, 50),
-            // Red
-            .M => Pixel.rgb(207, 32, 23)
-        };
-    }
-};
-
-/// Draw a star on the canvas
-pub fn projectStar(canvas: *Canvas, star: ExternStar, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
-    const point = canvas.coordToPoint(
-        SkyCoord{ .right_ascension = star.right_ascension, .declination = star.declination },
-        local_sidereal_time,
-        sin_latitude,
-        cos_latitude,
-        true
-    ) orelse return;
-
-    canvas.setPixelAt(point, star.getColor());
-    if (canvas.isInsideCircle(point)) {
-        canvas.setPixelAt(point, star.getColor());
-    }
-}
-
-/// Draw the boundaries of a constellation.
-pub fn projectConstellationGrid(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
-    var iter = constellation.boundary_iter();
-    while (iter.next()) |bound| {
-        const point_a = canvas.coordToPoint(bound[0], local_sidereal_time, sin_latitude, cos_latitude, false).?;
-        const point_b = canvas.coordToPoint(bound[1], local_sidereal_time, sin_latitude, cos_latitude, false).?;
-
-        if (!canvas.isInsideCircle(point_a) and !canvas.isInsideCircle(point_b)) {
-            continue;
-        }
-
-        var line_index: u32 = 0;
-        while (line_index < line_width) : (line_index += 1) {
-            const start = Point{ .x = point_a.x + @intToFloat(f32, line_index), .y = point_a.y + @intToFloat(f32, line_index) };
-            const end = Point{ .x = point_b.x + @intToFloat(f32, line_index), .y = point_b.y + @intToFloat(f32, line_index) };
-            canvas.drawLine(Line{ .a = start, .b = end }, color);
-        }
-        
-    }
-}
-
-/// Draw the asterism (pattern) of a constellation.
-pub fn projectConstellationAsterism(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
-    var branch_index: usize = 0;
-    while (branch_index < constellation.asterism.len - 1) : (branch_index += 2) {
-        const point_a = canvas.coordToPoint(constellation.asterism[branch_index], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
-        const point_b = canvas.coordToPoint(constellation.asterism[branch_index + 1], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
-
-        if (!canvas.isInsideCircle(point_a) and !canvas.isInsideCircle(point_b)) {
-            continue;
-        }
-        
-        var line_index: u32 = 0;
-        while (line_index < line_width) : (line_index += 1) {
-            const start = Point{ .x = point_a.x + @intToFloat(f32, line_index), .y = point_a.y + @intToFloat(f32, line_index) };
-            const end = Point{ .x = point_b.x + @intToFloat(f32, line_index), .y = point_b.y + @intToFloat(f32, line_index) };
-            canvas.drawLine(Line{ .a = start, .b = end }, color);
-        }
-    }
-}
+//     pub fn getColor(spec: SpectralType) Pixel {
+//         return switch (spec) {
+//             // Blue
+//             .O => Pixel.rgb(2, 89, 156),
+//             // Blue-white
+//             .B => Pixel.rgb(129, 212, 247),
+//             // White
+//             .A => Pixel.rgb(255, 255, 255),
+//             // Yellow-white
+//             .F => Pixel.rgb(254, 255, 219),
+//             // Yellow
+//             .G => Pixel.rgb(253, 255, 112),
+//             // Orange
+//             .K => Pixel.rgb(240, 129, 50),
+//             // Red
+//             .M => Pixel.rgb(207, 32, 23)
+//         };
+//     }
+// };
 
 /// Get the constellation that's currently at the point on the canvas.
 pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []Constellation, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) ?usize {

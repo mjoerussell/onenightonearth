@@ -9,9 +9,10 @@ const Point = @import("./math_utils.zig").Point;
 
 const StarRenderer = @import("./StarRenderer.zig");
 
+const Star = @import("Star.zig");
+const ExternStar = Star.ExternStar;
+
 const star_math = @import("./star_math.zig");
-const Star = star_math.Star;
-const ExternStar = star_math.ExternStar;
 const Constellation = star_math.Constellation;
 const SkyCoord = star_math.SkyCoord;
 const Coord = star_math.Coord;
@@ -178,10 +179,10 @@ pub export fn getConstellationAtPoint(star_renderer: *StarRenderer, x: f32, y: f
     const index = star_math.getConstellationAtPoint(&star_renderer.canvas, point, star_renderer.constellations, local_sidereal_time, sin_lat, cos_lat);
     if (index) |i| {
         if (star_renderer.canvas.settings.draw_constellation_grid) {
-            star_math.projectConstellationGrid(&star_renderer.canvas, star_renderer.constellations[i], Pixel.rgb(255, 255, 255), 3, local_sidereal_time, sin_lat, cos_lat);
+            star_renderer.canvas.drawGrid(star_renderer.constellations[i], Pixel.rgb(255, 255, 255), 3, local_sidereal_time, sin_lat, cos_lat);
         }
         if (star_renderer.canvas.settings.draw_asterisms) {
-            star_math.projectConstellationAsterism(&star_renderer.canvas, star_renderer.constellations[i], Pixel.rgb(255, 255, 255), 3, local_sidereal_time, sin_lat, cos_lat);
+            star_renderer.canvas.drawAsterism(star_renderer.constellations[i], Pixel.rgb(255, 255, 255), 3, local_sidereal_time, sin_lat, cos_lat);
         }
         return @intCast(isize, i);
     } else return -1;
