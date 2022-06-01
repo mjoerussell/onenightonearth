@@ -3,6 +3,8 @@ const builtin = @import("builtin");
 const fs = std.fs;
 const Allocator = std.mem.Allocator;
 
+const log = std.log.scoped(.file_source);
+
 extern fn CreateFileMappingA(
     hFile: std.os.windows.HANDLE, 
     lpFileMappingAttributes: ?[*]std.os.windows.SECURITY_ATTRIBUTES,
@@ -49,23 +51,22 @@ const allowed_paths_absolute = [_][]const u8{
 
 mapped_files: std.StringHashMap([]const u8),
 
-pub fn init(allocator: Allocator, should_compress: bool) !FileSource {
+pub fn init(allocator: Allocator) !FileSource {
     var file_source = FileSource{ .mapped_files = std.StringHashMap([]const u8).init(allocator) };
     errdefer file_source.deinit();
 
-    if (should_compress) {
-        const cwd = fs.cwd();
-        cwd.makeDir(compressed_file_prefix) catch |err| switch (err) {
-            error.PathAlreadyExists => {},
-            else => return err,
-        };
-    }
+    const cwd = fs.cwd();
+    cwd.makeDir(compressed_file_prefix) catch |err| switch (err) {
+        error.PathAlreadyExists => {},
+        else => return err,
+    };
 
-    try file_source.initFileMappings(allocator, true);
+    try file_source.initFileMappings(allocator);
 
     return file_source;
 }
 
+/// Unmap all files and deinitialize the `mapped_files` hash map.
 pub fn deinit(file_source: *FileSource) void {
     var iter = file_source.mapped_files.valueIterator();
     while (iter.next()) |mapping| {
@@ -74,6 +75,7 @@ pub fn deinit(file_source: *FileSource) void {
     file_source.mapped_files.deinit();
 }
 
+/// Unmap a file from memory.
 fn deinitFileMapping(mapping: []const u8) void {
     switch (builtin.os.tag) {
         .windows => _ = UnmapViewOfFile(@intToPtr(*anyopaque, @ptrToInt(mapping.ptr))),
@@ -81,37 +83,48 @@ fn deinitFileMapping(mapping: []const u8) void {
     }
 }
 
-pub fn getFile(file_source: FileSource, path: []const u8) GetFileError![]const u8 {
+pub fn getFile(file_source: FileSource, path: []const u8) error{FileNotFound}![]const u8 {
     const clean_path = if (std.mem.startsWith(u8, path, "/")) path[1..] else path;
     return file_source.mapped_files.get(clean_path) orelse error.FileNotFound;
 }
 
-fn initFileMappings(file_source: *FileSource, allocator: Allocator, should_compress: bool) !void {
+/// Initialize all of the file mappings for the files defined in `allowed_paths_relative` and `allowed_paths_absolue`.
+/// The difference between these two sets of paths is that paths in `allowed_paths_relative` will be prepended with
+/// `FileSource.relative_dir` before being opened, while `allowed_paths_absolute` are not modified.
+///
+/// For both sets of files, the mapped data will be inserted into the `mapped_files` hash map with the unmodified
+/// paths set as the keys.
+fn initFileMappings(file_source: *FileSource, allocator: Allocator) !void {
     inline for (allowed_paths_relative) |file_path| {
-        var mapping = try createFileMapping(allocator, file_path, should_compress, true);
+        var mapping = try createFileMapping(allocator, FileSource.relative_dir ++ file_path);
         errdefer deinitFileMapping(mapping);
 
         try file_source.mapped_files.putNoClobber(file_path, mapping);
     }
 
     inline for (allowed_paths_absolute) |file_path| {
-        var mapping = try createFileMapping(allocator, file_path, false, false);
+        var mapping = try createFileMapping(allocator, file_path);
         errdefer deinitFileMapping(mapping);
 
         try file_source.mapped_files.putNoClobber(file_path, mapping);
     }
 }
 
-fn createFileMapping(allocator: Allocator, comptime file_path: []const u8, should_compress: bool, is_relative: bool) ![]const u8 {
-    const cwd = fs.cwd();
-    const full_path = if (is_relative) FileSource.relative_dir ++ file_path else file_path;
-    var target_file = if (should_compress) 
-        try copyAndCompress(allocator, full_path, FileSource.compressed_file_prefix ++ file_path)
-    else
-        cwd.openFile(full_path, .{}) catch |err| {
-            std.log.err("Error opening file {s}: {}", .{file_path, err});
-            return err;
-        };
+fn createFileMapping(allocator: Allocator, file_path: []const u8) ![]const u8 {
+    const clean_path = blk: {
+        if (std.mem.startsWith(u8, file_path, FileSource.relative_dir)) {
+            break :blk file_path[FileSource.relative_dir.len..];
+        } else {
+            break :blk file_path;
+        }
+    };
+    
+    var dest_path_buf: [FileSource.compressed_file_prefix.len + 100]u8 = undefined;
+
+
+    var dest_path = try std.fmt.bufPrint(&dest_path_buf, FileSource.compressed_file_prefix ++ "{s}", .{clean_path});
+    log.debug("Writing compressed file to path {s}", .{dest_path});
+    var target_file = try copyAndCompress(allocator, file_path, dest_path);
     defer target_file.close();
 
     const file_size = blk: {
@@ -134,7 +147,7 @@ fn copyAndCompress(allocator: Allocator, source: []const u8, destination: []cons
     const cwd = fs.cwd();
 
     var source_file = cwd.openFile(source, .{}) catch |err| {
-        std.log.err("Error opening file {s}: {}", .{source, err});
+        log.err("Error opening file {s}: {}", .{source, err});
         return err;
     };
     defer source_file.close();
@@ -166,10 +179,16 @@ fn createFileAtPath(path_with_filename: []const u8) !fs.File {
     while (parts.next()) |next_part| : (current_part = next_part) {
         current_dir = current_dir.makeOpenPath(current_part, .{}) catch |err| switch (err) {
             error.PathAlreadyExists => try current_dir.openDir(current_part, .{}),
-            else => return err,
+            else => {
+                log.err("Error trying to create/open subfolder {s}: {}", .{path_with_filename, err});
+                return err;
+            }
         };
     }
 
-    return try current_dir.createFile(current_part, .{ .read = true });
+    return current_dir.createFile(current_part, .{ .read = true }) catch |err| {
+        log.err("Error creating file {s}: {}", .{current_part, err});
+        return err;
+    };
 }
 
