@@ -67,9 +67,6 @@ COPY --from=zig /usr/src/bin /usr/src/bin
 
 COPY ./zig-server .
 
-COPY --from=prepare-data /usr/src/star_data.bin .
-COPY --from=prepare-data /usr/src/const_data.bin .
-
 RUN /usr/src/bin/zig build -Drelease-fast
 
 ##################################################
@@ -114,6 +111,8 @@ COPY --from=build-server /usr/src/zig-out/bin/zig-server /usr/src/server
 COPY --from=night-math /usr/web/dist/wasm ./web/dist/wasm
 
 COPY --from=prepare-data /usr/src/const_meta.json ./server/const_meta.json
+COPY --from=prepare-data /usr/src/star_data.bin ./server/star_data.bin
+COPY --from=prepare-data /usr/src/const_data.bin ./server/const_data.bin
 
 WORKDIR /usr/src/server
 

@@ -34,7 +34,9 @@ pub fn init(one_night: *OneNightServer, allocator: Allocator, address: std.net.A
     }
 
     one_night.clients = ClientList.init(allocator);
-    one_night.file_source = try FileSource.init(allocator);
+    
+    const should_compress = builtin.mode != .Debug;
+    one_night.file_source = try FileSource.init(allocator, should_compress);
 }
 
 pub fn deinit(server: *OneNightServer, allocator: Allocator) void {
