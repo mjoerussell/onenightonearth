@@ -3,97 +3,173 @@ const builtin = @import("builtin");
 const fs = std.fs;
 const Allocator = std.mem.Allocator;
 
+extern fn CreateFileMappingA(
+    hFile: std.os.windows.HANDLE, 
+    lpFileMappingAttributes: ?[*]std.os.windows.SECURITY_ATTRIBUTES,
+    flProtect: u32,
+    dwMaximumSizeHigh: u32,
+    dwMaximumSizeLow: u32,
+    lpName: ?[*]const u8
+) callconv(.C) std.os.windows.HANDLE;
+
+extern fn MapViewOfFile(
+    hFileMappingObject: std.os.windows.HANDLE,
+    dwDesiredAccess: u32,
+    dwFileOffsetHigh: u32,
+    dwFileOffsetLow: u32,
+    dwNumberOfBytesToMap: usize,
+) callconv(.C) *anyopaque;
+
+extern fn UnmapViewOfFile(lpBaseAddress: *anyopaque) callconv(.C) c_int;
+
 const FileSource = @This();
 
 pub const GetFileError = error{ FileNotFound, OutOfMemory, OpenError, FileTooBig };
 
 const relative_dir = "../web/";
-
+const compressed_file_prefix = "compressed/";
 /// These paths are relative to `index.html`, not the server. To get paths relative to
 /// the server, prepend `relative_dir`.
 ///
 /// The reason for this is that these are the paths that are going to be included in the 'uri' component
 /// of an http request. Storing them like this allows us to modify that value as little as possible.
-const allowed_paths = [_][]const u8{
+const allowed_paths_relative = [_][]const u8{
+    "index.html",
     "dist/bundle.js",
     "styles/main.css",
     "assets/favicon.ico",
     "dist/wasm/night-math.wasm",
 };
 
-preloaded_files: if (builtin.mode == .Debug) void else std.StringHashMap([]const u8),
+const allowed_paths_absolute = [_][]const u8{
+    "star_data.bin",
+    "const_data.bin",
+    "const_meta.json",
+};
 
-/// In debug mode, this initializer does nothing and cannot fail. All files are loaded when they are requested, in
-/// order to support live updates of static files. In release mode, this will read all of the files and store them
-/// in `preloaded_files`, with their base paths used as keys.
-pub fn init(allocator: Allocator) !FileSource {
-    if (builtin.mode == .Debug) {
-        _ = allocator;
-        return FileSource{
-            .preloaded_files = {},
+mapped_files: std.StringHashMap([]const u8),
+
+pub fn init(allocator: Allocator, should_compress: bool) !FileSource {
+    var file_source = FileSource{ .mapped_files = std.StringHashMap([]const u8).init(allocator) };
+    errdefer file_source.deinit();
+
+    if (should_compress) {
+        const cwd = fs.cwd();
+        cwd.makeDir(compressed_file_prefix) catch |err| switch (err) {
+            error.PathAlreadyExists => {},
+            else => return err,
         };
     }
 
-    // const cwd = fs.cwd();
-    var file_source: FileSource = undefined;
-    file_source.preloaded_files = std.StringHashMap([]const u8).init(allocator);
-    inline for (FileSource.allowed_paths) |path| {
-        // var file = cwd.openFile(FileSource.relative_dir ++ path, .{}) catch return error.OpenError;
-        // defer file.close();
-        // const file_content = try file.readToEndAlloc(allocator, std.math.maxInt(u32));
-        const file_content = try readAndCompress(allocator, FileSource.relative_dir ++ path);
-        try file_source.preloaded_files.putNoClobber(path, file_content);
-        std.log.info("Loaded file " ++ path, .{});
-    }
+    try file_source.initFileMappings(allocator, true);
 
     return file_source;
 }
 
-/// Get a file located at `file_path`. `file_path` should be relative to `index.html`, not the server.
-/// In debug mode, this function always reads the file from the filesystem and sends the current content.
-/// In release modes, the files are preloaded and the contents are fetched from `preloaded_files`.
-pub fn getFile(file_source: FileSource, allocator: Allocator, file_path: []const u8) ![]const u8 {
-    const clean_path = if (file_path[0] == '/') file_path[1..] else file_path;
-    if (builtin.mode == .Debug) {
-        _ = file_source;
-        // const cwd = fs.cwd();
-        inline for (FileSource.allowed_paths) |path| {
-            if (std.mem.eql(u8, path, clean_path)) {
-                return try readAndCompress(allocator, FileSource.relative_dir ++ path);
-                // var file = cwd.openFile(FileSource.relative_dir ++ path, .{}) catch return error.OpenError;
-                // defer file.close();
-                // return try file.readToEndAlloc(allocator, std.math.maxInt(u32));
-            }
-        }
+pub fn deinit(file_source: *FileSource) void {
+    var iter = file_source.mapped_files.valueIterator();
+    while (iter.next()) |mapping| {
+        deinitFileMapping(mapping.*);
+    }
+    file_source.mapped_files.deinit();
+}
 
-        return error.FileNotFound;
-    } else {
-        _ = allocator;
-        return file_source.preloaded_files.get(clean_path) orelse return error.FileNotFound;
+fn deinitFileMapping(mapping: []const u8) void {
+    switch (builtin.os.tag) {
+        .windows => _ = UnmapViewOfFile(@intToPtr(*anyopaque, @ptrToInt(mapping.ptr))),
+        else => std.os.munmap(@alignCast(std.mem.page_size, mapping)),
     }
 }
 
-fn readAndCompress(allocator: Allocator, filename: []const u8) ![]const u8 {
+pub fn getFile(file_source: FileSource, path: []const u8) GetFileError![]const u8 {
+    const clean_path = if (std.mem.startsWith(u8, path, "/")) path[1..] else path;
+    return file_source.mapped_files.get(clean_path) orelse error.FileNotFound;
+}
+
+fn initFileMappings(file_source: *FileSource, allocator: Allocator, should_compress: bool) !void {
+    inline for (allowed_paths_relative) |file_path| {
+        var mapping = try createFileMapping(allocator, file_path, should_compress, true);
+        errdefer deinitFileMapping(mapping);
+
+        try file_source.mapped_files.putNoClobber(file_path, mapping);
+    }
+
+    inline for (allowed_paths_absolute) |file_path| {
+        var mapping = try createFileMapping(allocator, file_path, false, false);
+        errdefer deinitFileMapping(mapping);
+
+        try file_source.mapped_files.putNoClobber(file_path, mapping);
+    }
+}
+
+fn createFileMapping(allocator: Allocator, comptime file_path: []const u8, should_compress: bool, is_relative: bool) ![]const u8 {
     const cwd = fs.cwd();
+    const full_path = if (is_relative) FileSource.relative_dir ++ file_path else file_path;
+    var target_file = if (should_compress) 
+        try copyAndCompress(allocator, full_path, FileSource.compressed_file_prefix ++ file_path)
+    else
+        cwd.openFile(full_path, .{}) catch |err| {
+            std.log.err("Error opening file {s}: {}", .{file_path, err});
+            return err;
+        };
+    defer target_file.close();
+
+    const file_size = blk: {
+        const stat = target_file.stat() catch break :blk 0;
+        break :blk stat.size;
+    };
+
+    return switch (builtin.os.tag) {
+        .windows => blk: {
+            var map_handle = CreateFileMappingA(target_file.handle, null, std.os.windows.PAGE_READONLY, 0, 0, null);
+            defer std.os.windows.CloseHandle(map_handle);
+
+            break :blk @ptrCast([*]u8, MapViewOfFile(map_handle, 0x0004, 0, 0, 0))[0..file_size];
+        },
+        else => try std.os.mmap(null, file_size, std.os.PROT.READ, std.os.linux.MAP.PRIVATE, target_file.handle, 0),
+    };
+}
+
+fn copyAndCompress(allocator: Allocator, source: []const u8, destination: []const u8) !fs.File {
+    const cwd = fs.cwd();
+
+    var source_file = cwd.openFile(source, .{}) catch |err| {
+        std.log.err("Error opening file {s}: {}", .{source, err});
+        return err;
+    };
+    defer source_file.close();
     
-    var file = try cwd.openFile(filename, .{});
-    defer file.close();
+    var dest_file = try createFileAtPath(destination);
+    errdefer dest_file.close();
+
+    var compressor = try std.compress.deflate.compressor(allocator, dest_file.writer(), .{ .level = .best_compression });
+    defer compressor.deinit();
 
     var read_buffer: [std.mem.page_size]u8 = undefined;
 
-    var output = std.ArrayList(u8).init(allocator);
-    errdefer output.deinit();
-
-    var compressor = try std.compress.deflate.compressor(allocator, output.writer(), .{ .level = .level_5 });
-    defer compressor.deinit();
-
-    var bytes_read = try file.readAll(&read_buffer);
+    var bytes_read = try source_file.readAll(&read_buffer);
     while (bytes_read > 0) {
         _ = try compressor.write(read_buffer[0..bytes_read]);
         if (bytes_read < read_buffer.len) break;
-        bytes_read = try file.readAll(&read_buffer);
+        bytes_read = try source_file.readAll(&read_buffer);
     }
 
     try compressor.flush();
-    return output.toOwnedSlice();
+    return dest_file;
 }
+
+fn createFileAtPath(path_with_filename: []const u8) !fs.File {
+    var parts = std.mem.split(u8, path_with_filename, "/");
+
+    var current_dir = fs.cwd();
+    var current_part = parts.next() orelse return error.InvalidPath;
+    while (parts.next()) |next_part| : (current_part = next_part) {
+        current_dir = current_dir.makeOpenPath(current_part, .{}) catch |err| switch (err) {
+            error.PathAlreadyExists => try current_dir.openDir(current_part, .{}),
+            else => return err,
+        };
+    }
+
+    return try current_dir.createFile(current_part, .{ .read = true });
+}
+
