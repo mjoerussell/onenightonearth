@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub fn build(b: *std.build.Builder) void {
+pub fn build(b: *std.build.Builder) !void {
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
@@ -12,9 +12,15 @@ pub fn build(b: *std.build.Builder) void {
     const mode = b.standardReleaseOptions();
 
     const is_single_threaded = b.option(bool, "single-threaded", "Build in single-threaded mode?");
+    const target_linux = b.option(bool, "target-linux", "Build for the default linux target instead of the native target") orelse false;
+
+    const default_linux_target = try std.zig.CrossTarget.parse(.{
+        .arch_os_abi = "x86_64-linux"
+    });
 
     const exe = b.addExecutable("zig-server", "src/main.zig");
-    exe.setTarget(target);
+    
+    exe.setTarget(if (target_linux) default_linux_target else target);
     exe.setBuildMode(mode);
     exe.install();
 

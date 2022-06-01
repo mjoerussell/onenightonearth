@@ -111,7 +111,7 @@ const LinuxClient = struct {
         const flags = os.linux.IOSQE_ASYNC;
         var resume_node = EventLoop.createResumeNode(@frame());
         suspend {
-            _ = client.event_loop.io_uring.recv(@intCast(u64, @ptrToInt(&resume_node)), client.socket, buffer, flags) catch return error.RecvErr;
+            _ = client.event_loop.io_uring.recv(@intCast(u64, @ptrToInt(&resume_node)), client.socket, .{ .buffer = buffer }, flags) catch return error.RecvErr;
             _ = client.event_loop.io_uring.submit() catch return error.SubmitErr;
         }
 
