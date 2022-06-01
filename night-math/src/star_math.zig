@@ -352,16 +352,12 @@ pub fn getConstellationAtPoint(canvas: *Canvas, point: Point, constellations: []
             const b_b = canvas.coordToPoint(bound[1], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
 
             const bound_line = Line{ .a = b_a, .b = b_b };
-            if (point_ray_right.segmentIntersection(bound_line)) |inter_point| {
-                if (canvas.isInsideCircle(inter_point)) {
-                    num_intersections_right += 1;
-                }
+            if (point_ray_right.segmentIntersection(bound_line)) |_| {
+                num_intersections_right += 1;
             }
 
-            if (point_ray_left.segmentIntersection(bound_line)) |inter_point| {
-                if (canvas.isInsideCircle(inter_point)) {
-                    num_intersections_left += 1;
-                }
+            if (point_ray_left.segmentIntersection(bound_line)) |_| {
+                num_intersections_left += 1;
             }
         }
         // If there are an odd number of intersections on the left and right side of the point, then the point
