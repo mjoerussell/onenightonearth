@@ -50,18 +50,25 @@ const allowed_paths_absolute = [_][]const u8{
 };
 
 mapped_files: std.StringHashMap([]const u8),
+allocator: Allocator,
+is_compressed: bool = builtin.mode != .Debug,
 
 pub fn init(allocator: Allocator) !FileSource {
-    var file_source = FileSource{ .mapped_files = std.StringHashMap([]const u8).init(allocator) };
+    var file_source = FileSource{ 
+        .mapped_files = std.StringHashMap([]const u8).init(allocator), 
+        .allocator = allocator,
+    };
     errdefer file_source.deinit();
 
-    const cwd = fs.cwd();
-    cwd.makeDir(compressed_file_prefix) catch |err| switch (err) {
-        error.PathAlreadyExists => {},
-        else => return err,
-    };
+    if (builtin.mode != .Debug) {
+        const cwd = fs.cwd();
+        cwd.makeDir(compressed_file_prefix) catch |err| switch (err) {
+            error.PathAlreadyExists => {},
+            else => return err,
+        };
 
-    try file_source.initFileMappings(allocator);
+        try file_source.initFileMappings();
+    }
 
     return file_source;
 }
@@ -83,9 +90,32 @@ fn deinitFileMapping(mapping: []const u8) void {
     }
 }
 
-pub fn getFile(file_source: FileSource, path: []const u8) error{FileNotFound}![]const u8 {
+pub fn getFile(file_source: FileSource, path: []const u8) ![]const u8 {
     const clean_path = if (std.mem.startsWith(u8, path, "/")) path[1..] else path;
+    if (builtin.mode == .Debug) {
+        const absolute_path = try getAbsolutePath(clean_path);
+        var file = try fs.cwd().openFile(absolute_path, .{});
+        defer file.close();
+
+        return try file.readToEndAlloc(file_source.allocator, std.math.maxInt(u32));
+    }
     return file_source.mapped_files.get(clean_path) orelse error.FileNotFound;
+}
+
+fn getAbsolutePath(path: []const u8) error{FileNotFound}![]const u8 {
+    inline for (FileSource.allowed_paths_relative) |allowed_path| {
+        if (std.mem.eql(u8, allowed_path, path)) {
+            return FileSource.relative_dir ++ allowed_path;
+        }
+    }
+
+    inline for (FileSource.allowed_paths_absolute) |allowed_path| {
+        if (std.mem.eql(u8, allowed_path, path)) {
+            return allowed_path;
+        }
+    }
+
+    return error.FileNotFound;
 }
 
 /// Initialize all of the file mappings for the files defined in `allowed_paths_relative` and `allowed_paths_absolue`.
@@ -94,16 +124,16 @@ pub fn getFile(file_source: FileSource, path: []const u8) error{FileNotFound}![]
 ///
 /// For both sets of files, the mapped data will be inserted into the `mapped_files` hash map with the unmodified
 /// paths set as the keys.
-fn initFileMappings(file_source: *FileSource, allocator: Allocator) !void {
+fn initFileMappings(file_source: *FileSource) !void {
     inline for (allowed_paths_relative) |file_path| {
-        var mapping = try createFileMapping(allocator, FileSource.relative_dir ++ file_path);
+        var mapping = try createFileMapping(file_source.allocator, FileSource.relative_dir ++ file_path);
         errdefer deinitFileMapping(mapping);
 
         try file_source.mapped_files.putNoClobber(file_path, mapping);
     }
 
     inline for (allowed_paths_absolute) |file_path| {
-        var mapping = try createFileMapping(allocator, file_path);
+        var mapping = try createFileMapping(file_source.allocator, file_path);
         errdefer deinitFileMapping(mapping);
 
         try file_source.mapped_files.putNoClobber(file_path, mapping);
@@ -124,6 +154,7 @@ fn createFileMapping(allocator: Allocator, file_path: []const u8) ![]const u8 {
 
     var dest_path = try std.fmt.bufPrint(&dest_path_buf, FileSource.compressed_file_prefix ++ "{s}", .{clean_path});
     log.debug("Writing compressed file to path {s}", .{dest_path});
+    
     var target_file = try copyAndCompress(allocator, file_path, dest_path);
     defer target_file.close();
 

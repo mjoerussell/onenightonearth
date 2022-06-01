@@ -149,7 +149,9 @@ fn handle(client: *OneNightClient, file_source: FileSource) !void {
         var response = http.Response.init(allocator);    
         try response.header("Content-Length", file_data.len);
         try response.header("Content-Type", content_type);
-        try response.header("Content-Encoding", "deflate");
+        if (file_source.is_compressed) {
+            try response.header("Content-Encoding", "deflate");
+        }
         response.body = file_data;
 
         // Send the response
@@ -192,7 +194,10 @@ fn handleIndex(allocator: Allocator, file_source: FileSource, request: http.Requ
     response.status = .ok;
     try response.header("Content-Type", "text/html");
     try response.header("Content-Length", index_data.len);
-    try response.header("Content-Encoding", "deflate");
+
+    if (file_source.is_compressed) {
+        try response.header("Content-Encoding", "deflate");
+    }
     response.body = index_data;
 
     return response;
@@ -207,7 +212,9 @@ fn handleStars(allocator: Allocator, file_source: FileSource, request: http.Requ
     response.status = .ok;
     try response.header("Content-Type", "application/octet-stream");
     try response.header("Content-Length", star_data.len);
-    try response.header("Content-Encoding", "deflate");
+    if (file_source.is_compressed) {
+        try response.header("Content-Encoding", "deflate");
+    }
     response.body = star_data;
 
     return response;
@@ -221,7 +228,10 @@ fn handleConstellations(allocator: Allocator, file_source: FileSource, request: 
     var response = http.Response.init(allocator);
     try response.header("Content-Type", "application/octet-stream");
     try response.header("Content-Length", const_data.len);
-    try response.header("Content-Encoding", "deflate");
+
+    if (file_source.is_compressed) {
+        try response.header("Content-Encoding", "deflate");
+    }
     response.body = const_data;
     return response;
 }
@@ -235,7 +245,10 @@ fn handleConstellationMetadata(allocator: Allocator, file_source: FileSource, re
     response.status = .ok;
     try response.header("Content-Type", "application/json");
     try response.header("Content-Length", const_meta_data.len);
-    try response.header("Content-Encoding", "deflate");
+ 
+    if (file_source.is_compressed) {
+        try response.header("Content-Encoding", "deflate");
+    }
     response.body = const_meta_data;
 
     return response;
