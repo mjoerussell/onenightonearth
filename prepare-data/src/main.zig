@@ -5,8 +5,6 @@ const Allocator = std.mem.Allocator;
 const fp = @import("fixed_point.zig");
 const FixedPoint = fp.FixedPoint(i16, 12);
 
-const CompressedFileWriter = @import("CompressedFileWriter.zig");
-
 /// A standard degree-to-radian conversion function.
 pub fn degToRad(degrees: anytype) @TypeOf(degrees) {
     return degrees * (std.math.pi / 180.0);
@@ -274,7 +272,7 @@ pub fn main() anyerror!void {
 
     var stars = try readSaoCatalog(allocator, "sao_catalog");
 
-    try writeStarData(allocator, stars, star_out_filename);
+    try writeStarData(stars, star_out_filename);
 
     const constellations = try readConstellationFiles(allocator, "constellations/iau");
     defer {
@@ -282,7 +280,7 @@ pub fn main() anyerror!void {
         allocator.free(constellations);
     }
 
-    try writeConstellationData(allocator, constellations, const_out_filename);
+    try writeConstellationData(constellations, const_out_filename);
     try writeConstellationMetadata(allocator, constellations, const_out_metadata_filename);
 }
 
@@ -339,14 +337,21 @@ fn readSaoCatalog(allocator: Allocator, catalog_filename: []const u8) ![]Star {
     return star_list.toOwnedSlice();
 }
 
-fn writeStarData(allocator: Allocator, stars: []Star, out_filename: []const u8) !void {
-    var cfw = try CompressedFileWriter.init(allocator, out_filename);
-    defer cfw.deinit();
+fn writeStarData(stars: []Star, out_filename: []const u8) !void {
+    const cwd = fs.cwd();
 
-    var writer = cfw.writer();
+    var out_file = try cwd.createFile(out_filename, .{});
+    defer out_file.close();
+
+    var out_file_writer = out_file.writer();
+    var buffered_writer = std.io.bufferedWriter(out_file_writer);
+
+    var writer = buffered_writer.writer();
 
     var bytes = std.mem.sliceAsBytes(stars);
     _ = try writer.write(bytes);
+
+    try buffered_writer.flush();
 }
 
 /// Read and parse all of the constellation files in a given directory.
@@ -401,11 +406,16 @@ fn readConstellationFiles(allocator: Allocator, constellation_dir_name: []const 
     return constellations.toOwnedSlice();
 }
 
-fn writeConstellationData(allocator: Allocator, constellations: []Constellation, const_out_filename: []const u8) !void {
-    var cfw = try CompressedFileWriter.init(allocator, const_out_filename);
-    defer cfw.deinit();
+fn writeConstellationData(constellations: []Constellation, out_filename: []const u8) !void {
+    const cwd = fs.cwd();
 
-    var writer = cfw.writer();
+    var out_file = try cwd.createFile(out_filename, .{});
+    defer out_file.close();
+
+    var out_file_writer = out_file.writer();
+    var buffered_writer = std.io.bufferedWriter(out_file_writer);
+
+    var writer = buffered_writer.writer();
 
     var num_boundaries: u32 = 0;
     var num_asterisms: u32 = 0;
@@ -434,13 +444,20 @@ fn writeConstellationData(allocator: Allocator, constellations: []Constellation,
             _ = try writer.write(std.mem.toBytes(asterism_coord)[0..]);
         }
     }
+
+    try buffered_writer.flush();
 }
 
 fn writeConstellationMetadata(allocator: Allocator, constellations: []Constellation, filename: []const u8) !void {
-    var cfw = try CompressedFileWriter.init(allocator, filename);
-    defer cfw.deinit();
+    const cwd = fs.cwd();
 
-    var writer = cfw.writer();
+    var out_file = try cwd.createFile(filename, .{});
+    defer out_file.close();
+
+    var out_file_writer = out_file.writer();
+    var buffered_writer = std.io.bufferedWriter(out_file_writer);
+
+    var writer = buffered_writer.writer();
     
     var metadata_json = std.ArrayList(std.json.Value).init(allocator);
     for (constellations) |constellation| {
@@ -453,4 +470,6 @@ fn writeConstellationMetadata(allocator: Allocator, constellations: []Constellat
     }
     const metadata = std.json.Value{ .Array = metadata_json };
     try metadata.jsonStringify(.{}, writer);
+
+    try buffered_writer.flush();
 }
