@@ -8,6 +8,7 @@ const winsock = @import("./winsock.zig");
 
 const Allocator = std.mem.Allocator;
 
+const log = std.log.scoped(.client);
 const is_windows = builtin.os.tag == .windows;
 
 pub const Client = switch (builtin.os.tag) {
@@ -40,7 +41,7 @@ const WindowsClient = struct {
             },
             os.windows.ws2_32.SOCKET_ERROR => switch (os.windows.ws2_32.WSAGetLastError()) {
                 .WSAENOTSOCK => {
-                    std.log.warn("Tried to close a handle that is not a socket: {*}\nRetrying...", .{client.socket});
+                    log.warn("Tried to close a handle that is not a socket: {*}\nRetrying...", .{client.socket});
                 },
                 else => {},
             },

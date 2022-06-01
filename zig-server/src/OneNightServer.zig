@@ -34,9 +34,9 @@ pub fn init(one_night: *OneNightServer, allocator: Allocator, address: std.net.A
     }
 
     one_night.clients = ClientList.init(allocator);
-    
-    const should_compress = builtin.mode != .Debug;
-    one_night.file_source = try FileSource.init(allocator, should_compress);
+
+    // const should_compress = builtin.mode != .Debug;
+    one_night.file_source = try FileSource.init(allocator);
 }
 
 pub fn deinit(server: *OneNightServer, allocator: Allocator) void {
@@ -60,7 +60,7 @@ pub fn accept(server: *OneNightServer, allocator: Allocator) !void {
     defer server.cleanup(allocator);
     const connection = try server.server.accept();
 
-    std.log.info("Got connection", .{});
+    std.log.debug("Got connection", .{});
 
     // Create a new client and start handling its request.
     var client = try Client.init(allocator, &server.event_loop, connection);

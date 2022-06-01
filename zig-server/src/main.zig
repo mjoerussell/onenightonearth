@@ -3,9 +3,12 @@ const builtin = @import("builtin");
 
 const OneNightServer = @import("OneNightServer.zig");
 
-pub fn main() anyerror!void {
-    std.log.info("Starting server", .{});
+pub const log_level = switch (builtin.mode) {
+    .Debug => .debug,
+    else => .info,
+};
 
+pub fn main() anyerror!void {
     const port = 8080;
     var localhost = try std.net.Address.parseIp("0.0.0.0", port);
     const allocator = std.heap.page_allocator;
@@ -15,7 +18,7 @@ pub fn main() anyerror!void {
     defer server.deinit(allocator);
 
     std.log.info("Listening on port {}", .{ port });
-    std.log.info("Build is single threaded: {}", .{builtin.single_threaded});
+    std.log.debug("Build is single threaded: {}", .{builtin.single_threaded});
 
     while (true) {
         server.accept(allocator) catch {};

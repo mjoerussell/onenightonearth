@@ -7,6 +7,8 @@ const Timer = std.time.Timer;
 
 const http = @import("http");
 
+const log = std.log.scoped(.night_client);
+
 const OneNightClient = @This();
 
 const CommonClient = @import("client.zig").Client;
@@ -26,9 +28,6 @@ const route_handlers = std.ComptimeStringMap(RequestHandler, .{
     .{ "/constellations", handleConstellations },
     .{ "/constellations/meta", handleConstellationMetadata },
 });
-
-// const star_data = @embedFile("../star_data.bin");
-// const const_data = @embedFile("../const_data.bin");
 
 common_client: CommonClient,
 handle_frame: *@Frame(OneNightClient.handle) = undefined,
@@ -70,6 +69,11 @@ pub fn run(client: *OneNightClient, file_source: FileSource) void {
 fn handle(client: *OneNightClient, file_source: FileSource) !void {   
     // Each client will only handle 1 request/response (http1.1), so after handling is complete we'll close the connection
     defer client.close();
+    errdefer |err| {
+        // Something happened and we're bubbling up an error all the way to the handler.
+        // We'll log it here for tracking
+        log.err("Client terminated with error: {}", .{err});
+    }
 
     var timer = Timer.start() catch unreachable;
 
@@ -99,7 +103,7 @@ fn handle(client: *OneNightClient, file_source: FileSource) !void {
     defer {
         const end_ts = timer.read();
         const uri = request.uri() orelse "/";
-        std.log.info("Thread {}: Handling request for {s} took {d:.6}ms", .{std.Thread.getCurrentId(), uri, (@intToFloat(f64, end_ts) - @intToFloat(f64, start_ts)) / std.time.ns_per_ms});
+        log.info("Thread {}: Handling request for {s} took {d:.6}ms", .{std.Thread.getCurrentId(), uri, (@intToFloat(f64, end_ts) - @intToFloat(f64, start_ts)) / std.time.ns_per_ms});
     }
 
     const uri = request.uri() orelse {
@@ -112,7 +116,7 @@ fn handle(client: *OneNightClient, file_source: FileSource) !void {
     if (route_handlers.get(uri)) |handler| {
         // Get the response from the handler. If an error occurs, then get a 500 reponse
         var response = handler(allocator, file_source, request) catch |err| blk: {
-            std.log.err("Error handling request at {s}: {}", .{uri, err});
+            log.err("Error handling request at {s}: {}", .{uri, err});
             break :blk http.Response.initStatus(allocator, .internal_server_error);
         };
         // Send the response
@@ -123,14 +127,14 @@ fn handle(client: *OneNightClient, file_source: FileSource) !void {
         const file_data = file_source.getFile(uri) catch |err| switch (err) {
             error.FileNotFound => {
                 // The file either a) doesn't exist or b) is not one of the files registered in FileSource to be readable
-                std.log.warn("Client tried to get file {s}, but it could not be found", .{uri});
+                log.warn("Client tried to get file {s}, but it could not be found", .{uri});
                 var response = http.Response.initStatus(allocator, .not_found);
                 try response.write(writer);
                 return;
             },
             else => {
                 // Some unknown error occurred, just send 500 back
-                std.log.err("Error when trying to get file {s}: {}", .{uri, err});
+                log.err("Error when trying to get file {s}: {}", .{uri, err});
                 var response = http.Response.initStatus(allocator, .internal_server_error);
                 try response.write(writer);
                 return;
@@ -138,6 +142,8 @@ fn handle(client: *OneNightClient, file_source: FileSource) !void {
         };
 
         // Start building the file response
+        // getContentType can't return null here because we know at this point that the file the client is fetching
+        // is a know file in FileSource, and all of the known files have valid file extensions for getContentType
         const content_type = getContentType(uri).?;
         
         var response = http.Response.init(allocator);    
@@ -180,7 +186,6 @@ fn getContentType(filename: []const u8) ?[]const u8 {
 /// onenightonearth.com instead of onenightonearth.com/index.html
 fn handleIndex(allocator: Allocator, file_source: FileSource, request: http.Request) !http.Response {
     _ = request;
-    std.log.info("Reading index.html", .{});
 
     var index_data = try file_source.getFile("index.html");
     var response = http.Response.init(allocator);
@@ -196,7 +201,6 @@ fn handleIndex(allocator: Allocator, file_source: FileSource, request: http.Requ
 /// Handle the /stars endpoint. Returns the star data buffer as an octet-stream.
 fn handleStars(allocator: Allocator, file_source: FileSource, request: http.Request) !http.Response {
     _ = request;
-
     var star_data = try file_source.getFile("star_data.bin");
 
     var response = http.Response.init(allocator);
@@ -213,6 +217,7 @@ fn handleStars(allocator: Allocator, file_source: FileSource, request: http.Requ
 fn handleConstellations(allocator: Allocator, file_source: FileSource, request: http.Request) !http.Response {
     _ = request;
     var const_data = try file_source.getFile("const_data.bin");
+
     var response = http.Response.init(allocator);
     try response.header("Content-Type", "application/octet-stream");
     try response.header("Content-Length", const_data.len);
@@ -224,8 +229,8 @@ fn handleConstellations(allocator: Allocator, file_source: FileSource, request: 
 /// Handle the /constellations/meta endpoint. Returns the constellation metadata as a JSON-encoded value.
 fn handleConstellationMetadata(allocator: Allocator, file_source: FileSource, request: http.Request) !http.Response {
     _ = request;
-    
     var const_meta_data = try file_source.getFile("const_meta.json");
+
     var response = http.Response.init(allocator);
     response.status = .ok;
     try response.header("Content-Type", "application/json");

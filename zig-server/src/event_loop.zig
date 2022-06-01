@@ -7,6 +7,7 @@ const Allocator = std.mem.Allocator;
 
 const winsock = @import("winsock.zig");
 
+const log = std.log.scoped(.event_loop);
 const is_single_threaded = builtin.single_threaded;
 
 /// Async event management abstraction for Windows/Linux platforms. Provides a common API for handling async operations.
@@ -82,7 +83,7 @@ const WindowsEventLoop = struct {
             error.WouldBlock => {},
             error.Eof => {},
             else => {
-                std.log.warn("Unexpected error when getting queued completion status: {}", .{err});
+                log.warn("Unexpected error when getting queued completion status: {}", .{err});
                 return;
             },
         };
@@ -136,24 +137,24 @@ const LinuxEventLoop = struct {
     pub fn init(loop: *LinuxEventLoop, allocator: Allocator, comptime options: EventLoopOptions) !void {
         loop.is_running = true;
         // This values for entries is arbitrary, currently. The only qualifier being intentionally met is that it's a power of 2
-        var entries: u16 = 1024;
+        var entries: u16 = 4096;
         // Keep trying to initialize IO_Uring with a smaller and smaller "entries" value until every possible value has been exhausted.
         loop.io_uring = while (entries >= 1) {
             if (linux.IO_Uring.init(@intCast(u13, entries), 0)) |ring| {
                 break ring;
             } else |err| switch (err) {
                 error.SystemResources => {
-                    std.log.warn("Could not initialize io_uring with {} entries.", .{entries});
+                    log.warn("Could not initialize io_uring with {} entries.", .{entries});
                     entries /= 2;
                     continue;
                 },
                 else => {
-                    std.log.err("Error while initializing io_uring: {}", .{err});
+                    log.err("Error while initializing io_uring: {}", .{err});
                     return err;
                 }
             }
         } else {
-            std.log.err("Could not initialize io_uring with even 1 entry. Aborting...", .{});
+            log.err("Could not initialize io_uring with even 1 entry. Aborting...", .{});
             return error.SystemResources;
         };
 
@@ -184,25 +185,30 @@ const LinuxEventLoop = struct {
     /// Dequeue a completion event, if one is available. If none are available then this returns immediately. If one is found, then it tries to
     /// acquire the async frame associated with the ResumeNode and try to resume it.
     pub fn getCompletion(loop: *LinuxEventLoop) !void {
-        var cqes: [1]linux.io_uring_cqe = undefined;    
+        var cqes: [16]linux.io_uring_cqe = undefined;    
         // Wait for 0 completion queue events so we don't block in single-threaded mode
         const wait_count: u32 = if (is_single_threaded) 0 else 1;
-        const count = try loop.io_uring.copy_cqes(&cqes, wait_count);
+        const count = loop.io_uring.copy_cqes(&cqes, wait_count) catch |err| {
+            log.err("Error while trying to copy CQEs: {}\nAborting getCompletion()...", .{err});
+            return err;
+        };
         if (count > 0) {
-            switch (cqes[0].err()) {
-                .SUCCESS => {
-                    var resume_node = @intToPtr(?*ResumeNode, @intCast(usize, cqes[0].user_data));
-                    if (resume_node) |rn| {
-                        // cqe.res can't be negative because cqe.err() only returns .SUCCESS if cqe.res >= 0
-                        rn.bytes_worked = @intCast(usize, cqes[0].res);
-                        if (@cmpxchgStrong(bool, &rn.is_resumed, false, true, .SeqCst, .SeqCst) == null) {
-                            resume rn.frame;
+            for (cqes[0..count]) |cqe| {
+                switch (cqes.err()) {
+                    .SUCCESS => {
+                        var resume_node = @intToPtr(?*ResumeNode, @intCast(usize, cqes.user_data));
+                        if (resume_node) |rn| {
+                            // cqe.res can't be negative because cqe.err() only returns .SUCCESS if cqe.res >= 0
+                            rn.bytes_worked = @intCast(usize, cqes.res);
+                            if (@cmpxchgStrong(bool, &rn.is_resumed, false, true, .SeqCst, .SeqCst) == null) {
+                                resume rn.frame;
+                            }
                         }
-                    }
-                },
-                else => |err| {
-                    std.log.err("Error on cqe: {}", .{err});
-                },
+                    },
+                    else => |err| {
+                        log.err("Error retrieving CQE: {}", .{err});
+                    },
+                }
             }
         }
     }
