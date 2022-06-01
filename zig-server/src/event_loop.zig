@@ -194,12 +194,12 @@ const LinuxEventLoop = struct {
         };
         if (count > 0) {
             for (cqes[0..count]) |cqe| {
-                switch (cqes.err()) {
+                switch (cqe.err()) {
                     .SUCCESS => {
-                        var resume_node = @intToPtr(?*ResumeNode, @intCast(usize, cqes.user_data));
+                        var resume_node = @intToPtr(?*ResumeNode, @intCast(usize, cqe.user_data));
                         if (resume_node) |rn| {
                             // cqe.res can't be negative because cqe.err() only returns .SUCCESS if cqe.res >= 0
-                            rn.bytes_worked = @intCast(usize, cqes.res);
+                            rn.bytes_worked = @intCast(usize, cqe.res);
                             if (@cmpxchgStrong(bool, &rn.is_resumed, false, true, .SeqCst, .SeqCst) == null) {
                                 resume rn.frame;
                             }
