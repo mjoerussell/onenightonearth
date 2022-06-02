@@ -20,7 +20,7 @@ const WaypointIterator = struct {
             .num_waypoints = num_waypoints,
             .waypoint_inc = great_circle.distance / @intToFloat(f32, num_waypoints),
             .course_angle = great_circle.course_angle,
-            .negative_dir = great_circle.end.longitude > great_circle.start.longitude,
+            .negative_dir = great_circle.end.longitude < great_circle.start.longitude and great_circle.end.longitude > (great_circle.start.longitude - math.pi),
         };
     }
 
@@ -66,6 +66,13 @@ pub fn init(start: Coord, end: Coord) GreatCircle {
         .start = start,
         .end = end,
     };
+
+    if (great_circle.start.longitude > math.pi) {
+        great_circle.start.longitude -= 2 * math.pi;
+    }
+    if (great_circle.end.longitude > math.pi) {
+        great_circle.end.longitude -= 2 * math.pi;
+    }
 
     const sin_start_latitude = math.sin(great_circle.start.latitude);
     const cos_start_latitude = math.cos(great_circle.start.latitude);
