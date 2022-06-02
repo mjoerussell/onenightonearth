@@ -26,6 +26,19 @@ pub const SpectralType = enum(u8) {
     G,
     K,
     M,
+
+    pub fn fromChar(char: u8) ?SpectralType {
+        return switch (char) {
+            'o', 'O' => .O,
+            'b', 'B' => .B,
+            'a', 'A' => .A,
+            'f', 'F' => .F,
+            'g', 'G' => .G,
+            'k', 'K' => .K,
+            'm', 'M' => .M,
+            else => null,
+        };
+    }
 };
 
 pub const SkyCoord = packed struct {
@@ -230,16 +243,7 @@ pub const Star = packed struct {
                         star.spec_type = .A;
                         continue;
                     }
-                    star.spec_type = switch (std.ascii.toLower(part[0])) {
-                        'o' => SpectralType.O,
-                        'b' => SpectralType.B,
-                        'a' => SpectralType.A,
-                        'f' => SpectralType.F,
-                        'g' => SpectralType.G,
-                        'k' => SpectralType.K,
-                        'm' => SpectralType.M,
-                        else => SpectralType.A,
-                    };
+                    star.spec_type = SpectralType.fromChar(part[0]) orelse .A;
                 },
                 else => {},
             }
