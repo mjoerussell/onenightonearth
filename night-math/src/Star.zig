@@ -1,16 +1,15 @@
 const std = @import("std");
 const math = std.math;
 
-const fixed_point = @import("fixed_point.zig");
-const FixedPoint = fixed_point.FixedPoint(i16, 12);
+const FixedPoint = @import("fixed_point.zig").DefaultFixedPoint;
 
 const Pixel = @import("Canvas.zig").Pixel;
 
 const Star = @This();
 
 pub const ExternStar = packed struct {
-    right_ascension: i16,
-    declination: i16,
+    right_ascension: u16,
+    declination: u16,
     brightness: u8,
     spec_type: SpectralType,
 

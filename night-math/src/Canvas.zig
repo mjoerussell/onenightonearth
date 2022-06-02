@@ -14,8 +14,7 @@ const star_math = @import("./star_math.zig");
 const SkyCoord = star_math.SkyCoord;
 const ObserverPosition = star_math.ObserverPosition;
 
-const fixed_point = @import("fixed_point.zig");
-const FixedPoint = fixed_point.FixedPoint(i16, 12);
+const FixedPoint = @import("fixed_point.zig").DefaultFixedPoint;
 
 const Canvas = @This();
 

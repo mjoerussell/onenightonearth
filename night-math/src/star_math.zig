@@ -12,8 +12,7 @@ const math_utils = @import("./math_utils.zig");
 const Point = math_utils.Point;
 const Line = math_utils.Line;
 
-const fixed_point = @import("fixed_point.zig");
-const FixedPoint = fixed_point.FixedPoint(i16, 12);
+const FixedPoint = @import("fixed_point.zig").DefaultFixedPoint;
 
 const Constellation = @import("Constellation.zig");
 
@@ -23,8 +22,8 @@ pub const Coord = packed struct {
 };
 
 pub const SkyCoord = packed struct {
-    right_ascension: i16 = 0,
-    declination: i16 = 0,
+    right_ascension: u16 = 0,
+    declination: u16 = 0,
 
     pub fn getCoord(sky_coord: SkyCoord, observer_timestamp: i64) Coord {
         const partial_lst = getPartialLocalSiderealTime(observer_timestamp);

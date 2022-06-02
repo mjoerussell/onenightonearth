@@ -21,8 +21,7 @@ const ObserverPosition = star_math.ObserverPosition;
 
 const GreatCircle = @import("GreatCircle.zig");
 
-const fixed_point = @import("fixed_point.zig");
-const FixedPoint = fixed_point.FixedPoint(i16, 12);
+const FixedPoint = @import("fixed_point.zig").DefaultFixedPoint;
 
 const allocator = std.heap.page_allocator;
 
