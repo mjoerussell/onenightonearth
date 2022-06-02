@@ -8,6 +8,8 @@ const imports = struct {
     pub const wasm_interface = @import("src/wasm_interface.zig");
     pub const star_renderer = @import("src/StarRenderer.zig");
     pub const canvas = @import("src/Canvas.zig");
+    pub const star = @import("src/Star.zig");
+    pub const constellation = @import("src/Constellation.zig");
 };
 
 fn writeTypescriptPrimative(comptime T: type, writer: anytype) !void {
