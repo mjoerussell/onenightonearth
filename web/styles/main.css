@@ -2,6 +2,7 @@
     --background-color: #f5f5ec;
     --text-color: #01020f;
     --button-color: #081f41;
+    --toggle-focus: #0060df;
 }
 
 body {
@@ -167,6 +168,10 @@ div.toggle {
     border-radius: 500px;
     cursor: pointer;
     float: right;
+}
+
+div.toggle:focus-within {
+    outline: 2px solid var(--toggle-focus);
 }
 
 div.toggle input[type='checkbox'] {
