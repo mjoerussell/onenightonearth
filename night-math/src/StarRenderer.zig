@@ -9,9 +9,9 @@ const Pixel = Canvas.Pixel;
 
 const star_math = @import("star_math.zig");
 const ObserverPosition = star_math.ObserverPosition;
-const Constellation = star_math.Constellation;
 
 const Star = @import("Star.zig");
+const Constellation = @import("Constellation.zig");
 
 const StarRenderer = @This();
 
@@ -21,7 +21,7 @@ canvas: Canvas,
 // observer_timestamp: i64,
 
 stars: std.MultiArrayList(Star),
-constellations: []star_math.Constellation,
+constellations: []Constellation,
 
 pub fn run(renderer: *StarRenderer, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
     const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };

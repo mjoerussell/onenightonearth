@@ -12,12 +12,14 @@ const StarRenderer = @import("./StarRenderer.zig");
 const Star = @import("Star.zig");
 const ExternStar = Star.ExternStar;
 
+const Constellation = @import("Constellation.zig");
+
 const star_math = @import("./star_math.zig");
-const Constellation = star_math.Constellation;
 const SkyCoord = star_math.SkyCoord;
 const Coord = star_math.Coord;
 const ObserverPosition = star_math.ObserverPosition;
-const GreatCircle = star_math.GreatCircle;
+
+const GreatCircle = @import("GreatCircle.zig");
 
 const fixed_point = @import("fixed_point.zig");
 const FixedPoint = fixed_point.FixedPoint(i16, 12);
@@ -176,7 +178,7 @@ pub export fn getConstellationAtPoint(star_renderer: *StarRenderer, x: f32, y: f
     const sin_lat = std.math.sin(observer_latitude);
     const cos_lat = std.math.cos(observer_latitude);
 
-    const index = star_math.getConstellationAtPoint(&star_renderer.canvas, point, star_renderer.constellations, local_sidereal_time, sin_lat, cos_lat);
+    const index = star_math.getConstellationAtPoint(star_renderer.canvas, point, star_renderer.constellations, local_sidereal_time, sin_lat, cos_lat);
     if (index) |i| {
         if (star_renderer.canvas.settings.draw_constellation_grid) {
             star_renderer.canvas.drawGrid(star_renderer.constellations[i], Pixel.rgb(255, 255, 255), 3, local_sidereal_time, sin_lat, cos_lat);
@@ -201,9 +203,15 @@ pub export fn findWaypoints(start_lat: f32, start_long: f32, end_lat: f32, end_l
     const start = Coord{ .latitude = start_lat, .longitude = start_long };
     const end = Coord{ .latitude = end_lat, .longitude = end_long };
 
-    const great_circle = GreatCircle(num_waypoints).init(start, end);
+    const great_circle = GreatCircle.init(start, end);
+    var waypoint_iter = great_circle.getWaypoints(num_waypoints);
 
-    std.mem.copy(Coord, waypoints[0..], great_circle.waypoints[0..]);
+    var waypoint_index: usize = 0;
+    while (waypoint_iter.next()) |waypoint| : (waypoint_index += 1) {
+        waypoints[waypoint_index] = waypoint;
+    }
+
+    // std.mem.copy(Coord, waypoints[0..], great_circle.waypoints[0..]);
 
     return &waypoints;
 }

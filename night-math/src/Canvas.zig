@@ -7,11 +7,12 @@ const math_utils = @import("./math_utils.zig");
 const Point = math_utils.Point;
 const Line = math_utils.Line;
 
+const Constellation = @import("Constellation.zig");
 const Star = @import("Star.zig");
+
 const star_math = @import("./star_math.zig");
 const SkyCoord = star_math.SkyCoord;
 const ObserverPosition = star_math.ObserverPosition;
-const Constellation = star_math.Constellation;
 
 const fixed_point = @import("fixed_point.zig");
 const FixedPoint = fixed_point.FixedPoint(i16, 12);
