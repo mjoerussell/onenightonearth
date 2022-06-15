@@ -131,19 +131,17 @@ pub fn initializeConstellations(star_renderer: *StarRenderer, data: [*]u8) void 
     // the byte index where the boundary data stops, and then the byte index where the asterism data stops.
     // That will also be the end of the entire dataset
     const constellation_end_index = @intCast(usize, 12 + num_constellations * @sizeOf(ConstellationInfo));
-    const boundary_end_index = @intCast(usize, constellation_end_index + total_num_boundaries * @sizeOf(i16) * 2);
-    const asterism_end_index = @intCast(usize, boundary_end_index + total_num_asterisms * @sizeOf(i16) * 2);
+    const boundary_end_index = @intCast(usize, constellation_end_index + total_num_boundaries * @sizeOf(SkyCoord.ExternSkyCoord));
+    const asterism_end_index = @intCast(usize, boundary_end_index + total_num_asterisms * @sizeOf(SkyCoord.ExternSkyCoord));
 
     // We now know how big the data slice is, so defer freeing all of it
     defer allocator.free(data[0..asterism_end_index]);
 
     // Convert the data slices from u8's to something more accurate. The constellation metadata is in the form of ConstellationInfo's,
     // and the boundary and asterism data are stored as i16 (fixed point) right ascension/declination pairs
-    // @note Have to multiply total_num_(boundaries|asterisms) by 2 here because those numbers are for the total number of *coordinates*, which
-    //       includes both RA+dec. We're just getting each one individually as an i16, so we're getting 2 i16's per coord
     const constellation_data = @ptrCast([*]ConstellationInfo, data[12..constellation_end_index])[0..num_constellations];
-    const boundary_data = @ptrCast([*]i16, @alignCast(@alignOf(i16), &data[constellation_end_index]))[0..total_num_boundaries * 2];
-    const asterism_data = @ptrCast([*]i16, @alignCast(@alignOf(i16), &data[boundary_end_index]))[0..total_num_asterisms * 2];
+    const boundary_data = SkyCoord.ExternSkyCoord.unsafeSliceCast(data[constellation_end_index..boundary_end_index]);
+    const asterism_data = SkyCoord.ExternSkyCoord.unsafeSliceCast(data[boundary_end_index..asterism_end_index]);
 
     star_renderer.constellations = allocator.alloc(Constellation, num_constellations) catch {
         log.err("Error while allocating constellations: tried to allocate {} constellations\n", .{num_constellations});
@@ -154,8 +152,6 @@ pub fn initializeConstellations(star_renderer: *StarRenderer, data: [*]u8) void 
     var c_bound_start: usize = 0;
     var c_ast_start: usize = 0;
     for (star_renderer.constellations) |*c, c_index| {
-        // These are the number of coordinates, so again we'll have to multiply by 2 when talking about
-        // individual i16's and their indices/counts
         const num_boundaries = constellation_data[c_index].num_boundaries;
         const num_asterisms = constellation_data[c_index].num_asterisms;
         
@@ -168,20 +164,18 @@ pub fn initializeConstellations(star_renderer: *StarRenderer, data: [*]u8) void 
 
         // Get the correct boundary and asterism coords from the data slices
         for (c.boundaries) |*boundary, bound_index| {
-            const bound_coord_index = c_bound_start + 2 * bound_index;
-            boundary.right_ascension = FixedPoint.toFloat(boundary_data[bound_coord_index]);
-            boundary.declination = FixedPoint.toFloat(boundary_data[bound_coord_index + 1]);
+            const bound_coord_index = c_bound_start + bound_index;
+            boundary.* = boundary_data[bound_coord_index].toSkyCoord();
         }
 
         for (c.asterism) |*asterism, asterism_index| {
-            const asterism_coord_index = c_ast_start + 2 * asterism_index;
-            asterism.right_ascension = FixedPoint.toFloat(asterism_data[asterism_coord_index]);
-            asterism.declination = FixedPoint.toFloat(asterism_data[asterism_coord_index + 1]);
+            const asterism_coord_index = c_ast_start + asterism_index;
+            asterism.* = asterism_data[asterism_coord_index].toSkyCoord();
         }
 
         // Increment the base index for the boundaries and asterisms of the next constellation
-        c_bound_start += num_boundaries * 2;
-        c_ast_start += num_asterisms * 2;
+        c_bound_start += num_boundaries;
+        c_ast_start += num_asterisms;
     }
 }
 

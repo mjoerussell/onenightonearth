@@ -64,7 +64,7 @@ export class WasmInterface {
         return constellation_index;
     }
 
-    getConstellationCentroid(index: number): wasm.SkyCoord | null {
+    getConstellationCentroid(index: number): wasm.ExternSkyCoord | null {
         this.lib.getConstellationCentroid(this.renderer_ptr, index);
         const result_data = new Float32Array(this.memory, this.result_ptr, 2);
         return {
@@ -106,7 +106,7 @@ export class WasmInterface {
         };
     }
 
-    getCoordForSkyCoord(sky_coord: wasm.SkyCoord, timestamp: BigInt): wasm.Coord {
+    getCoordForSkyCoord(sky_coord: wasm.ExternSkyCoord, timestamp: BigInt): wasm.Coord {
         this.lib.getCoordForSkyCoord(sky_coord.right_ascension, sky_coord.declination, timestamp);
         const result_data = new Float32Array(this.memory, this.result_ptr, 2);
         return {

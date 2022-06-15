@@ -132,14 +132,14 @@ export const sizedExternStar: Sized<ExternStar> = {
 	spec_type: WasmPrimative.u8,
 };
 
-export type SkyCoord = {
+export type ExternSkyCoord = {
 	right_ascension: number;
 	declination: number;
 };
 
-export const sizedSkyCoord: Sized<SkyCoord> = {
-	right_ascension: WasmPrimative.f32,
-	declination: WasmPrimative.f32,
+export const sizedExternSkyCoord: Sized<ExternSkyCoord> = {
+	right_ascension: WasmPrimative.i16,
+	declination: WasmPrimative.i16,
 };
 
 export interface WasmModule {

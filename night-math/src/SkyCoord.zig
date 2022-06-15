@@ -2,10 +2,28 @@ const std = @import("std");
 const math = std.math;
 
 const math_utils = @import("math_utils.zig");
+const FixedPoint = @import("fixed_point.zig").DefaultFixedPoint;
 
 const Coord = @import("star_math.zig").Coord;
 
 const SkyCoord = @This();
+
+pub const ExternSkyCoord = extern struct {
+    right_ascension: i16,
+    declination: i16,
+
+    pub inline fn unsafeSliceCast(data: []u8) []ExternSkyCoord {
+        const coord_count = data.len / @sizeOf(ExternSkyCoord);
+        return @ptrCast([*]ExternSkyCoord, @alignCast(@alignOf(ExternSkyCoord), data))[0..coord_count];
+    }
+
+    pub fn toSkyCoord(sky_coord: ExternSkyCoord) SkyCoord {
+        return SkyCoord{
+            .right_ascension = FixedPoint.toFloat(sky_coord.right_ascension),
+            .declination = FixedPoint.toFloat(sky_coord.declination), 
+        };
+    }
+};
 
 right_ascension: f32 = 0,
 declination: f32 = 0,
