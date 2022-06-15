@@ -70,16 +70,6 @@ export const sizedCoord: Sized<Coord> = {
 	longitude: WasmPrimative.f32,
 };
 
-export type SkyCoord = {
-	right_ascension: number;
-	declination: number;
-};
-
-export const sizedSkyCoord: Sized<SkyCoord> = {
-	right_ascension: WasmPrimative.i16,
-	declination: WasmPrimative.i16,
-};
-
 export type Point = {
 	x: number;
 	y: number;
@@ -140,6 +130,16 @@ export const sizedExternStar: Sized<ExternStar> = {
 	declination: WasmPrimative.i16,
 	brightness: WasmPrimative.u8,
 	spec_type: WasmPrimative.u8,
+};
+
+export type SkyCoord = {
+	right_ascension: number;
+	declination: number;
+};
+
+export const sizedSkyCoord: Sized<SkyCoord> = {
+	right_ascension: WasmPrimative.f32,
+	declination: WasmPrimative.f32,
 };
 
 export interface WasmModule {

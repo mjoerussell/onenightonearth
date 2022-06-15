@@ -10,6 +10,15 @@ const imports = struct {
     pub const canvas = @import("src/Canvas.zig");
     pub const star = @import("src/Star.zig");
     pub const constellation = @import("src/Constellation.zig");
+    // @note This is just a hack for now, since SkyCoord was moved to its own file and so is no longer 'extern'
+    //       Eventually I'm going to want a different solution that doesn't require any updates to be made here, and
+    //       instead entirely relies on the actual codebase
+    pub const sky_coord = struct {
+        pub const SkyCoord = extern struct {
+            right_ascension: f32,
+            declination: f32,
+        };
+    };
 };
 
 fn writeTypescriptPrimative(comptime T: type, writer: anytype) !void {

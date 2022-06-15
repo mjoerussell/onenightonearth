@@ -3,8 +3,7 @@ const math = std.math;
 
 const FixedPoint = @import("fixed_point.zig").DefaultFixedPoint;
 
-const star_math = @import("star_math.zig");
-const SkyCoord = star_math.SkyCoord;
+const SkyCoord = @import("SkyCoord.zig");
 
 const Canvas = @import("Canvas.zig");
 const math_utils = @import("math_utils.zig");
@@ -56,8 +55,8 @@ pub fn centroid(constellation: Constellation) SkyCoord {
     var z: f32 = 0;
 
     for (constellation.boundaries) |b| {
-        const ra_f32 = FixedPoint.toFloat(b.right_ascension);
-        const dec_f32 = FixedPoint.toFloat(b.declination);
+        const ra_f32 = b.right_ascension;
+        const dec_f32 = b.declination;
         x += math.cos(dec_f32) * math.cos(ra_f32);
         y += math.cos(dec_f32) * math.sin(ra_f32);
         z += math.sin(dec_f32);
@@ -72,8 +71,8 @@ pub fn centroid(constellation: Constellation) SkyCoord {
     const central_lat = math.atan2(f32, z, central_sqrt);
 
     return SkyCoord{
-        .right_ascension = FixedPoint.fromFloat(central_long),
-        .declination = FixedPoint.fromFloat(central_lat)
+        .right_ascension = central_long,
+        .declination = central_lat,
     };
 }
 

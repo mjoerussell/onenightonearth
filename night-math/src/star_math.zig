@@ -21,21 +21,6 @@ pub const Coord = packed struct {
     longitude: f32,
 };
 
-pub const SkyCoord = packed struct {
-    right_ascension: i16 = 0,
-    declination: i16 = 0,
-
-    pub fn getCoord(sky_coord: SkyCoord, observer_timestamp: i64) Coord {
-        const partial_lst = getPartialLocalSiderealTime(observer_timestamp);
-        var longitude = FixedPoint.toFloat(sky_coord.right_ascension) - partial_lst;
-
-        return Coord{
-            .latitude = FixedPoint.toFloat(sky_coord.declination),
-            .longitude = longitude
-        };
-    }
-};
-
 pub const ObserverPosition = struct {
     latitude: f32,
     longitude: f32,

@@ -10,8 +10,8 @@ const Line = math_utils.Line;
 const Constellation = @import("Constellation.zig");
 const Star = @import("Star.zig");
 
+const SkyCoord = @import("SkyCoord.zig");
 const star_math = @import("./star_math.zig");
-const SkyCoord = star_math.SkyCoord;
 const ObserverPosition = star_math.ObserverPosition;
 
 const FixedPoint = @import("fixed_point.zig").DefaultFixedPoint;
@@ -161,8 +161,8 @@ pub fn projectAndRenderStarsWide(canvas: *Canvas, sky_coords: std.MultiArrayList
 pub fn coordToPoint(canvas: Canvas, sky_coord: SkyCoord, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32, filter_below_horizon: bool) ?Point {
     const two_pi = comptime math.pi * 2.0;
 
-    const right_ascension = FixedPoint.toFloat(sky_coord.right_ascension);
-    const declination = FixedPoint.toFloat(sky_coord.declination);
+    const right_ascension = sky_coord.right_ascension;
+    const declination = sky_coord.declination;
 
     const hour_angle = local_sidereal_time - right_ascension;
     const sin_dec = math.sin(declination);
