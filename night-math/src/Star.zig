@@ -8,8 +8,8 @@ const Pixel = @import("Canvas.zig").Pixel;
 const Star = @This();
 
 pub const ExternStar = packed struct {
-    right_ascension: u16,
-    declination: u16,
+    right_ascension: i16,
+    declination: i16,
     brightness: u8,
     spec_type: SpectralType,
 

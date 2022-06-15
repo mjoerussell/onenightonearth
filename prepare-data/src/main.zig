@@ -3,7 +3,7 @@ const fs = std.fs;
 const Allocator = std.mem.Allocator;
 
 const fp = @import("fixed_point.zig");
-const FixedPoint = fp.FixedPoint(u16, 13);
+const FixedPoint = fp.FixedPoint(i16, 12);
 
 /// A standard degree-to-radian conversion function.
 pub fn degToRad(degrees: anytype) @TypeOf(degrees) {
@@ -42,8 +42,8 @@ pub const SpectralType = enum(u8) {
 };
 
 pub const SkyCoord = packed struct {
-    right_ascension: u16,
-    declination: u16,
+    right_ascension: i16,
+    declination: i16,
 };
 
 pub const ConstellationInfo = packed struct {
@@ -154,8 +154,8 @@ pub const Constellation = struct {
                         var dec_value = try std.fmt.parseFloat(f32, declination);
 
                         const star_coord = SkyCoord{ 
-                            .right_ascension = FixedPoint.fromFloat(degToRad(ra_value)), 
-                            .declination = FixedPoint.fromFloat(degToRadLong(dec_value)),
+                            .right_ascension = FixedPoint.fromFloat(degToRadLong(ra_value)), 
+                            .declination = FixedPoint.fromFloat(degToRad(dec_value)),
                         };
 
                         try stars.put(star_name, star_coord);
@@ -185,8 +185,8 @@ pub const Constellation = struct {
                         const right_ascension = @intToFloat(f32, ra_hours * 15) + ((@intToFloat(f32, ra_minutes) / 60) * 15) + ((ra_seconds / 3600) * 15);
                         const dec_value = try std.fmt.parseFloat(f32, std.mem.trim(u8, declination, " "));
                         var boundary_coord = SkyCoord{
-                            .right_ascension = FixedPoint.fromFloat(degToRad(right_ascension)),
-                            .declination = FixedPoint.fromFloat(degToRadLong(dec_value)),
+                            .right_ascension = FixedPoint.fromFloat(degToRadLong(right_ascension)),
+                            .declination = FixedPoint.fromFloat(degToRad(dec_value)),
                         };
 
                         try boundary_list.append(boundary_coord);
@@ -203,8 +203,8 @@ pub const Constellation = struct {
 };
 
 pub const Star = packed struct {
-    right_ascension: u16,
-    declination: u16,
+    right_ascension: i16,
+    declination: i16,
     brightness: u8,
     spec_type: SpectralType,
 
@@ -249,8 +249,8 @@ pub const Star = packed struct {
             }
         }
 
-        star.right_ascension = FixedPoint.fromFloat(degToRad(right_ascension));
-        star.declination = FixedPoint.fromFloat(degToRadLong(declination));
+        star.right_ascension = FixedPoint.fromFloat(degToRadLong(right_ascension));
+        star.declination = FixedPoint.fromFloat(degToRad(declination));
 
         return star;
     }

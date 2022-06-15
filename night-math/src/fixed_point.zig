@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub const DefaultFixedPoint = FixedPoint(u16, 13);
+pub const DefaultFixedPoint = FixedPoint(i16, 12);
 
 pub fn FixedPoint(comptime Int: type, comptime fractional_bits: u8) type {
     if (!std.meta.trait.isIntegral(Int)) @compileError("FixedPoint requires an integer type as the target conversion");

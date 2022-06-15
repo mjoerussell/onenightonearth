@@ -76,8 +76,8 @@ export type SkyCoord = {
 };
 
 export const sizedSkyCoord: Sized<SkyCoord> = {
-	right_ascension: WasmPrimative.u16,
-	declination: WasmPrimative.u16,
+	right_ascension: WasmPrimative.i16,
+	declination: WasmPrimative.i16,
 };
 
 export type Point = {
@@ -136,8 +136,8 @@ export type ExternStar = {
 };
 
 export const sizedExternStar: Sized<ExternStar> = {
-	right_ascension: WasmPrimative.u16,
-	declination: WasmPrimative.u16,
+	right_ascension: WasmPrimative.i16,
+	declination: WasmPrimative.i16,
 	brightness: WasmPrimative.u8,
 	spec_type: WasmPrimative.u8,
 };
