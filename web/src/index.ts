@@ -195,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         controls.latitude = directed_add(controls.latitude, new_coord.latitude);
-        controls.longitude = directed_add(controls.longitude, -new_coord.longitude);
+        controls.longitude = directed_add(controls.longitude, new_coord.longitude);
 
         // Keep the longitude value in the range [-180, 180]
         if (controls.longitude > Math.PI) {
