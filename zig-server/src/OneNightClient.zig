@@ -150,7 +150,7 @@ fn handle(client: *OneNightClient, file_source: FileSource) !void {
         try response.header("Content-Length", file_data.len);
         try response.header("Content-Type", content_type);
         if (builtin.mode != .Debug) {
-            try response.header("Cache-Control", "max-age=600");
+            try response.header("Cache-Control", "max-age=3600");
         }
         if (file_source.is_compressed) {
             try response.header("Content-Encoding", "deflate");
@@ -199,7 +199,7 @@ fn handleIndex(allocator: Allocator, file_source: FileSource, request: http.Requ
     try response.header("Content-Length", index_data.len);
 
     if (builtin.mode != .Debug) {
-        try response.header("Cache-Control", "max-age=600");
+        try response.header("Cache-Control", "max-age=3600");
     }
 
     if (file_source.is_compressed) {
@@ -221,7 +221,7 @@ fn handleStars(allocator: Allocator, file_source: FileSource, request: http.Requ
     try response.header("Content-Length", star_data.len);
 
     if (builtin.mode != .Debug) {
-        try response.header("Cache-Control", "max-age=600");
+        try response.header("Cache-Control", "max-age=3600");
     }
 
     if (file_source.is_compressed) {
@@ -242,7 +242,7 @@ fn handleConstellations(allocator: Allocator, file_source: FileSource, request: 
     try response.header("Content-Length", const_data.len);
 
     if (builtin.mode != .Debug) {
-        try response.header("Cache-Control", "max-age=600");
+        try response.header("Cache-Control", "max-age=3600");
     }
 
     if (file_source.is_compressed) {
@@ -263,7 +263,7 @@ fn handleConstellationMetadata(allocator: Allocator, file_source: FileSource, re
     try response.header("Content-Length", const_meta_data.len);
 
     if (builtin.mode != .Debug) {
-        try response.header("Cache-Control", "max-age=600");
+        try response.header("Cache-Control", "max-age=3600");
     }
  
     if (file_source.is_compressed) {
