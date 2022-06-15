@@ -2,7 +2,7 @@ const std = @import("std");
 const math = std.math;
 
 const FixedPoint = @import("fixed_point.zig").DefaultFixedPoint;
-
+const ExternSkyCoord = @import("SkyCoord.zig").ExternSkyCoord;
 const Pixel = @import("Canvas.zig").Pixel;
 
 const Star = @This();
@@ -12,6 +12,18 @@ pub const ExternStar = packed struct {
     declination: i16,
     brightness: u8,
     spec_type: SpectralType,
+
+    pub fn toStar(ext_star: ExternStar) Star {
+        const right_ascension = FixedPoint.toFloat(ext_star.right_ascension);
+        const declination = FixedPoint.toFloat(ext_star.declination);
+        return .{
+            .right_ascension = right_ascension,
+            .declination = declination,
+            .sin_declination = math.sin(declination),
+            .cos_declination = math.cos(declination),
+            .pixel = ext_star.getColor(),
+        };
+    }
 
     pub fn getColor(star: ExternStar) Pixel {
         var base_color = star.spec_type.getColor();
@@ -64,15 +76,3 @@ declination: f32,
 sin_declination: f32,
 cos_declination: f32,
 pixel: Pixel,
-
-pub fn fromExternStar(ext_star: ExternStar) Star {
-    const right_ascension = FixedPoint.toFloat(ext_star.right_ascension);
-    const declination = FixedPoint.toFloat(ext_star.declination);
-    return .{
-        .right_ascension = right_ascension,
-        .declination = declination,
-        .sin_declination = math.sin(declination),
-        .cos_declination = math.cos(declination),
-        .pixel = ext_star.getColor(),
-    };
-}

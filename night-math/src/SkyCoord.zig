@@ -13,8 +13,7 @@ pub const ExternSkyCoord = extern struct {
     declination: i16,
 
     pub inline fn unsafeSliceCast(data: []u8) []ExternSkyCoord {
-        const coord_count = data.len / @sizeOf(ExternSkyCoord);
-        return @ptrCast([*]ExternSkyCoord, @alignCast(@alignOf(ExternSkyCoord), data))[0..coord_count];
+        return @bitCast([]ExternSkyCoord, data);
     }
 
     pub fn toSkyCoord(sky_coord: ExternSkyCoord) SkyCoord {

@@ -64,7 +64,7 @@ pub fn initializeStars(star_renderer: *StarRenderer, stars: []ExternStar) void {
     };
 
     for (stars) |star| {
-        star_renderer.stars.appendAssumeCapacity(Star.fromExternStar(star));
+        star_renderer.stars.appendAssumeCapacity(star.toStar());
     }
 
     allocator.free(stars);
