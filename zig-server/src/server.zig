@@ -31,7 +31,10 @@ const WindowsServer = struct {
     pub fn listen(server: *Server, address: net.Address) !void {
         const flags = os.windows.ws2_32.WSA_FLAG_OVERLAPPED | os.windows.ws2_32.WSA_FLAG_NO_HANDLE_INHERIT;
         const socket = try os.windows.WSASocketW(@intCast(i32, address.any.family), @as(i32, os.SOCK.STREAM), @as(i32, os.IPPROTO.TCP), null, 0, flags);
-        errdefer os.windows.closesocket(socket) catch unreachable;
+        errdefer |err| {
+            std.log.err("Error occurred while listening on address {}: {}", .{address, err});
+            os.windows.closesocket(socket) catch unreachable;
+        }
 
         if (is_single_threaded) {
             // Make the socket non-blocking so that we don't get blocked on accept() in single-threaded mode

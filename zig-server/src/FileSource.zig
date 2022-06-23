@@ -90,14 +90,14 @@ fn deinitFileMapping(mapping: []const u8) void {
     }
 }
 
-pub fn getFile(file_source: FileSource, path: []const u8) ![]const u8 {
+pub fn getFile(file_source: FileSource, allocator: Allocator, path: []const u8) ![]const u8 {
     const clean_path = if (std.mem.startsWith(u8, path, "/")) path[1..] else path;
     if (builtin.mode == .Debug) {
         const absolute_path = try getAbsolutePath(clean_path);
         var file = try fs.cwd().openFile(absolute_path, .{});
         defer file.close();
 
-        return try file.readToEndAlloc(file_source.allocator, std.math.maxInt(u32));
+        return try file.readToEndAlloc(allocator, std.math.maxInt(u32));
     }
     return file_source.mapped_files.get(clean_path) orelse error.FileNotFound;
 }

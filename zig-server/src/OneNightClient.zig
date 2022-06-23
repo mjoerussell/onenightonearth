@@ -112,6 +112,8 @@ fn handle(client: *OneNightClient, file_source: FileSource) !void {
         return;
     };
 
+    log.debug("Handling request for {s}", .{uri});
+
     // If the request uri has a registered handler, then use it to processs the request and generate the response
     if (route_handlers.get(uri)) |handler| {
         // Get the response from the handler. If an error occurs, then get a 500 reponse
@@ -124,7 +126,7 @@ fn handle(client: *OneNightClient, file_source: FileSource) !void {
     } else {
         // If this doesn't match an 'api' (as defined in route_handlers) then we'll assume that the user is trying to fetch a file
         // We'll use file_source to try to read the file. If there's an error, then we'll handle it appropriately.
-        const file_data = file_source.getFile(uri) catch |err| switch (err) {
+        const file_data = file_source.getFile(allocator, uri) catch |err| switch (err) {
             error.FileNotFound => {
                 // The file either a) doesn't exist or b) is not one of the files registered in FileSource to be readable
                 log.warn("Client tried to get file {s}, but it could not be found", .{uri});
@@ -192,7 +194,8 @@ fn getContentType(filename: []const u8) ?[]const u8 {
 fn handleIndex(allocator: Allocator, file_source: FileSource, request: http.Request) !http.Response {
     _ = request;
 
-    var index_data = try file_source.getFile("index.html");
+    var index_data = try file_source.getFile(allocator, "index.html");
+
     var response = http.Response.init(allocator);
     response.status = .ok;
     try response.header("Content-Type", "text/html");
@@ -213,7 +216,7 @@ fn handleIndex(allocator: Allocator, file_source: FileSource, request: http.Requ
 /// Handle the /stars endpoint. Returns the star data buffer as an octet-stream.
 fn handleStars(allocator: Allocator, file_source: FileSource, request: http.Request) !http.Response {
     _ = request;
-    var star_data = try file_source.getFile("star_data.bin");
+    var star_data = try file_source.getFile(allocator, "star_data.bin");
 
     var response = http.Response.init(allocator);
     response.status = .ok;
@@ -235,7 +238,7 @@ fn handleStars(allocator: Allocator, file_source: FileSource, request: http.Requ
 /// Handle the /constellations endpoint. Returns the constellation data buffer as an octet-stream.
 fn handleConstellations(allocator: Allocator, file_source: FileSource, request: http.Request) !http.Response {
     _ = request;
-    var const_data = try file_source.getFile("const_data.bin");
+    var const_data = try file_source.getFile(allocator, "const_data.bin");
 
     var response = http.Response.init(allocator);
     try response.header("Content-Type", "application/octet-stream");
@@ -255,7 +258,7 @@ fn handleConstellations(allocator: Allocator, file_source: FileSource, request: 
 /// Handle the /constellations/meta endpoint. Returns the constellation metadata as a JSON-encoded value.
 fn handleConstellationMetadata(allocator: Allocator, file_source: FileSource, request: http.Request) !http.Response {
     _ = request;
-    var const_meta_data = try file_source.getFile("const_meta.json");
+    var const_meta_data = try file_source.getFile(allocator, "const_meta.json");
 
     var response = http.Response.init(allocator);
     response.status = .ok;
