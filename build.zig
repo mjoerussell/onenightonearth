@@ -1,10 +1,20 @@
 const std = @import("std");
-const build = std.build;
+const Allocator = std.mem.Allocator;
 
-pub fn link(exe: *build.LibExeObjStep, path: []const u8) void {
-    exe.addPackage(.{
+pub fn link(exe: *std.build.LibExeObjStep, allocator: Allocator, package_path: []const u8) !void {
+    const lib_path = try std.fmt.allocPrint(allocator, "{s}/src/lib.zig", .{package_path});
+    defer allocator.free(lib_path);
+    
+    const http_lib_path = try std.fmt.allocPrint(allocator, "{s}/http/src/lib.zig", .{package_path});
+    defer allocator.free(http_lib_path);
+
+    exe.addPackage(std.build.Pkg{
         .name = "tortie",
-        .path = build.FileSource.relative(path),
+        .source = std.build.FileSource.relative(lib_path),
+        .dependencies = &[_]std.build.Pkg{ .{
+            .name = "http",
+            .source = std.build.FileSource.relative(http_lib_path),
+        }},
     });
 }
 
@@ -24,8 +34,6 @@ pub fn build(b: *std.build.Builder) !void {
     exe.setTarget(target);
     exe.setBuildMode(mode);
     exe.install();
-
-    exe.single_threaded = is_single_threaded orelse false;
 
     exe.addPackagePath("http", "http/src/lib.zig");
 
