@@ -50,13 +50,11 @@ const allowed_paths_absolute = [_][]const u8{
 };
 
 mapped_files: std.StringHashMap([]const u8),
-allocator: Allocator,
 is_compressed: bool = builtin.mode != .Debug,
 
 pub fn init(allocator: Allocator) !FileSource {
     var file_source = FileSource{ 
         .mapped_files = std.StringHashMap([]const u8).init(allocator), 
-        .allocator = allocator,
     };
     errdefer file_source.deinit();
 
@@ -67,7 +65,7 @@ pub fn init(allocator: Allocator) !FileSource {
             else => return err,
         };
 
-        try file_source.initFileMappings();
+        try file_source.initFileMappings(allocator);
     }
 
     return file_source;
@@ -124,9 +122,9 @@ fn getAbsolutePath(path: []const u8) error{FileNotFound}![]const u8 {
 ///
 /// For both sets of files, the mapped data will be inserted into the `mapped_files` hash map with the unmodified
 /// paths set as the keys.
-fn initFileMappings(file_source: *FileSource) !void {
+fn initFileMappings(file_source: *FileSource, allocator: Allocator) !void {
     inline for (allowed_paths_relative) |file_path| {
-        var mapping = try createFileMapping(file_source.allocator, FileSource.relative_dir ++ file_path);
+        var mapping = try createFileMapping(allocator, FileSource.relative_dir ++ file_path);
         errdefer deinitFileMapping(mapping);
 
         try file_source.mapped_files.putNoClobber(file_path, mapping);
