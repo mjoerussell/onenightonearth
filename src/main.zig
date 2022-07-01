@@ -1,7 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const Server = @import("MRServer.zig");
+const Server = @import("TortieServer.zig");
 
 pub const log_level = switch (builtin.mode) {
     .Debug => .debug,

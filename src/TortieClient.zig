@@ -7,7 +7,7 @@ const Timer = std.time.Timer;
 
 const http = @import("http");
 
-const log = std.log.scoped(.night_client);
+const log = std.log.scoped(.tortie_client);
 
 const TortieClient = @This();
 

@@ -4,7 +4,7 @@ const Allocator = std.mem.Allocator;
 
 const TortieServer = @This();
 
-const Client = @import("MRClient.zig");
+const Client = @import("TortieClient.zig");
 const Server = @import("server.zig").Server;
 const EventLoop = @import("event_loop.zig").EventLoop;
 const FileSource = @import("FileSource.zig");
