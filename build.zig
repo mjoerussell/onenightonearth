@@ -1,4 +1,12 @@
 const std = @import("std");
+const build = std.build;
+
+pub fn link(exe: *build.LibExeObjStep, path: []const u8) void {
+    exe.addPackage(.{
+        .name = "tortie",
+        .path = build.FileSource.relative(path),
+    });
+}
 
 pub fn build(b: *std.build.Builder) !void {
     // Standard target options allows the person running `zig build` to choose
