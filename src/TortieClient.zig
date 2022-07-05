@@ -1,8 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
-const os = std.os;
-const net = std.net;
 const Timer = std.time.Timer;
 
 const http = @import("http");
@@ -14,20 +12,12 @@ const TortieClient = @This();
 const CommonClient = @import("client.zig").Client;
 const EventLoop = @import("event_loop.zig").EventLoop;
 const FileSource = @import("FileSource.zig");
+const Route = @import("Route.zig");
 
 const Connection = switch (builtin.os.tag) {
     .windows, .linux => std.os.socket_t,
-    else => net.StreamServer.Connection,
+    else => std.net.StreamServer.Connection,
 };
-
-// Used to map a URI to a handler function.
-const RequestHandler = fn (Allocator, FileSource, http.Request) anyerror!http.Response;
-const route_handlers = std.ComptimeStringMap(RequestHandler, .{
-    .{ "/", handleIndex },
-    .{ "/stars", handleStars },
-    .{ "/constellations", handleConstellations },
-    .{ "/constellations/meta", handleConstellationMetadata },
-});
 
 common_client: CommonClient,
 handle_frame: *@Frame(TortieClient.handle) = undefined,
@@ -62,11 +52,11 @@ pub fn close(client: *TortieClient) void {
     @atomicStore(bool, &client.connected, false, .SeqCst);
 }
 
-pub fn run(client: *TortieClient, file_source: FileSource) void {
-    client.handle_frame.* = async client.handle(file_source);
+pub fn run(client: *TortieClient, file_source: ?FileSource, routes: []Route) void {
+    client.handle_frame.* = async client.handle(file_source, routes);
 }
 
-fn handle(client: *TortieClient, file_source: FileSource) !void {   
+fn handle(client: *TortieClient, file_source: ?FileSource, routes: []Route) !void {   
     // Each client will only handle 1 request/response (http1.1), so after handling is complete we'll close the connection
     defer client.close();
     errdefer |err| {
@@ -114,54 +104,61 @@ fn handle(client: *TortieClient, file_source: FileSource) !void {
 
     log.debug("Handling request for {s}", .{uri});
 
-    // If the request uri has a registered handler, then use it to processs the request and generate the response
-    if (route_handlers.get(uri)) |handler| {
-        // Get the response from the handler. If an error occurs, then get a 500 reponse
-        var response = handler(allocator, file_source, request) catch |err| blk: {
-            log.err("Error handling request at {s}: {}", .{uri, err});
-            break :blk http.Response.initStatus(allocator, .internal_server_error);
-        };
-        // Send the response
-        try response.write(writer);
-    } else {
-        // If this doesn't match an 'api' (as defined in route_handlers) then we'll assume that the user is trying to fetch a file
-        // We'll use file_source to try to read the file. If there's an error, then we'll handle it appropriately.
-        const file_data = file_source.getFile(allocator, uri) catch |err| switch (err) {
-            error.FileNotFound => {
-                // The file either a) doesn't exist or b) is not one of the files registered in FileSource to be readable
-                log.warn("Client tried to get file {s}, but it could not be found", .{uri});
-                var response = http.Response.initStatus(allocator, .not_found);
-                try response.write(writer);
-                return;
-            },
-            else => {
-                // Some unknown error occurred, just send 500 back
-                log.err("Error when trying to get file {s}: {}", .{uri, err});
-                var response = http.Response.initStatus(allocator, .internal_server_error);
-                try response.write(writer);
-                return;
-            }
-        };
-
-        // Start building the file response
-        // getContentType can't return null here because we know at this point that the file the client is fetching
-        // is a know file in FileSource, and all of the known files have valid file extensions for getContentType
-        const content_type = getContentType(uri).?;
-        
-        var response = http.Response.init(allocator);    
-        try response.header("Content-Length", file_data.len);
-        try response.header("Content-Type", content_type);
-        if (builtin.mode != .Debug) {
-            try response.header("Cache-Control", "max-age=3600");
+    for (routes) |route| {
+        if (route.matches(uri)) {
+            var response = route.handler(allocator, file_source, request) catch |err| blk: {
+                log.err("Error handling request {s}: {}", .{uri, err});
+                break :blk http.Response.initStatus(allocator, .internal_server_error);
+            };
+            try response.write(writer);
+            return;
         }
-        if (file_source.is_compressed) {
-            try response.header("Content-Encoding", "deflate");
-        }
-        response.body = file_data;
-
-        // Send the response
-        try response.write(writer);
     }
+
+    if (file_source == null) {
+        log.warn("Client tried to get file {s}, but no files are available", .{uri});
+        var response = http.Response.initStatus(allocator, .not_found);
+        try response.write(writer);
+        return;
+    }
+
+    // If this doesn't match an 'api' (as defined in route_handlers) then we'll assume that the user is trying to fetch a file
+    // We'll use file_source to try to read the file. If there's an error, then we'll handle it appropriately.
+    const file_data = file_source.?.getFile(uri) catch |err| switch (err) {
+        error.FileNotFound => {
+            // The file either a) doesn't exist or b) is not one of the files registered in FileSource to be readable
+            log.warn("Client tried to get file {s}, but it could not be found", .{uri});
+            var response = http.Response.initStatus(allocator, .not_found);
+            try response.write(writer);
+            return;
+        },
+        else => {
+            // Some unknown error occurred, just send 500 back
+            log.err("Error when trying to get file {s}: {}", .{uri, err});
+            var response = http.Response.initStatus(allocator, .internal_server_error);
+            try response.write(writer);
+            return;
+        }
+    };
+
+    // Start building the file response
+    // getContentType can't return null here because we know at this point that the file the client is fetching
+    // is a know file in FileSource, and all of the known files have valid file extensions for getContentType
+    const content_type = getContentType(uri).?;
+    
+    var response = http.Response.init(allocator);    
+    try response.header("Content-Length", file_data.len);
+    try response.header("Content-Type", content_type);
+    if (!file_source.?.config.hot_reload) {
+        try response.header("Cache-Control", "max-age=3600");
+    }
+    if (file_source.?.config.should_compress) {
+        try response.header("Content-Encoding", "deflate");
+    }
+    response.body = file_data;
+
+    // Send the response
+    try response.write(writer);
 }
 
 /// Gets the content-type of a file using the file extension. Only supports css, html, js, wasm, and ico files currently
@@ -187,92 +184,4 @@ fn getContentType(filename: []const u8) ?[]const u8 {
     }
 
     return null;
-}
-
-/// Handle the main index.html page. This is used instead of a FileSource file so that users can navigate to 
-/// onenightonearth.com instead of onenightonearth.com/index.html
-fn handleIndex(allocator: Allocator, file_source: FileSource, request: http.Request) !http.Response {
-    _ = request;
-
-    var index_data = try file_source.getFile(allocator, "index.html");
-
-    var response = http.Response.init(allocator);
-    response.status = .ok;
-    try response.header("Content-Type", "text/html");
-    try response.header("Content-Length", index_data.len);
-
-    if (builtin.mode != .Debug) {
-        try response.header("Cache-Control", "max-age=3600");
-    }
-
-    if (file_source.is_compressed) {
-        try response.header("Content-Encoding", "deflate");
-    }
-    response.body = index_data;
-
-    return response;
-}
-
-/// Handle the /stars endpoint. Returns the star data buffer as an octet-stream.
-fn handleStars(allocator: Allocator, file_source: FileSource, request: http.Request) !http.Response {
-    _ = request;
-    var star_data = try file_source.getFile(allocator, "star_data.bin");
-
-    var response = http.Response.init(allocator);
-    response.status = .ok;
-    try response.header("Content-Type", "application/octet-stream");
-    try response.header("Content-Length", star_data.len);
-
-    if (builtin.mode != .Debug) {
-        try response.header("Cache-Control", "max-age=3600");
-    }
-
-    if (file_source.is_compressed) {
-        try response.header("Content-Encoding", "deflate");
-    }
-    response.body = star_data;
-
-    return response;
-}
-
-/// Handle the /constellations endpoint. Returns the constellation data buffer as an octet-stream.
-fn handleConstellations(allocator: Allocator, file_source: FileSource, request: http.Request) !http.Response {
-    _ = request;
-    var const_data = try file_source.getFile(allocator, "const_data.bin");
-
-    var response = http.Response.init(allocator);
-    try response.header("Content-Type", "application/octet-stream");
-    try response.header("Content-Length", const_data.len);
-
-    if (builtin.mode != .Debug) {
-        try response.header("Cache-Control", "max-age=3600");
-    }
-
-    if (file_source.is_compressed) {
-        try response.header("Content-Encoding", "deflate");
-    }
-    response.body = const_data;
-    return response;
-}
-
-/// Handle the /constellations/meta endpoint. Returns the constellation metadata as a JSON-encoded value.
-fn handleConstellationMetadata(allocator: Allocator, file_source: FileSource, request: http.Request) !http.Response {
-    _ = request;
-    var const_meta_data = try file_source.getFile(allocator, "const_meta.json");
-
-    var response = http.Response.init(allocator);
-    response.status = .ok;
-    try response.header("Content-Type", "application/json");
-    try response.header("Content-Length", const_meta_data.len);
-
-    if (builtin.mode != .Debug) {
-        try response.header("Cache-Control", "max-age=3600");
-    }
- 
-    if (file_source.is_compressed) {
-        try response.header("Content-Encoding", "deflate");
-    }
-    response.body = const_meta_data;
-
-    return response;
 }
