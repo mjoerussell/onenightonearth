@@ -5,213 +5,212 @@ const Allocator = std.mem.Allocator;
 
 const log = std.log.scoped(.file_source);
 
-extern fn CreateFileMappingA(
-    hFile: std.os.windows.HANDLE, 
-    lpFileMappingAttributes: ?[*]std.os.windows.SECURITY_ATTRIBUTES,
-    flProtect: u32,
-    dwMaximumSizeHigh: u32,
-    dwMaximumSizeLow: u32,
-    lpName: ?[*]const u8
-) callconv(.C) std.os.windows.HANDLE;
-
-extern fn MapViewOfFile(
-    hFileMappingObject: std.os.windows.HANDLE,
-    dwDesiredAccess: u32,
-    dwFileOffsetHigh: u32,
-    dwFileOffsetLow: u32,
-    dwNumberOfBytesToMap: usize,
-) callconv(.C) *anyopaque;
-
-extern fn UnmapViewOfFile(lpBaseAddress: *anyopaque) callconv(.C) c_int;
-
 const FileSource = @This();
 
 pub const GetFileError = error{ FileNotFound, OutOfMemory, OpenError, FileTooBig };
 
-const relative_dir = "static/";
-const compressed_file_prefix = "compressed/";
-/// These paths are relative to `index.html`, not the server. To get paths relative to
-/// the server, prepend `relative_dir`.
-///
-/// The reason for this is that these are the paths that are going to be included in the 'uri' component
-/// of an http request. Storing them like this allows us to modify that value as little as possible.
-const allowed_paths_relative = [_][]const u8{
-    "index.html",
-    "styles/main.css",
-    "favicon.ico",
+pub const FilePath = union(enum) {
+    /// Define the necessary hashing functions used to use values of this struct
+    /// as keys in a hash map.
+    const HashContext = struct {
+        pub fn hash(ctx: @This(), key: FilePath) u64 {
+            const Wyhash = std.hash.Wyhash;
+            _ = ctx;
+            return switch (key) {
+                .absolute => |path| Wyhash.hash(0, path),
+                .relative => |path| blk: {
+                    const dir_hash = Wyhash.hash(0, path.dir_path);
+                    break :blk Wyhash.hash(dir_hash, path.relative_path);
+                },
+            };
+        }
+
+        pub fn eql(ctx: @This(), a: FilePath, b: FilePath) bool {
+            _ = ctx;
+            return switch (a) {
+                .absolute => |a_path| switch (b) {
+                    .absolute => |b_path| std.mem.eql(u8, a_path, b_path),
+                    .relative => false,
+                },
+                .relative => |a_path| switch (b) {
+                    .absolute => false,
+                    .relative => |b_path| blk: {
+                        const dir_eql = std.mem.eql(u8, a_path.dir_path, b_path.dir_path);
+                        const file_path_eql = std.mem.eql(u8, a_path.relative_path, b_path.relative_path);
+                        break :blk dir_eql and file_path_eql;
+                    },
+                },
+            };
+        }
+    };
+
+    absolute: []const u8,
+    relative: struct {
+        dir_path: []const u8,
+        relative_path: []const u8,
+    },
+
+    /// Create a new absolute file path. The input path will be used, unmodified, when trying to open the file at
+    /// the specified location.
+    pub fn absolute(path: []const u8) FilePath {
+        return FilePath{ .absolute = path };
+    }
+
+    /// Create a new relative file path. The first parameter is the relative prefix, which can be *ignored* for the purpose
+    /// of looking up the file.
+    ///
+    /// The intended use of the relative path is to allow the client to ask for static files by some kind of relative path
+    /// (for instance, relative to `index.html`) without having to know what the static directory is. File lookup will be
+    /// performed using the two paths concatenated together with a file separator in-between.
+    pub fn relative(dir_path: []const u8, relative_file_path: []const u8) FilePath {
+        return FilePath{
+            .relative = .{ 
+                .dir_path = dir_path,
+                .relative_path = relative_file_path,
+            },
+        };
+    }
+
+    /// Get the full file path represented by this `FilePath` object. `absolute` paths will return
+    /// the inner value unmodified, will not allocate, and cannot fail. `relative` paths will concatenate
+    /// the `dir_path` and `relative_path` values with a path separator in-between. This concatenation does
+    /// allocate, and therefore can fail.
+    pub fn getFullPath(file_path: FilePath, allocator: Allocator) ![]const u8 {
+        switch (file_path) {
+            .absolute => |fp| return fp,
+            .relative => |fp| {
+                var path_buf = try allocator.alloc(u8, fp.dir_path.len + fp.relative_path.len + 1);
+                std.mem.copy(u8, path_buf, fp.dir_path);
+                path_buf[fp.dir_path.len] = '/';
+                std.mem.copy(u8, path_buf[fp.dir_path.len + 1..], fp.relative_path);
+                return path_buf;
+            },
+        }
+    }
+
+    /// Try to open the file at the path represented by this `FilePath` object.
+    pub fn open(file_path: FilePath, allocator: Allocator) !fs.File {
+        const full_path = try file_path.getFullPath(allocator);
+        const cwd = fs.cwd();
+        return try cwd.openFile(full_path, .{});
+    }
+
+    /// Test to see if the given path matches this `FilePath`. For `absolute` file paths, the input
+    /// value and the stored path value will be compared directly. For `relative` file paths, the
+    /// input value will only be compared against the `relative_path` value.
+    pub fn matches(file_path: FilePath, test_path: []const u8) bool {
+        return switch (file_path) {
+            .absolute => |fp| std.mem.eql(u8, fp, test_path),
+            .relative => |fp| std.mem.eql(u8, fp.relative_path, test_path),
+        };
+    }
 };
 
-const allowed_paths_absolute = [_][]const u8{};
+const FilePathHashMap = std.HashMap(FilePath, []const u8, FilePath.HashContext, std.hash_map.default_max_load_percentage);
 
-mapped_files: std.StringHashMap([]const u8),
-is_compressed: bool = builtin.mode != .Debug,
+pub const FileSourceConfig = struct {
+    should_compress: bool = builtin.mode != .Debug,
+    hot_reload: bool = builtin.mode == .Debug,
+};
 
-pub fn init(allocator: Allocator) !FileSource {
-    var file_source = FileSource{ 
-        .mapped_files = std.StringHashMap([]const u8).init(allocator), 
+allocator: Allocator,
+allowed_paths: []const FilePath,
+mapped_files: FilePathHashMap,
+config: FileSourceConfig,
+
+pub fn init(allocator: Allocator, allowed_paths: []const FilePath, config: FileSourceConfig) !FileSource {
+    var file_source = FileSource{
+        .allocator = allocator,
+        .allowed_paths = allowed_paths,
+        .mapped_files = FilePathHashMap.init(allocator),
+        .config = config,
     };
     errdefer file_source.deinit();
 
-    if (builtin.mode != .Debug) {
-        const cwd = fs.cwd();
-        cwd.makeDir(compressed_file_prefix) catch |err| switch (err) {
-            error.PathAlreadyExists => {},
-            else => return err,
-        };
+    // If the file source is configured to hot reload its files, then there's no point in
+    // loading everything into memory - the files are going to be re-read every time they're accessed.
+    // In that case, we're done initializing
+    if (file_source.config.hot_reload) return file_source;
 
-        try file_source.initFileMappings(allocator);
+    for (allowed_paths) |path| {
+        var file = try path.open(allocator);
+        defer file.close();
+
+        var contents = try file.readToEndAlloc(allocator, std.math.maxInt(u32));
+        if (file_source.config.should_compress) {
+            defer allocator.free(contents);
+
+            var compressed = try copyAndCompress(allocator, contents);
+            try file_source.mapped_files.put(path, compressed);
+        } else {
+            try file_source.mapped_files.put(path, contents);
+        }
     }
 
     return file_source;
 }
 
-/// Unmap all files and deinitialize the `mapped_files` hash map.
 pub fn deinit(file_source: *FileSource) void {
-    var iter = file_source.mapped_files.valueIterator();
-    while (iter.next()) |mapping| {
-        deinitFileMapping(mapping.*);
+    var file_iter = file_source.mapped_files.valueIterator();
+    while (file_iter.next()) |value| {
+        file_source.allocator.free(value.*);
     }
+
+    file_source.allocator.free(file_source.allowed_paths);
     file_source.mapped_files.deinit();
 }
 
-/// Unmap a file from memory.
-fn deinitFileMapping(mapping: []const u8) void {
-    switch (builtin.os.tag) {
-        .windows => _ = UnmapViewOfFile(@intToPtr(*anyopaque, @ptrToInt(mapping.ptr))),
-        else => std.os.munmap(@alignCast(std.mem.page_size, mapping)),
+pub fn getFile(file_source: FileSource, path: []const u8) ![]const u8 {
+    const clean_path = if (path[0] == '/') path[1..] else path;
+
+    if (file_source.getAllowedFilePath(clean_path)) |allowed_path| {
+        if (file_source.config.hot_reload) {
+            var file = try allowed_path.open(file_source.allocator);
+            defer file.close();
+
+            const content = try file.readToEndAlloc(file_source.allocator, std.math.maxInt(u32));
+            if (file_source.config.should_compress) {
+                defer file_source.allocator.free(content);
+                return try copyAndCompress(file_source.allocator, content);
+            } 
+            
+            return content;
+        } 
+        
+        return file_source.mapped_files.get(allowed_path) orelse error.FileNotFound;
     }
+
+    log.debug("File {s} was not in the list of allowed paths", .{path});
+    return error.FileNotFound;
 }
 
-pub fn getFile(file_source: FileSource, allocator: Allocator, path: []const u8) ![]const u8 {
-    const clean_path = if (std.mem.startsWith(u8, path, "/")) path[1..] else path;
-    if (builtin.mode == .Debug) {
-        const absolute_path = try getAbsolutePath(clean_path);
-        var file = try fs.cwd().openFile(absolute_path, .{});
-        defer file.close();
-
-        return try file.readToEndAlloc(allocator, std.math.maxInt(u32));
-    }
-    return file_source.mapped_files.get(clean_path) orelse error.FileNotFound;
-}
-
-fn getAbsolutePath(path: []const u8) error{FileNotFound}![]const u8 {
-    inline for (FileSource.allowed_paths_relative) |allowed_path| {
-        if (std.mem.eql(u8, allowed_path, path)) {
-            return FileSource.relative_dir ++ allowed_path;
-        }
-    }
-
-    inline for (FileSource.allowed_paths_absolute) |allowed_path| {
-        if (std.mem.eql(u8, allowed_path, path)) {
+/// Iterate over the allowed file paths and return the first one that matches
+/// the input path. If none are a match, then return `null`.
+fn getAllowedFilePath(file_source: FileSource, path: []const u8) ?FilePath {
+    for (file_source.allowed_paths) |allowed_path| {
+        if (allowed_path.matches(path)) {
             return allowed_path;
         }
     }
 
-    return error.FileNotFound;
+    return null;
 }
 
-/// Initialize all of the file mappings for the files defined in `allowed_paths_relative` and `allowed_paths_absolue`.
-/// The difference between these two sets of paths is that paths in `allowed_paths_relative` will be prepended with
-/// `FileSource.relative_dir` before being opened, while `allowed_paths_absolute` are not modified.
-///
-/// For both sets of files, the mapped data will be inserted into the `mapped_files` hash map with the unmodified
-/// paths set as the keys.
-fn initFileMappings(file_source: *FileSource, allocator: Allocator) !void {
-    inline for (allowed_paths_relative) |file_path| {
-        var mapping = try createFileMapping(allocator, FileSource.relative_dir ++ file_path);
-        errdefer deinitFileMapping(mapping);
-
-        try file_source.mapped_files.putNoClobber(file_path, mapping);
-    }
-
-    inline for (allowed_paths_absolute) |file_path| {
-        var mapping = try createFileMapping(file_source.allocator, file_path);
-        errdefer deinitFileMapping(mapping);
-
-        try file_source.mapped_files.putNoClobber(file_path, mapping);
-    }
+pub fn deinitFile(file_source: FileSource, content: []const u8) void {
+    if (!file_source.config.hot_reload) return;
+    file_source.allocator.free(content);
 }
 
-fn createFileMapping(allocator: Allocator, file_path: []const u8) ![]const u8 {
-    const clean_path = blk: {
-        if (std.mem.startsWith(u8, file_path, FileSource.relative_dir)) {
-            break :blk file_path[FileSource.relative_dir.len..];
-        } else {
-            break :blk file_path;
-        }
-    };
+fn copyAndCompress(allocator: Allocator, source: []const u8) ![]const u8 {
+    var dest_buffer = std.ArrayList(u8).init(allocator);
+    errdefer dest_buffer.deinit();
     
-    var dest_path_buf: [FileSource.compressed_file_prefix.len + 100]u8 = undefined;
-
-
-    var dest_path = try std.fmt.bufPrint(&dest_path_buf, FileSource.compressed_file_prefix ++ "{s}", .{clean_path});
-    log.debug("Writing compressed file to path {s}", .{dest_path});
-    
-    var target_file = try copyAndCompress(allocator, file_path, dest_path);
-    defer target_file.close();
-
-    const file_size = blk: {
-        const stat = target_file.stat() catch break :blk 0;
-        break :blk stat.size;
-    };
-
-    return switch (builtin.os.tag) {
-        .windows => blk: {
-            var map_handle = CreateFileMappingA(target_file.handle, null, std.os.windows.PAGE_READONLY, 0, 0, null);
-            defer std.os.windows.CloseHandle(map_handle);
-
-            break :blk @ptrCast([*]u8, MapViewOfFile(map_handle, 0x0004, 0, 0, 0))[0..file_size];
-        },
-        else => try std.os.mmap(null, file_size, std.os.PROT.READ, std.os.linux.MAP.PRIVATE, target_file.handle, 0),
-    };
-}
-
-fn copyAndCompress(allocator: Allocator, source: []const u8, destination: []const u8) !fs.File {
-    const cwd = fs.cwd();
-
-    var source_file = cwd.openFile(source, .{}) catch |err| {
-        log.err("Error opening file {s}: {}", .{source, err});
-        return err;
-    };
-    defer source_file.close();
-    
-    var dest_file = try createFileAtPath(destination);
-    errdefer dest_file.close();
-
-    var compressor = try std.compress.deflate.compressor(allocator, dest_file.writer(), .{ .level = .best_compression });
+    var compressor = try std.compress.deflate.compressor(allocator, dest_buffer.writer(), .{ .level = .best_compression });
     defer compressor.deinit();
 
-    var read_buffer: [std.mem.page_size]u8 = undefined;
-
-    var bytes_read = try source_file.readAll(&read_buffer);
-    while (bytes_read > 0) {
-        _ = try compressor.write(read_buffer[0..bytes_read]);
-        if (bytes_read < read_buffer.len) break;
-        bytes_read = try source_file.readAll(&read_buffer);
-    }
+    _ = try compressor.write(source);
 
     try compressor.flush();
-    return dest_file;
+
+    return dest_buffer.toOwnedSlice();
 }
-
-fn createFileAtPath(path_with_filename: []const u8) !fs.File {
-    var parts = std.mem.split(u8, path_with_filename, "/");
-
-    var current_dir = fs.cwd();
-    var current_part = parts.next() orelse return error.InvalidPath;
-    while (parts.next()) |next_part| : (current_part = next_part) {
-        current_dir = current_dir.makeOpenPath(current_part, .{}) catch |err| switch (err) {
-            error.PathAlreadyExists => try current_dir.openDir(current_part, .{}),
-            else => {
-                log.err("Error trying to create/open subfolder {s}: {}", .{path_with_filename, err});
-                return err;
-            }
-        };
-    }
-
-    return current_dir.createFile(current_part, .{ .read = true }) catch |err| {
-        log.err("Error creating file {s}: {}", .{current_part, err});
-        return err;
-    };
-}
-
