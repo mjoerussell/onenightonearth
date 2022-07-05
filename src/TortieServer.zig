@@ -56,6 +56,15 @@ pub fn addRoute(server: *TortieServer, uri: []const u8, handler: Route.Handler) 
     try server.routes.append(.{ .uri = uri, .handler = handler });
 }
 
+pub fn run(server: *TortieServer, allocator: Allocator) noreturn {
+    while (true) {
+        server.accept(allocator) catch {};
+        if (builtin.single_threaded) {
+            server.event_loop.getCompletion() catch continue;
+        }
+    }
+}
+
 /// Accept a new client connection and add it to the client list. Also starts handling the client request/response
 /// process.
 pub fn accept(server: *TortieServer, allocator: Allocator) !void {
@@ -74,8 +83,7 @@ pub fn accept(server: *TortieServer, allocator: Allocator) !void {
     try server.clients.append(client);
 }
 
-/// Background "process" for cleaning up expired clients. Whenever the server has gone > 1sec without accepting a new connection
-/// this will remove and destroy all of the clients that have disconnected.
+/// Remove clients that are no longer connected from the client list
 fn cleanup(server: *TortieServer, allocator: Allocator) void {
     var client_index: usize = 0;
     while (client_index < server.clients.items.len) {
