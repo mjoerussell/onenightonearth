@@ -8,6 +8,7 @@ const Client = @import("TortieClient.zig");
 const Server = @import("server.zig").Server;
 const EventLoop = @import("event_loop.zig").EventLoop;
 const FileSource = @import("FileSource.zig");
+const Route = @import("Route.zig");
 
 const ClientList = std.ArrayList(*Client);
 
@@ -18,10 +19,11 @@ const has_custom_impl = switch (builtin.os.tag) {
 
 server: Server,
 event_loop: EventLoop = undefined,
+routes: std.ArrayList(Route),
 
 clients: ClientList,
 
-file_source: FileSource,
+file_source: ?FileSource = null,
 
 /// Starting listening on the given address and initialize other server resources.
 pub fn init(tortie: *TortieServer, allocator: Allocator, address: std.net.Address) !void {
@@ -33,9 +35,8 @@ pub fn init(tortie: *TortieServer, allocator: Allocator, address: std.net.Addres
         try tortie.event_loop.init(allocator, .{ });
     }
 
+    tortie.routes = std.ArrayList(Route).init(allocator);
     tortie.clients = ClientList.init(allocator);
-
-    tortie.file_source = try FileSource.init(allocator);
 }
 
 pub fn deinit(server: *TortieServer, allocator: Allocator) void {
@@ -45,10 +46,14 @@ pub fn deinit(server: *TortieServer, allocator: Allocator) void {
     }
     server.clients.deinit();
     if (has_custom_impl) {
-        server.event_loop.deinit();
+        server.event_loop.deinit(allocator);
     }
 
     server.server.deinit();
+}
+
+pub fn addRoute(server: *TortieServer, uri: []const u8, handler: Route.Handler) !void { 
+    try server.routes.append(.{ .uri = uri, .handler = handler });
 }
 
 /// Accept a new client connection and add it to the client list. Also starts handling the client request/response
@@ -63,7 +68,7 @@ pub fn accept(server: *TortieServer, allocator: Allocator) !void {
 
     // Create a new client and start handling its request.
     var client = try Client.init(allocator, &server.event_loop, connection);
-    client.run(server.file_source);
+    client.run(server.file_source, server.routes.items);
 
     // Append the client to the server's client list.
     try server.clients.append(client);
