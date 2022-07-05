@@ -1,4 +1,5 @@
 const std = @import("std");
+const tortie = @import("lib/tortie/build.zig");
 
 pub fn build(b: *std.build.Builder) !void {
     // Standard target options allows the person running `zig build` to choose
@@ -26,7 +27,8 @@ pub fn build(b: *std.build.Builder) !void {
 
     exe.single_threaded = is_single_threaded orelse false;
 
-    exe.addPackagePath("http", "http/src/lib.zig");
+    // exe.addPackagePath("http", "http/src/lib.zig");
+    try tortie.link(exe, b.allocator, "lib/tortie");
 
     const run_cmd = exe.run();
     run_cmd.step.dependOn(b.getInstallStep());
