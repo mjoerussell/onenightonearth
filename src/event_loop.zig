@@ -54,7 +54,7 @@ const WindowsEventLoop = struct {
     }
 
     pub fn deinit(loop: *WindowsEventLoop, allocator: Allocator) void {
-        @atomicStore(bool, &loop.is_running, false, .Acquire);
+        @atomicStore(bool, &loop.is_running, false, .SeqCst);
         // loop.is_running = false;
         if (loop.worker_threads) |workers| {
             for (workers) |*thread| thread.join();
