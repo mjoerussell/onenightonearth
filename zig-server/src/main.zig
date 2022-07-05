@@ -3,7 +3,6 @@ const builtin = @import("builtin");
 
 const Allocator = std.mem.Allocator;
 
-// const OneNightServer = @import("OneNightServer.zig");
 const tortie = @import("tortie");
 const Server = tortie.TortieServer;
 const FileSource = tortie.FileSource;
@@ -48,12 +47,7 @@ pub fn main() anyerror!void {
     std.log.info("Listening on port {}", .{ port });
     std.log.debug("Build is single threaded: {}", .{builtin.single_threaded});
 
-    while (true) {
-        server.accept(allocator) catch {};
-        if (builtin.single_threaded) {
-            server.event_loop.getCompletion() catch continue;
-        }
-    }
+    server.run(allocator);
 }
 
 /// Handle the main index.html page. This is used instead of a FileSource file so that users can navigate to 
