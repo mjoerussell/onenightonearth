@@ -1,5 +1,5 @@
 const std = @import("std");
-const Build = build.Build;
+const Build = std.build.Build;
 
 pub fn build(b: *Build) !void {
     _ = b.addModule("tortie", .{
