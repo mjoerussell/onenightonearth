@@ -172,10 +172,7 @@ pub fn acceptEx(listen_socket: os.socket_t, accept_socket: os.socket_t, data_buf
         .WSAENOTCONN => error.NotConnected,
         .WSAETIMEDOUT => error.TimedOut,
         .WSA_OPERATION_ABORTED => error.OperationAborted,
-        else => |error_code| {
-            log.err("Error during acceptEx(): {}", .{error_code});
-            return error.GeneralError;
-        },
+        else => error.GeneralError,
     };
 }
 
@@ -201,11 +198,7 @@ pub fn disconnectEx(socket: os.socket_t, overlapped: *os.windows.OVERLAPPED, sho
         .WSAENOTCONN => error.NotConnected,
         .WSAETIMEDOUT => error.TimedOut,
         .WSA_OPERATION_ABORTED => error.OperationAborted,
-        else => |error_code| {
-            log.err("Error during disconnectEx(): {}", .{error_code});
-            return error.GeneralError;
-        },
-    };
+        else => error.GeneralError,
 }
 
 fn loadAcceptEx(listen_socket: os.socket_t) !void {
@@ -229,8 +222,6 @@ fn loadDisconnectEx(socket: os.socket_t) !void {
     var disconnect_ex_buf: [@sizeOf(@TypeOf(lp_disconnect_ex))]u8 = undefined;
 
     _ = os.windows.WSAIoctl(socket, os.windows.ws2_32.SIO_GET_EXTENSION_FUNCTION_POINTER, &std.mem.toBytes(guid_disconnect_ex), &disconnect_ex_buf, null, null) catch {
-        const err = os.windows.ws2_32.WSAGetLastError();
-        log.err("Error loading disconnectEx(): {}", .{err});
         return error.GeneralError;
     };
     lp_disconnect_ex = std.mem.bytesToValue(LPFN_DISCONNECTEX, &disconnect_ex_buf);
