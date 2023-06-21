@@ -6,8 +6,8 @@ const server = @import("server.zig");
 pub const Request = @import("http/Request.zig");
 pub const Response = @import("http/Response.zig");
 
-const Client = server.Client;
-const Server = server.Server;
+pub const Client = server.Client;
+pub const Server = server.Server;
 
 pub fn HandlerFn(comptime ServerContext: type) type {
     return fn (*Client, ServerContext) anyerror!void;
