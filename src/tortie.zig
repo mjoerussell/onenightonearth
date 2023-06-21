@@ -18,11 +18,11 @@ pub fn TortieServer(comptime ServerContext: type) type {
         const Self = @This();
         const log = std.log.scoped(.tortie);
 
-        handler_fn: *HandlerFn(ServerContext),
+        handler_fn: *const HandlerFn(ServerContext),
         server: Server,
         context: ServerContext,
 
-        pub fn init(address: std.net.Address, context: ServerContext, handler_fn: *HandlerFn(ServerContext)) !Self {
+        pub fn init(address: std.net.Address, context: ServerContext, handler_fn: *const HandlerFn(ServerContext)) !Self {
             return Self{
                 .server = try Server.init(address),
                 .handler_fn = handler_fn,
