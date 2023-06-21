@@ -30,7 +30,7 @@ pub fn TortieServer(comptime ServerContext: type) type {
             };
         }
 
-        pub fn run(tortie: *TortieServer) !void {
+        pub fn run(tortie: *Self) !void {
             var ready_clients: [16]*Client = undefined;
             const client_count = tortie.server.getCompletions(&ready_clients) catch |err| switch (err) {
                 error.WouldBlock => return,
