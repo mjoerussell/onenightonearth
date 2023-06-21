@@ -16,7 +16,7 @@ pub fn HandlerFn(comptime ServerContext: type) type {
 pub fn TortieServer(comptime ServerContext: type) type {
     return struct {
         const Self = @This();
-        
+
         handler_fn: HandlerFn(ServerContext),
         server: Server,
         context: ServerContext,
@@ -78,5 +78,5 @@ pub fn TortieServer(comptime ServerContext: type) type {
                 }
             }
         }
-    }
+    };
 }
