@@ -3,6 +3,9 @@ const Allocator = std.mem.Allocator;
 
 const server = @import("server.zig");
 
+pub const Request = @import("http/Request.zig");
+pub const Response = @import("http/Response.zig");
+
 const Client = server.Client;
 const Server = server.Server;
 
