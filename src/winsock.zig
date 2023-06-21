@@ -199,6 +199,7 @@ pub fn disconnectEx(socket: os.socket_t, overlapped: *os.windows.OVERLAPPED, sho
         .WSAETIMEDOUT => error.TimedOut,
         .WSA_OPERATION_ABORTED => error.OperationAborted,
         else => error.GeneralError,
+    };
 }
 
 fn loadAcceptEx(listen_socket: os.socket_t) !void {
