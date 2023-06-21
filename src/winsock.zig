@@ -149,6 +149,29 @@ pub fn getQueuedCompletionStatus(completion_port: os.windows.HANDLE, completion_
     };
 }
 
+pub fn getQueuedCompletionStatusEx(completion_port: os.windows.HANDLE, overlapped_entries: []os.windows.OVERLAPPED_ENTRY, timeout_ms: ?u32, alertable: bool) !usize {
+    var entries_removed: u32 = 0;
+
+    var alertable_ext: c_int = if (alertable) os.windows.TRUE else os.windows.FALSE;
+    const result = os.windows.kernel32.GetQueuedCompletionStatusEx(completion_port, overlapped_entries.ptr, @intCast(u32, overlapped_entries.len), &entries_removed, timeout_ms orelse os.windows.INFINITE, alertable_ext);
+
+    if (result == os.windows.TRUE) {
+        return entries_removed;
+    }
+
+    if (entries_removed == 0) return error.WouldBlock;
+
+    return switch (os.windows.kernel32.GetLastError()) {
+        .NETNAME_DELETED => error.ConnectionReset,
+        .CONNECTION_ABORTED => error.ConnectionAborted,
+        .NO_NETWORK => error.NetworkDown,
+        .ABANDONED_WAIT_0 => error.Abandoned,
+        .OPERATION_ABORTED => error.Cancelled,
+        .HANDLE_EOF => error.Eof,
+        else => error.GeneralError,
+    };
+}
+
 var lp_accept_ex: ?os.windows.ws2_32.LPFN_ACCEPTEX = null;
 pub fn acceptEx(listen_socket: os.socket_t, accept_socket: os.socket_t, data_buffer: []u8, bytes_recieved: *usize, overlapped: *os.windows.OVERLAPPED) !void {
     if (lp_accept_ex == null) {
