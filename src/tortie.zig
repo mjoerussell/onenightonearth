@@ -16,6 +16,7 @@ pub fn HandlerFn(comptime ServerContext: type) type {
 pub fn TortieServer(comptime ServerContext: type) type {
     return struct {
         const Self = @This();
+        const log = std.log.scoped(.tortie);
 
         handler_fn: HandlerFn(ServerContext),
         server: Server,
