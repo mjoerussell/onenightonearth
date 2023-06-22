@@ -1,13 +1,13 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const server = @import("server.zig");
+const server_impl = @import("server.zig");
 
 pub const Request = @import("http/Request.zig");
 pub const Response = @import("http/Response.zig");
 
-pub const Client = server.Client;
-pub const Server = server.Server;
+pub const Client = server_impl.Client;
+pub const Server = server_impl.Server;
 
 pub fn HandlerFn(comptime ServerContext: type) type {
     return fn (*Client, ServerContext) anyerror!void;
