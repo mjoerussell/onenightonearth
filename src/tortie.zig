@@ -41,9 +41,9 @@ pub fn TortieServer(comptime ServerContext: type) type {
                 switch (client.state) {
                     .accepting => {
                         client.start_ts = std.time.microTimestamp();
-                        server.recv(client) catch |err| {
+                        tortie.server.recv(client) catch |err| {
                             log.err("Encountered error during recv(): {}", .{err});
-                            server.deinitClient(client);
+                            tortie.server.deinitClient(client);
                         };
                     },
                     .reading => {
@@ -53,23 +53,23 @@ pub fn TortieServer(comptime ServerContext: type) type {
                         client.request = Request{ .data = client.buffer[0..client.len] };
                         tortie.handle_fn(client, tortie.context) catch |err| {
                             log.err("Error processing client request: {}", .{err});
-                            server.deinitClient(client);
+                            tortie.server.deinitClient(client);
                             continue;
                         };
 
                         client.response.complete() catch {};
                         client.len = fbs.pos;
 
-                        server.send(client) catch |err| {
+                        tortie.server.send(client) catch |err| {
                             std.log.err("Encountered error during send(): {}", .{err});
-                            server.deinitClient(client);
+                            tortie.server.deinitClient(client);
                         };
                     },
                     .writing => {
-                        server.deinitClient(client);
+                        tortie.server.deinitClient(client);
                     },
                     .disconnecting => {
-                        server.acceptClient(client) catch |err| {
+                        tortie.server.acceptClient(client) catch |err| {
                             log.err("Error accepting new client: {}", .{err});
                         };
                     },
