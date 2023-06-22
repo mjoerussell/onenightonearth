@@ -51,7 +51,7 @@ pub fn TortieServer(comptime ServerContext: type) type {
                         client.response = Response.writer(fbs.writer());
 
                         client.request = Request{ .data = client.buffer[0..client.len] };
-                        tortie.handle_fn(client, tortie.context) catch |err| {
+                        tortie.handler_fn(client, tortie.context) catch |err| {
                             log.err("Error processing client request: {}", .{err});
                             tortie.server.deinitClient(client);
                             continue;
