@@ -76,15 +76,15 @@ pub export fn initialize(stars: [*]ExternStar, num_stars: u32, constellation_dat
         unreachable;
     };
     initializeStars(star_renderer, stars[0..num_stars]);
-    
+
     star_renderer.canvas = Canvas.init(allocator, settings.getCanvasSettings()) catch {
         const num_pixels = star_renderer.canvas.settings.width * star_renderer.canvas.settings.height;
-        log.err("Ran out of memory during canvas intialization (needed {} kB for {} pixels)", .{(num_pixels * @sizeOf(Pixel)) / 1000, num_pixels});
+        log.err("Ran out of memory during canvas intialization (needed {} kB for {} pixels)", .{ (num_pixels * @sizeOf(Pixel)) / 1000, num_pixels });
         unreachable;
     };
 
     initializeConstellations(star_renderer, constellation_data);
-    
+
     return star_renderer;
 }
 
@@ -94,7 +94,7 @@ pub export fn updateCanvasSettings(star_renderer: *StarRenderer, settings: *Exte
         star_renderer.canvas.data = allocator.realloc(star_renderer.canvas.data, new_settings.width * new_settings.height) catch unreachable;
         star_renderer.canvas.settings = new_settings;
         return getImageData(star_renderer);
-    } 
+    }
     star_renderer.canvas.settings = new_settings;
     return null;
 }
@@ -120,7 +120,7 @@ pub fn initializeConstellations(star_renderer: *StarRenderer, data: [*]u8) void 
         is_zodiac: u8,
     };
 
-    // Get some metadata about the constellation data that we're about to read. 
+    // Get some metadata about the constellation data that we're about to read.
     // This first set is the total number of constellations, followed by the total number of boundary coordinates,
     // and finally the total number of asterism coordinates
     const num_constellations = std.mem.bytesToValue(u32, data[0..4]);
@@ -139,7 +139,7 @@ pub fn initializeConstellations(star_renderer: *StarRenderer, data: [*]u8) void 
 
     // Convert the data slices from u8's to something more accurate. The constellation metadata is in the form of ConstellationInfo's,
     // and the boundary and asterism data are stored as i16 (fixed point) right ascension/declination pairs
-    const constellation_data = @ptrCast([*]ConstellationInfo, data[12..constellation_end_index])[0..num_constellations];
+    const constellation_data = @ptrCast([*]ConstellationInfo, @alignCast(@alignOf([*]ConstellationInfo), data[12..constellation_end_index]))[0..num_constellations];
     const boundary_data = SkyCoord.ExternSkyCoord.unsafeSliceCast(data[constellation_end_index..boundary_end_index]);
     const asterism_data = SkyCoord.ExternSkyCoord.unsafeSliceCast(data[boundary_end_index..asterism_end_index]);
 
@@ -151,10 +151,10 @@ pub fn initializeConstellations(star_renderer: *StarRenderer, data: [*]u8) void 
     // Initialize the actual constellation data
     var c_bound_start: usize = 0;
     var c_ast_start: usize = 0;
-    for (star_renderer.constellations) |*c, c_index| {
+    for (star_renderer.constellations, 0..) |*c, c_index| {
         const num_boundaries = constellation_data[c_index].num_boundaries;
         const num_asterisms = constellation_data[c_index].num_asterisms;
-        
+
         // Set up the constellation with empty boundaries and asterisms
         c.* = Constellation{
             .is_zodiac = constellation_data[c_index].is_zodiac == 1,
@@ -163,12 +163,12 @@ pub fn initializeConstellations(star_renderer: *StarRenderer, data: [*]u8) void 
         };
 
         // Get the correct boundary and asterism coords from the data slices
-        for (c.boundaries) |*boundary, bound_index| {
+        for (c.boundaries, 0..) |*boundary, bound_index| {
             const bound_coord_index = c_bound_start + bound_index;
             boundary.* = boundary_data[bound_coord_index].toSkyCoord();
         }
 
-        for (c.asterism) |*asterism, asterism_index| {
+        for (c.asterism, 0..) |*asterism, asterism_index| {
             const asterism_coord_index = c_ast_start + asterism_index;
             asterism.* = asterism_data[asterism_coord_index].toSkyCoord();
         }

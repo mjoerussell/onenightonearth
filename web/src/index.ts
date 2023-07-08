@@ -53,7 +53,15 @@ document.addEventListener('DOMContentLoaded', () => {
             controls.setConstellations(constellations);
         });
 
-    WebAssembly.instantiateStreaming(fetch('./dist/wasm/night-math.wasm'), {
+    const wasm_fetch = fetch('night-math.wasm').then(response => {
+        console.log('Headers: ');
+        response.headers.forEach((value, key) => {
+            console.log(`${key}: ${value}`);
+        });
+        return response;
+    });
+
+    WebAssembly.instantiateStreaming(wasm_fetch, {
         env: {
             consoleLog: (msg_ptr: number, msg_len: number) => {
                 const message = wasm_interface.getString(msg_ptr, msg_len);

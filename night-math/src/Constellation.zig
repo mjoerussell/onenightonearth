@@ -29,9 +29,9 @@ pub const BoundaryIter = struct {
         if (iter.boundary_index == iter.constellation.boundaries.len - 1) {
             const result = [2]SkyCoord{ iter.constellation.boundaries[iter.boundary_index], iter.constellation.boundaries[0] };
             iter.boundary_index += 1;
-            return result; 
+            return result;
         }
-        
+
         const result = [2]SkyCoord{ iter.constellation.boundaries[iter.boundary_index], iter.constellation.boundaries[iter.boundary_index + 1] };
         iter.boundary_index += 1;
         return result;
@@ -81,15 +81,9 @@ pub fn isPointInside(constellation: Constellation, canvas: Canvas, point: Point,
     var num_intersections_left: u32 = 0;
 
     // Get a ray projected from the point to the right side of the canvas
-    const point_ray_right = Line{ 
-        .a = point, 
-        .b = Point{ .x = @intToFloat(f32, canvas.settings.width), .y = point.y } 
-    };
+    const point_ray_right = Line{ .a = point, .b = Point{ .x = @intToFloat(f32, canvas.settings.width), .y = point.y } };
     // Get a ray projected from the point to the left side of the canvas
-    const point_ray_left = Line{ 
-        .a = point, 
-        .b = Point{ .x = -@intToFloat(f32, canvas.settings.width), .y = point.y } 
-    };
+    const point_ray_left = Line{ .a = point, .b = Point{ .x = -@intToFloat(f32, canvas.settings.width), .y = point.y } };
 
     // Loop over all of the boundaries and count how many times both rays intersect with the boundary line
     // If they intersect inside the canvas circle, then add that to the left or right intersection counter

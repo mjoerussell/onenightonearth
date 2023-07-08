@@ -10,27 +10,31 @@ pub fn build(b: *std.build.Builder) !void {
 
     // Standard release options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
-    const mode = b.standardReleaseOptions();
+    const mode = b.standardOptimizeOption(.{});
 
     const is_single_threaded = b.option(bool, "single-threaded", "Build in single-threaded mode?");
     const target_linux = b.option(bool, "target-linux", "Build for the default linux target instead of the native target") orelse false;
 
-    const default_linux_target = try std.zig.CrossTarget.parse(.{
-        .arch_os_abi = "x86_64-linux"
+    const default_linux_target = try std.zig.CrossTarget.parse(.{ .arch_os_abi = "x86_64-linux" });
+
+    const exe = b.addExecutable(.{
+        .name = "zig-server",
+        .root_source_file = .{ .path = "src/main.zig" },
+        .optimize = mode,
+        .target = if (target_linux) default_linux_target else target,
     });
 
-    const exe = b.addExecutable("zig-server", "src/main.zig");
-    
-    exe.setTarget(if (target_linux) default_linux_target else target);
-    exe.setBuildMode(mode);
-    exe.install();
+    _ = b.addInstallArtifact(exe);
 
     exe.single_threaded = is_single_threaded orelse false;
 
-    // exe.addPackagePath("http", "http/src/lib.zig");
-    try tortie.link(exe, b.allocator, "lib/tortie");
+    exe.addAnonymousModule("tortie", .{
+        .source_file = .{ .path = "lib/tortie/src/lib.zig" },
+    });
+    // try tortie.link(exe, b.allocator, "lib/tortie");
 
-    const run_cmd = exe.run();
+    // const run_cmd = exe.run();
+    const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
         run_cmd.addArgs(args);

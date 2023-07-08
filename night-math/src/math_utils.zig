@@ -87,7 +87,7 @@ pub const OperationError = error{NaN};
 pub fn boundedACos(x: anytype) OperationError!@TypeOf(x) {
     const T = @TypeOf(x);
     const value = switch (T) {
-        f32, f64 =>  math.acos(x),
+        f32, f64 => math.acos(x),
         f128, comptime_float => return math.acos(@floatCast(f64, x)),
         else => @compileError("boundedACos not implemented for type " ++ @typeName(T)),
     };
@@ -110,7 +110,7 @@ fn FloatModResult(comptime input_type: type) type {
     return switch (@typeInfo(input_type)) {
         .ComptimeFloat => f128,
         .Float => input_type,
-        else => @compileError("floatMod is not implemented for type " ++ @typeName(input_type))
+        else => @compileError("floatMod is not implemented for type " ++ @typeName(input_type)),
     };
 }
 
@@ -133,21 +133,15 @@ pub fn floatEq(a: anytype, b: @TypeOf(a), epsilon: f32) bool {
 test "custom float modulus" {
     const margin = 0.0001;
     try std.testing.expectEqual(1.0, comptime floatMod(4.0, 1.5));
-    try std.testing.expectApproxEqAbs(@as(f32, 1.3467),  floatMod(@as(f32, 74.17405), 14.56547), margin);
-    try std.testing.expectApproxEqAbs(@as(f32, 1.3467),  floatMod(@as(f32, 74.17405), -14.56547), margin);
+    try std.testing.expectApproxEqAbs(@as(f32, 1.3467), floatMod(@as(f32, 74.17405), 14.56547), margin);
+    try std.testing.expectApproxEqAbs(@as(f32, 1.3467), floatMod(@as(f32, 74.17405), -14.56547), margin);
     try std.testing.expectApproxEqAbs(@as(f32, -1.3467), floatMod(@as(f32, -74.17405), -14.56547), margin);
     try std.testing.expectApproxEqAbs(@as(f32, -1.3467), floatMod(@as(f32, -74.17405), 14.56547), margin);
 }
 
 test "line intersection" {
-    const line_a = Line{
-        .a = Point{ .x = 234, .y = 129 },
-        .b = Point{ .x = 345, .y = 430 }
-    };
-    const line_b = Line{
-        .a = Point{ .x = 293, .y = 185 },
-        .b = Point{ .x = 481, .y = 512 }
-    };
+    const line_a = Line{ .a = Point{ .x = 234, .y = 129 }, .b = Point{ .x = 345, .y = 430 } };
+    const line_b = Line{ .a = Point{ .x = 293, .y = 185 }, .b = Point{ .x = 481, .y = 512 } };
 
     const inter_point = line_a.intersection(line_b);
     try std.testing.expectApproxEqAbs(@as(f32, 186.05), inter_point.?.x, 0.01);
@@ -160,14 +154,8 @@ test "line intersection" {
 }
 
 test "segment intersect" {
-    const line_a = Line{
-        .a = Point{ .x = 234, .y = 129 },
-        .b = Point{ .x = 345, .y = 430 }
-    };
-    const line_b = Line{
-        .a = Point{ .x = 241, .y = 201 },
-        .b = Point{ .x = 299, .y = 105 }
-    };
+    const line_a = Line{ .a = Point{ .x = 234, .y = 129 }, .b = Point{ .x = 345, .y = 430 } };
+    const line_b = Line{ .a = Point{ .x = 241, .y = 201 }, .b = Point{ .x = 299, .y = 105 } };
 
     const inter_point = line_a.intersection(line_b);
     try std.testing.expectApproxEqAbs(@as(f32, 253.14), inter_point.?.x, 0.01);

@@ -42,9 +42,9 @@ fn getPartialLocalSiderealTime(timestamp: i64) f32 {
 pub fn getConstellationAtPoint(canvas: Canvas, point: Point, constellations: []Constellation, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) ?usize {
     if (!canvas.isInsideCircle(point)) return null;
 
-    for (constellations) |c, constellation_index| {
+    for (constellations, 0..) |c, constellation_index| {
         if (canvas.settings.zodiac_only and !c.is_zodiac) continue;
-        
+
         if (c.isPointInside(canvas, point, local_sidereal_time, sin_latitude, cos_latitude)) {
             return constellation_index;
         }
@@ -92,4 +92,3 @@ pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_e
         .longitude = new_relative_longitude,
     };
 }
-

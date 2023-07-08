@@ -66,7 +66,7 @@ pub const SpectralType = enum(u8) {
             // Orange
             .K => Pixel.rgb(240, 129, 50),
             // Red
-            .M => Pixel.rgb(207, 32, 23)
+            .M => Pixel.rgb(207, 32, 23),
         };
     }
 };
