@@ -212,7 +212,10 @@ const WindowsServer = struct {
                 if (total_bytes_recv == client.request_buffer.capacity) {
                     // We've received bytes until we ran out of capacity. We'll increase the capacity
                     // and then try to recieve more bytes
-                    client.request_buffer.resize(client.request_buffer.capacity + 1024);
+                    client.request_buffer.resize(client.request_buffer.capacity + 1024) catch {
+                        log.err("Reached capacity on request_buffer, but could not allocate additional space. Will try to handle the request with the data received so far...", .{});
+                        client.state = .read_complete;
+                    };
                 } else {
                     // We stopped receiving bytes before running out of capacity, which signals to us
                     // that the client is done sending data. We'll mark ourselves as done reading
@@ -393,7 +396,10 @@ const LinuxServer = struct {
                         const bytes_transferred = @intCast(usize, cqe.res);
                         const total_bytes_recv = client.request_buffer.len + bytes_transferred;
                         if (total_bytes_recv == client.request_buffer.capacity) {
-                            client.request_buffer.resize(client.request_buffer.capacity + 1024);
+                            client.request_buffer.resize(client.request_buffer.capacity + 1024) catch {
+                                log.err("Reached capacity on request_buffer, but could not allocate additional space. Will try to handle the request with the data received so far...", .{});
+                                client.state = .read_complete;
+                            };
                         } else {
                             client.state = .read_complete;
                         }
