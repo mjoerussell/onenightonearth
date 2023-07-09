@@ -40,6 +40,7 @@ pub fn Writer(comptime W: type) type {
         const Self = @This();
 
         writer: W,
+        body_started: bool = false,
 
         pub fn writeStatus(self: Self, method: HttpMethod, uri: []const u8) !void {
             try self.writer.print("{s} {s} HTTP/1.1\r\n", .{ method.toString(), uri });
@@ -54,8 +55,11 @@ pub fn Writer(comptime W: type) type {
             try self.writer.print(format_string, .{ header_name, header_value });
         }
 
-        pub fn writeBody(self: Self, body: []const u8) !void {
-            try self.writer.writeAll("\r\n");
+        pub fn writeBody(self: *Self, body: []const u8) !void {
+            if (!self.body_started) {
+                try self.writer.writeAll("\r\n");
+                self.body_started = true;
+            }
             try self.writer.writeAll(body);
         }
 
