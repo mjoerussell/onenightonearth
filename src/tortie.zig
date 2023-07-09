@@ -41,7 +41,7 @@ pub fn TortieServer(comptime ServerContext: type) type {
                 switch (client.state) {
                     .accepting => {
                         client.start_ts = std.time.microTimestamp();
-                        client.request_buffer.len = 0;
+                        client.request_buffer.items.len = 0;
                         tortie.server.recv(client) catch |err| {
                             log.err("Encountered error during recv(): {}", .{err});
                             tortie.server.deinitClient(client);
