@@ -187,7 +187,7 @@ const WindowsServer = struct {
         client.zero();
         client.state = .accepting;
 
-        winsock.acceptEx(server.socket, client.socket, &client.request_buffer.items, &client.request_buffer.items.len, &client.overlapped) catch |err| switch (err) {
+        winsock.acceptEx(server.socket, client.socket, client.request_buffer.items, &client.request_buffer.items.len, &client.overlapped) catch |err| switch (err) {
             error.IoPending, error.ConnectionReset => {},
             else => {
                 log.warn("Error occurred during acceptEx(): {}", .{err});
