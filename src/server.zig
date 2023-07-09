@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const builtin = @import("builtin");
 const os = std.os;
 const net = std.net;
@@ -30,6 +31,7 @@ pub const ClientState = enum {
     idle,
     accepting,
     reading,
+    read_complete,
     writing,
     disconnecting,
 };
@@ -37,9 +39,11 @@ pub const ClientState = enum {
 pub const WindowsClient = struct {
     socket: os.socket_t,
     request: Request,
-    response: Response.FixedBufferWriter,
-    buffer: [4096]u8 = undefined,
-    len: usize = 0,
+    request_buffer: std.ArrayList(u8),
+
+    response: Response.Writer(std.ArrayList(u8).Writer),
+    response_buffer: std.ArrayList(u8),
+
     start_ts: i64 = 0,
     state: ClientState = .idle,
 
@@ -55,13 +59,22 @@ pub const WindowsClient = struct {
         .hEvent = null,
     },
 
+    fn init(allocator: Allocator) !WindowsClient {
+        var client: WindowsClient = undefined;
+        client.request_buffer = try std.ArrayList(u8).initWithCapacity(allocator, 1024);
+        client.response_buffer = try std.ArrayList(u8).initWithCapacity(allocator, 1024);
+        client.zero();
+        return client;
+    }
+
     fn zero(client: *WindowsClient) void {
-        // 0-init read/write buffer
-        for (&client.buffer) |*b| b.* = 0;
-        client.len = 0;
         client.state = .idle;
         client.request = undefined;
+        client.request_buffer.shrinkAndFree(1024);
+
         client.response = undefined;
+        client.response_buffer.shrinkAndFree(1024);
+
         client.overlapped = .{
             .Internal = 0,
             .InternalHigh = 0,
@@ -83,7 +96,7 @@ const WindowsServer = struct {
     listen_address: net.Address = undefined,
     io_port: os.windows.HANDLE,
 
-    pub fn init(address: net.Address) !WindowsServer {
+    pub fn init(allocator: Allocator, address: net.Address) !WindowsServer {
         var server = WindowsServer{
             .io_port = try windows.CreateIoCompletionPort(windows.INVALID_HANDLE_VALUE, null, undefined, undefined),
             .listen_address = address,
@@ -110,6 +123,7 @@ const WindowsServer = struct {
 
         // Init all clients to a mostly empty, but usable, state
         for (&server.clients) |*client| {
+            client.* = try WindowsClient.init(allocator);
             client.socket = try server.getSocket();
             _ = try windows.CreateIoCompletionPort(client.socket, server.io_port, undefined, 0);
             try server.acceptClient(client);
@@ -153,7 +167,7 @@ const WindowsServer = struct {
         _ = server;
         client.state = .reading;
 
-        winsock.wsaRecv(client.socket, &client.buffer, &client.overlapped) catch |err| switch (err) {
+        winsock.wsaRecv(client.socket, client.request_buffer.unusedCapacitySlice(), &client.overlapped) catch |err| switch (err) {
             error.IoPending => return,
             else => return err,
         };
@@ -163,7 +177,7 @@ const WindowsServer = struct {
         _ = server;
         client.state = .writing;
 
-        winsock.wsaSend(client.socket, client.buffer[0..client.len], &client.overlapped) catch |err| switch (err) {
+        winsock.wsaSend(client.socket, client.response_buffer.items, &client.overlapped) catch |err| switch (err) {
             error.IoPending => return,
             else => return err,
         };
@@ -173,7 +187,7 @@ const WindowsServer = struct {
         client.zero();
         client.state = .accepting;
 
-        winsock.acceptEx(server.socket, client.socket, &client.buffer, &client.len, &client.overlapped) catch |err| switch (err) {
+        winsock.acceptEx(server.socket, client.socket, &client.request_buffer.items, &client.request_buffer.items.len, &client.overlapped) catch |err| switch (err) {
             error.IoPending, error.ConnectionReset => {},
             else => {
                 log.warn("Error occurred during acceptEx(): {}", .{err});
@@ -184,21 +198,35 @@ const WindowsServer = struct {
 
     pub fn getCompletions(server: *WindowsServer, clients: []*Client) !usize {
         var overlapped_entries: [16]windows.OVERLAPPED_ENTRY = undefined;
-        var client_count: usize = 0;
-        var entries_removed = try winsock.getQueuedCompletionStatusEx(server.io_port, &overlapped_entries, null, false);
-        for (overlapped_entries[0..entries_removed]) |entry| {
+        const entries_removed = try winsock.getQueuedCompletionStatusEx(server.io_port, &overlapped_entries, null, false);
+
+        for (overlapped_entries[0..entries_removed], 0..) |entry, client_index| {
             var client = @fieldParentPtr(Client, "overlapped", entry.lpOverlapped);
-            client.len = @intCast(usize, entry.dwNumberOfBytesTransferred);
+            const bytes_transferred = @intCast(usize, entry.dwNumberOfBytesTransferred);
             if (client.state == .accepting) {
                 os.setsockopt(client.socket, os.windows.ws2_32.SOL.SOCKET, os.windows.ws2_32.SO.UPDATE_ACCEPT_CONTEXT, &std.mem.toBytes(server.socket)) catch |err| {
                     std.log.err("Error during setsockopt: {}", .{err});
                 };
+            } else if (client.state == .reading) {
+                const total_bytes_recv = client.request_buffer.items.len + bytes_transferred;
+                if (total_bytes_recv == client.request_buffer.capacity) {
+                    // We've received bytes until we ran out of capacity. We'll increase the capacity
+                    // and then try to recieve more bytes
+                    client.request_buffer.resize(client.request_buffer.capacity + 1024);
+                } else {
+                    // We stopped receiving bytes before running out of capacity, which signals to us
+                    // that the client is done sending data. We'll mark ourselves as done reading
+                    // and move on to handle the request.
+                    client.state = .read_complete;
+                }
+
+                // We wrote to the buffer directly, so the len wasn't automatically updated.
+                client.request_buffer.items.len = total_bytes_recv;
             }
-            clients[client_count] = client;
-            client_count += 1;
+            clients[client_index] = client;
         }
 
-        return client_count;
+        return entries_removed;
     }
 
     fn getSocket(server: WindowsServer) !os.socket_t {
@@ -209,22 +237,38 @@ const WindowsServer = struct {
 
 const LinuxClient = struct {
     socket: os.socket_t,
+
     request: Request,
-    response: Response.FixedBufferWriter,
+    request_buffer: std.ArrayList(u8),
+
+    response: Response.Writer(std.ArrayList(u8).Writer),
+    response_buffer: std.ArrayList(u8),
 
     address: os.sockaddr = undefined,
     address_len: os.socklen_t = @sizeOf(std.net.Address),
-    buffer: [4096]u8 = undefined,
-    len: usize = 0,
+
     start_ts: i64 = 0,
     state: ClientState = .idle,
+
+    fn init(allocator: Allocator) !LinuxClient {
+        var client: LinuxClient = undefined;
+        client.request_buffer = try std.ArrayList(u8).initCapacity(allocator, 1024);
+        client.response_buffer = try std.ArrayList(u8).initCapacity(allocator, 1024);
+        client.zero();
+        return client;
+    }
 
     fn zero(client: *LinuxClient) void {
         client.* = .{
             .socket = undefined,
             .request = undefined,
+            .request_buffer = client.request_buffer,
             .response = undefined,
+            .response_buffer = client.response_buffer,
         };
+
+        client.request_buffer.shrinkAndFree();
+        client.response_buffer.shrinkAndFree();
     }
 };
 
@@ -235,7 +279,7 @@ const LinuxServer = struct {
     listen_address: net.Address = undefined,
     io_uring: std.os.linux.IO_Uring,
 
-    pub fn init(address: net.Address) !LinuxServer {
+    pub fn init(allocator: Allocator, address: net.Address) !LinuxServer {
         var server: LinuxServer = undefined;
 
         const flags = 0;
@@ -268,6 +312,7 @@ const LinuxServer = struct {
         try os.getsockname(server.socket, &server.listen_address.any, &socklen);
 
         for (&server.clients) |*client| {
+            client.* = try LinuxClient.init(allocator);
             try server.acceptClient(client);
         }
 
@@ -301,7 +346,7 @@ const LinuxServer = struct {
 
         const flags = 0;
 
-        _ = try server.io_uring.recv(@intCast(u64, @ptrToInt(client)), client.socket, .{ .buffer = &client.buffer }, flags);
+        _ = try server.io_uring.recv(@intCast(u64, @ptrToInt(client)), client.socket, .{ .buffer = client.request_buffer.unusedCapacitySlice() }, flags);
     }
 
     pub fn send(server: *LinuxServer, client: *LinuxClient) !void {
@@ -309,7 +354,7 @@ const LinuxServer = struct {
 
         const flags = 0;
 
-        _ = try server.io_uring.send(@intCast(u64, @ptrToInt(client)), client.socket, client.buffer[0..client.len], flags);
+        _ = try server.io_uring.send(@intCast(u64, @ptrToInt(client)), client.socket, client.response_buffer.items, flags);
     }
 
     pub fn acceptClient(server: *LinuxServer, client: *LinuxClient) !void {
@@ -344,8 +389,16 @@ const LinuxServer = struct {
                 .SUCCESS => {
                     if (client.state == .accepting) {
                         client.socket = cqe.res;
-                    } else {
-                        client.len = @intCast(usize, cqe.res);
+                    } else if (client.state == .reading) {
+                        const bytes_transferred = @intCast(usize, cqe.res);
+                        const total_bytes_recv = client.request_buffer.len + bytes_transferred;
+                        if (total_bytes_recv == client.request_buffer.capacity) {
+                            client.request_buffer.resize(client.request_buffer.capacity + 1024);
+                        } else {
+                            client.state = .read_complete;
+                        }
+
+                        client.request_buffer.len = total_bytes_recv;
                     }
                     clients[client_count] = client;
                     client_count += 1;

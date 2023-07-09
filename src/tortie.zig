@@ -47,10 +47,18 @@ pub fn TortieServer(comptime ServerContext: type) type {
                         };
                     },
                     .reading => {
-                        var fbs = std.io.fixedBufferStream(&client.buffer);
-                        client.response = Response.writer(fbs.writer());
+                        tortie.server.recv(client) catch |err| {
+                            log.err("Encountered error during recv: {}", .{err});
+                            tortie.server.deinitClient(client);
+                        };
+                    },
+                    .read_complete => {
+                        client.response = Response.writer(client.response_buffer.writer());
 
-                        client.request = Request{ .data = client.buffer[0..client.len] };
+                        client.request = Request{
+                            .data = client.request_buffer.items,
+                        };
+
                         tortie.handler_fn(client, tortie.context) catch |err| {
                             log.err("Error processing client request: {}", .{err});
                             tortie.server.deinitClient(client);
@@ -58,7 +66,6 @@ pub fn TortieServer(comptime ServerContext: type) type {
                         };
 
                         client.response.complete() catch {};
-                        client.len = fbs.pos;
 
                         tortie.server.send(client) catch |err| {
                             std.log.err("Encountered error during send(): {}", .{err});
