@@ -22,9 +22,9 @@ pub fn TortieServer(comptime ServerContext: type) type {
         server: Server,
         context: ServerContext,
 
-        pub fn init(address: std.net.Address, context: ServerContext, handler_fn: *const HandlerFn(ServerContext)) !Self {
+        pub fn init(allocator: Allocator, address: std.net.Address, context: ServerContext, handler_fn: *const HandlerFn(ServerContext)) !Self {
             return Self{
-                .server = try Server.init(address),
+                .server = try Server.init(allocator, address),
                 .handler_fn = handler_fn,
                 .context = context,
             };
