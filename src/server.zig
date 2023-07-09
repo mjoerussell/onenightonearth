@@ -61,8 +61,8 @@ pub const WindowsClient = struct {
 
     fn init(allocator: Allocator) !WindowsClient {
         var client: WindowsClient = undefined;
-        client.request_buffer = try std.ArrayList(u8).initWithCapacity(allocator, 1024);
-        client.response_buffer = try std.ArrayList(u8).initWithCapacity(allocator, 1024);
+        client.request_buffer = try std.ArrayList(u8).initCapacity(allocator, 1024);
+        client.response_buffer = try std.ArrayList(u8).initCapacity(allocator, 1024);
         client.zero();
         return client;
     }
