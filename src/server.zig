@@ -70,10 +70,14 @@ pub const WindowsClient = struct {
     fn zero(client: *WindowsClient) void {
         client.state = .idle;
         client.request = undefined;
-        client.request_buffer.shrinkAndFree(1024);
+        if (client.request_buffer.capacity > 1024) {
+            client.request_buffer.shrinkAndFree(1024);
+        }
 
         client.response = undefined;
-        client.response_buffer.shrinkAndFree(1024);
+        if (client.request_buffer.capacity > 1024) {
+            client.response_buffer.shrinkAndFree(1024);
+        }
 
         client.overlapped = .{
             .Internal = 0,
@@ -270,8 +274,13 @@ const LinuxClient = struct {
             .response_buffer = client.response_buffer,
         };
 
-        client.request_buffer.shrinkAndFree();
-        client.response_buffer.shrinkAndFree();
+        if (client.request_buffer.capacity > 1024) {
+            client.request_buffer.shrinkAndFree(1024);
+        }
+
+        if (client.request_buffer.capacity > 1024) {
+            client.response_buffer.shrinkAndFree(1024);
+        }
     }
 };
 
