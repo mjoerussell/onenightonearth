@@ -1,5 +1,4 @@
 const std = @import("std");
-const tortie = @import("lib/tortie/build.zig");
 
 pub fn build(b: *std.build.Builder) !void {
     // Standard target options allows the person running `zig build` to choose
@@ -17,6 +16,8 @@ pub fn build(b: *std.build.Builder) !void {
 
     const default_linux_target = try std.zig.CrossTarget.parse(.{ .arch_os_abi = "x86_64-linux" });
 
+    const tortie_dep = b.dependency("tortie", .{});
+
     const exe = b.addExecutable(.{
         .name = "zig-server",
         .root_source_file = .{ .path = "src/main.zig" },
@@ -24,16 +25,12 @@ pub fn build(b: *std.build.Builder) !void {
         .target = if (target_linux) default_linux_target else target,
     });
 
-    _ = b.addInstallArtifact(exe);
+    exe.addModule("tortie", tortie_dep.module("tortie"));
+
+    b.installArtifact(exe);
 
     exe.single_threaded = is_single_threaded orelse false;
 
-    exe.addAnonymousModule("tortie", .{
-        .source_file = .{ .path = "lib/tortie/src/lib.zig" },
-    });
-    // try tortie.link(exe, b.allocator, "lib/tortie");
-
-    // const run_cmd = exe.run();
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
