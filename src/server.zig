@@ -134,7 +134,7 @@ const WindowsServer = struct {
             client.socket = try server.getSocket();
             _ = try windows.CreateIoCompletionPort(client.socket, server.io_port, undefined, 0);
             try server.acceptClient(client);
-            client.id = index;
+            client.id = @intCast(index);
         }
 
         return server;
