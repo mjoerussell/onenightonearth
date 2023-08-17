@@ -46,7 +46,7 @@ pub const WindowsClient = struct {
 
     start_ts: i64 = 0,
     state: ClientState = .idle,
-    id: isize = -1;
+    id: isize = -1,
 
     overlapped: windows.OVERLAPPED = .{
         .Internal = 0,
