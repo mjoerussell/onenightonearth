@@ -68,6 +68,8 @@ pub fn TortieServer(comptime ServerContext: type) type {
 
                         client.response.complete() catch {};
 
+                        std.debug.print("Response: {s}\n\n", .{client.response_buffer.items});
+
                         tortie.server.send(client) catch |err| {
                             std.log.err("Encountered error during send(): {}", .{err});
                             tortie.server.deinitClient(client);
