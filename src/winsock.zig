@@ -45,12 +45,12 @@ pub const SendError = error{
 pub fn wsaRecv(socket: os.socket_t, buffer: []u8, overlapped: *windows.OVERLAPPED) RecvError!void {
     var wsa_buf = windows.ws2_32.WSABUF{
         .buf = buffer.ptr,
-        .len = @truncate(u32, buffer.len),
+        .len = @as(u32, @truncate(buffer.len)),
     };
 
     var bytes_recieved: u32 = 0;
     var flags: u32 = 0;
-    var result = windows.ws2_32.WSARecv(socket, @ptrCast([*]windows.ws2_32.WSABUF, &wsa_buf), 1, &bytes_recieved, &flags, overlapped, null);
+    var result = windows.ws2_32.WSARecv(socket, @as([*]windows.ws2_32.WSABUF, @ptrCast(&wsa_buf)), 1, &bytes_recieved, &flags, overlapped, null);
     if (result != os.windows.ws2_32.SOCKET_ERROR) {
         return;
         // return wsaGetOverlappedResult(socket, overlapped) catch |err| switch (err) {
@@ -78,13 +78,13 @@ pub fn wsaRecv(socket: os.socket_t, buffer: []u8, overlapped: *windows.OVERLAPPE
 // pub fn wsaSend(socket: os.socket_t, buffer: []const u8, overlapped: *windows.OVERLAPPED) SendError!usize {
 pub fn wsaSend(socket: os.socket_t, buffer: []const u8, overlapped: *windows.OVERLAPPED) SendError!void {
     var wsa_buf = windows.ws2_32.WSABUF{
-        .buf = @intToPtr([*]u8, @ptrToInt(buffer.ptr)),
-        .len = @truncate(u32, buffer.len),
+        .buf = @as([*]u8, @ptrFromInt(@intFromPtr(buffer.ptr))),
+        .len = @as(u32, @truncate(buffer.len)),
     };
 
     var bytes_sent: u32 = 0;
     var flags: u32 = 0;
-    var result = windows.ws2_32.WSASend(socket, @ptrCast([*]windows.ws2_32.WSABUF, &wsa_buf), 1, &bytes_sent, flags, overlapped, null);
+    var result = windows.ws2_32.WSASend(socket, @as([*]windows.ws2_32.WSABUF, @ptrCast(&wsa_buf)), 1, &bytes_sent, flags, overlapped, null);
     if (result != os.windows.ws2_32.SOCKET_ERROR) {
         return;
         // return wsaGetOverlappedResult(socket, overlapped) catch |err| switch (err) {
@@ -113,7 +113,7 @@ pub fn wsaGetOverlappedResult(socket: os.socket_t, overlapped: *windows.OVERLAPP
     var flags: u32 = 0;
     const result = windows.ws2_32.WSAGetOverlappedResult(socket, overlapped, &bytes_recieved, windows.FALSE, &flags);
     if (result != windows.FALSE) {
-        return @intCast(usize, bytes_recieved);
+        return @as(usize, @intCast(bytes_recieved));
     }
 
     return switch (windows.ws2_32.WSAGetLastError()) {
@@ -153,7 +153,7 @@ pub fn getQueuedCompletionStatusEx(completion_port: os.windows.HANDLE, overlappe
     var entries_removed: u32 = 0;
 
     var alertable_ext: c_int = if (alertable) os.windows.TRUE else os.windows.FALSE;
-    const result = os.windows.kernel32.GetQueuedCompletionStatusEx(completion_port, overlapped_entries.ptr, @intCast(u32, overlapped_entries.len), &entries_removed, timeout_ms orelse os.windows.INFINITE, alertable_ext);
+    const result = os.windows.kernel32.GetQueuedCompletionStatusEx(completion_port, overlapped_entries.ptr, @as(u32, @intCast(overlapped_entries.len)), &entries_removed, timeout_ms orelse os.windows.INFINITE, alertable_ext);
 
     if (result == os.windows.TRUE) {
         return entries_removed;
@@ -181,7 +181,7 @@ pub fn acceptEx(listen_socket: os.socket_t, accept_socket: os.socket_t, data_buf
     const sockaddr_size = @sizeOf(os.sockaddr);
     const address_len = sockaddr_size + 16;
 
-    const result = lp_accept_ex.?(listen_socket, accept_socket, @ptrCast(*anyopaque, data_buffer.ptr), 0, address_len, address_len, @ptrCast(*u32, bytes_recieved), overlapped);
+    const result = lp_accept_ex.?(listen_socket, accept_socket, @as(*anyopaque, @ptrCast(data_buffer.ptr)), 0, address_len, address_len, @as(*u32, @ptrCast(bytes_recieved)), overlapped);
     if (result == os.windows.TRUE) return;
 
     return switch (os.windows.ws2_32.WSAGetLastError()) {

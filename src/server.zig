@@ -161,7 +161,7 @@ const WindowsServer = struct {
             }
 
             const end_ts = std.time.microTimestamp();
-            const duration = @intToFloat(f64, end_ts - client.start_ts) / std.time.us_per_ms;
+            const duration = @as(f64, @floatFromInt(end_ts - client.start_ts)) / std.time.us_per_ms;
             std.log.info("Request completed in {d:4}ms", .{duration});
             return;
         };
@@ -206,7 +206,7 @@ const WindowsServer = struct {
 
         for (overlapped_entries[0..entries_removed], 0..) |entry, client_index| {
             var client = @fieldParentPtr(Client, "overlapped", entry.lpOverlapped);
-            const bytes_transferred = @intCast(usize, entry.dwNumberOfBytesTransferred);
+            const bytes_transferred = @as(usize, @intCast(entry.dwNumberOfBytesTransferred));
             if (client.state == .accepting) {
                 os.setsockopt(client.socket, os.windows.ws2_32.SOL.SOCKET, os.windows.ws2_32.SO.UPDATE_ACCEPT_CONTEXT, &std.mem.toBytes(server.socket)) catch |err| {
                     std.log.err("Error during setsockopt: {}", .{err});
@@ -238,7 +238,7 @@ const WindowsServer = struct {
 
     fn getSocket(server: WindowsServer) !os.socket_t {
         const flags = os.windows.ws2_32.WSA_FLAG_OVERLAPPED;
-        return try os.windows.WSASocketW(@intCast(i32, server.listen_address.any.family), @as(i32, os.SOCK.STREAM), @as(i32, os.IPPROTO.TCP), null, 0, flags);
+        return try os.windows.WSASocketW(@as(i32, @intCast(server.listen_address.any.family)), @as(i32, os.SOCK.STREAM), @as(i32, os.IPPROTO.TCP), null, 0, flags);
     }
 };
 
@@ -297,7 +297,7 @@ const LinuxServer = struct {
         const flags = 0;
         var entries: u16 = 4096;
         server.io_uring = while (entries > 1) {
-            if (std.os.linux.IO_Uring.init(@intCast(u13, entries), flags)) |ring| {
+            if (std.os.linux.IO_Uring.init(@as(u13, @intCast(entries)), flags)) |ring| {
                 log.info("Submission queue created with {} entries", .{entries});
                 break ring;
             } else |err| switch (err) {
@@ -341,7 +341,7 @@ const LinuxServer = struct {
 
     pub fn deinitClient(server: *LinuxServer, client: *LinuxClient) void {
         client.state = .disconnecting;
-        _ = server.io_uring.close(@intCast(u64, @ptrToInt(client)), client.socket) catch |err| {
+        _ = server.io_uring.close(@as(u64, @intCast(@intFromPtr(client))), client.socket) catch |err| {
             std.log.err("Error submiting SQE for close(): {}", .{err});
             return;
         };
@@ -358,7 +358,7 @@ const LinuxServer = struct {
 
         const flags = 0;
 
-        _ = try server.io_uring.recv(@intCast(u64, @ptrToInt(client)), client.socket, .{ .buffer = client.request_buffer.unusedCapacitySlice() }, flags);
+        _ = try server.io_uring.recv(@as(u64, @intCast(@intFromPtr(client))), client.socket, .{ .buffer = client.request_buffer.unusedCapacitySlice() }, flags);
     }
 
     pub fn send(server: *LinuxServer, client: *LinuxClient) !void {
@@ -366,7 +366,7 @@ const LinuxServer = struct {
 
         const flags = 0;
 
-        _ = try server.io_uring.send(@intCast(u64, @ptrToInt(client)), client.socket, client.response_buffer.items, flags);
+        _ = try server.io_uring.send(@as(u64, @intCast(@intFromPtr(client))), client.socket, client.response_buffer.items, flags);
     }
 
     pub fn acceptClient(server: *LinuxServer, client: *LinuxClient) !void {
@@ -374,7 +374,7 @@ const LinuxServer = struct {
         client.state = .accepting;
         const flags = os.SOCK.CLOEXEC | os.SOCK.NONBLOCK;
 
-        _ = server.io_uring.accept(@intCast(u64, @ptrToInt(client)), server.socket, null, null, flags) catch |err| {
+        _ = server.io_uring.accept(@as(u64, @intCast(@intFromPtr(client))), server.socket, null, null, flags) catch |err| {
             log.err("Error while trying to accept client: {}", .{err});
             return err;
         };
@@ -396,13 +396,13 @@ const LinuxServer = struct {
         };
         if (count == 0) return error.WouldBlock;
         for (cqes[0..count]) |cqe| {
-            var client = @intToPtr(?*LinuxClient, @intCast(usize, cqe.user_data)) orelse continue;
+            var client = @as(?*LinuxClient, @ptrFromInt(@as(usize, @intCast(cqe.user_data)))) orelse continue;
             switch (cqe.err()) {
                 .SUCCESS => {
                     if (client.state == .accepting) {
                         client.socket = cqe.res;
                     } else if (client.state == .reading) {
-                        const bytes_transferred = @intCast(usize, cqe.res);
+                        const bytes_transferred = @as(usize, @intCast(cqe.res));
                         const total_bytes_recv = client.request_buffer.len + bytes_transferred;
                         if (total_bytes_recv == client.request_buffer.capacity) {
                             client.request_buffer.resize(client.request_buffer.capacity + 1024) catch {

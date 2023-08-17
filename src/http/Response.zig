@@ -148,7 +148,7 @@ pub fn Writer(comptime W: type) type {
         writer: W,
 
         pub fn writeStatus(self: Self, status: ResponseStatus) !void {
-            try self.writer.print("HTTP/1.1 {} {s}\r\n", .{ @enumToInt(status), status.getMessage() });
+            try self.writer.print("HTTP/1.1 {} {s}\r\n", .{ @intFromEnum(status), status.getMessage() });
         }
 
         pub fn writeHeader(self: Self, header_name: []const u8, header_value: anytype) !void {
