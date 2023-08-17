@@ -54,6 +54,7 @@ pub fn TortieServer(comptime ServerContext: type) type {
                         };
                     },
                     .read_complete => {
+                        std.debug.print("Handling request using client {}\n", .{client.id});
                         client.response = Response.writer(client.response_buffer.writer());
 
                         client.request = Request{
@@ -67,8 +68,6 @@ pub fn TortieServer(comptime ServerContext: type) type {
                         };
 
                         client.response.complete() catch {};
-
-                        std.debug.print("Response: {s}\n\n", .{client.response_buffer.items});
 
                         tortie.server.send(client) catch |err| {
                             std.log.err("Encountered error during send(): {}", .{err});

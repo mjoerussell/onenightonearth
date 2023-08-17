@@ -46,6 +46,7 @@ pub const WindowsClient = struct {
 
     start_ts: i64 = 0,
     state: ClientState = .idle,
+    id: isize = -1;
 
     overlapped: windows.OVERLAPPED = .{
         .Internal = 0,
@@ -128,11 +129,12 @@ const WindowsServer = struct {
         _ = try os.windows.CreateIoCompletionPort(socket, server.io_port, undefined, 0);
 
         // Init all clients to a mostly empty, but usable, state
-        for (&server.clients) |*client| {
+        for (&server.clients, 0..) |*client, index| {
             client.* = try WindowsClient.init(allocator);
             client.socket = try server.getSocket();
             _ = try windows.CreateIoCompletionPort(client.socket, server.io_port, undefined, 0);
             try server.acceptClient(client);
+            client.id = index;
         }
 
         return server;
