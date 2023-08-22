@@ -73,14 +73,14 @@ pub const WindowsClient = struct {
         client.request = undefined;
         if (client.request_buffer.capacity > 1024) {
             client.request_buffer.shrinkAndFree(1024);
-            client.request_buffer.items.len = 0;
         }
+        client.request_buffer.items.len = 0;
 
         client.response = undefined;
         if (client.request_buffer.capacity > 1024) {
             client.response_buffer.shrinkAndFree(1024);
-            client.response_buffer.items.len = 0;
         }
+        client.response_buffer.items.len = 0;
 
         client.overlapped = .{
             .Internal = 0,
