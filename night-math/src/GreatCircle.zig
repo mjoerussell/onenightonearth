@@ -18,7 +18,7 @@ const WaypointIterator = struct {
         return WaypointIterator{
             .start = great_circle.start,
             .num_waypoints = num_waypoints,
-            .waypoint_inc = great_circle.distance / @intToFloat(f32, num_waypoints),
+            .waypoint_inc = great_circle.distance / @as(f32, @floatFromInt(num_waypoints)),
             .course_angle = great_circle.course_angle,
             .negative_dir = great_circle.end.longitude < great_circle.start.longitude and great_circle.end.longitude > (great_circle.start.longitude - math.pi),
         };
@@ -28,7 +28,7 @@ const WaypointIterator = struct {
         if (iter.current_waypoint >= iter.num_waypoints) return null;
         defer iter.current_waypoint += 1;
 
-        const waypoint_dist = @intToFloat(f32, iter.current_waypoint + 1) * iter.waypoint_inc;
+        const waypoint_dist = @as(f32, @floatFromInt(iter.current_waypoint + 1)) * iter.waypoint_inc;
 
         const sin_start_latitude = math.sin(iter.start.latitude);
         const cos_start_latitude = math.cos(iter.start.latitude);

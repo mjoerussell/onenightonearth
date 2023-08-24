@@ -33,9 +33,9 @@ pub const ObserverPosition = struct {
 
 fn getPartialLocalSiderealTime(timestamp: i64) f32 {
     const j2000_offset_millis = 949_428_000_000;
-    const days_since_j2000 = @intToFloat(f64, timestamp - j2000_offset_millis) / 86_400_000.0;
-    const lst = ((100.46 + (0.985647 * days_since_j2000) + @intToFloat(f64, 15 * timestamp)) * (math.pi / 180.0));
-    return @floatCast(f32, math_utils.floatMod(lst, 2 * math.pi));
+    const days_since_j2000 = @as(f64, @floatFromInt(timestamp - j2000_offset_millis)) / 86_400_000.0;
+    const lst = ((100.46 + (0.985647 * days_since_j2000) + @as(f64, @floatFromInt(15 * timestamp))) * (math.pi / 180.0));
+    return @as(f32, @floatCast(math_utils.floatMod(lst, 2 * math.pi)));
 }
 
 /// Get the constellation that's currently at the point on the canvas.

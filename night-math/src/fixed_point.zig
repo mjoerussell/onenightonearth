@@ -9,11 +9,11 @@ pub fn FixedPoint(comptime Int: type, comptime fractional_bits: u8) type {
         const Self = @This();
 
         pub inline fn fromFloat(float_value: f32) Int {
-            return @floatToInt(Int, float_value * (1 << fractional_bits));
+            return @as(Int, @intFromFloat(float_value * (1 << fractional_bits)));
         }
 
         pub inline fn toFloat(fixed: Int) f32 {
-            return @intToFloat(f32, fixed) / @intToFloat(f32, @as(Int, 1) << fractional_bits);
+            return @as(f32, @floatFromInt(fixed)) / @as(f32, @floatFromInt(@as(Int, 1) << fractional_bits));
         }
     };
 }

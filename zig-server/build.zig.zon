@@ -1,10 +1,4 @@
-.{
-	.name = "onenight-server",
-	.version = "1.2.0",
-	.dependencies = .{
-		.tortie = .{
-			.url = "https://github.com/mjoerussell/tortie/archive/feature/dynamic-req-res.tar.gz",
-			.hash = "122096f717ec6203118999d8bb5a5dd6558ed8efa11c4a21a128d178588e9549ae3d",
-		}
-	}
-}
+.{ .name = "onenight-server", .version = "1.2.0", .dependencies = .{ .tortie = .{
+    .url = "https://github.com/mjoerussell/tortie/archive/feature/dynamic-req-res.tar.gz",
+    .hash = "1220ccc19c1453bd23c23e12359e91674d4c35964ccfe450b2f187953bd47552453d",
+} } }

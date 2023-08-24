@@ -54,10 +54,7 @@ fn writeTypescriptTypeName(comptime T: type, writer: anytype) !void {
 pub fn main() !void {
     const cwd = fs.cwd();
 
-    cwd.makePath("../web/src/wasm") catch |err| switch (err) {
-        error.PathAlreadyExists => {}, // we don't care if the path already exists, we want it to exist
-        else => return err,
-    };
+    try cwd.makePath("../web/src/wasm");
 
     var out_file = try cwd.createFile("../web/src/wasm/wasm_module.ts", .{});
     defer out_file.close();
@@ -138,7 +135,6 @@ pub fn main() !void {
     inline for (@typeInfo(imports).Struct.decls) |import_decl| {
         const ImportDecl = @field(imports, import_decl.name);
         inline for (@typeInfo(ImportDecl).Struct.decls) |decl| {
-            comptime if (!decl.is_pub) continue;
             const Decl = @field(ImportDecl, decl.name);
             switch (@typeInfo(@TypeOf(Decl))) {
                 .Type => switch (@typeInfo(Decl)) {
@@ -174,7 +170,6 @@ pub fn main() !void {
     inline for (@typeInfo(imports).Struct.decls) |import_decl| {
         const ImportDecl = @field(imports, import_decl.name);
         inline for (@typeInfo(ImportDecl).Struct.decls) |decl| {
-            comptime if (!decl.is_pub) continue;
             const Decl = @field(ImportDecl, decl.name);
             switch (@typeInfo(@TypeOf(Decl))) {
                 .Fn => |func_info| {

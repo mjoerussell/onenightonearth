@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 const log = @import("./log.zig");
 
@@ -23,7 +24,10 @@ const GreatCircle = @import("GreatCircle.zig");
 
 const FixedPoint = @import("fixed_point.zig").DefaultFixedPoint;
 
-const allocator = std.heap.page_allocator;
+const allocator = switch (builtin.cpu.arch) {
+    .wasm32, .wasm64 => std.heap.wasm_allocator,
+    else => std.heap.page_allocator,
+};
 
 const num_waypoints = 150;
 var waypoints: [num_waypoints]Coord = undefined;
@@ -130,16 +134,16 @@ pub fn initializeConstellations(star_renderer: *StarRenderer, data: [*]u8) void 
     // Here we'll figure out the byte index where the rest of the constellation metadata stops, and then
     // the byte index where the boundary data stops, and then the byte index where the asterism data stops.
     // That will also be the end of the entire dataset
-    const constellation_end_index = @intCast(usize, 12 + num_constellations * @sizeOf(ConstellationInfo));
-    const boundary_end_index = @intCast(usize, constellation_end_index + total_num_boundaries * @sizeOf(SkyCoord.ExternSkyCoord));
-    const asterism_end_index = @intCast(usize, boundary_end_index + total_num_asterisms * @sizeOf(SkyCoord.ExternSkyCoord));
+    const constellation_end_index = @as(usize, @intCast(12 + num_constellations * @sizeOf(ConstellationInfo)));
+    const boundary_end_index = @as(usize, @intCast(constellation_end_index + total_num_boundaries * @sizeOf(SkyCoord.ExternSkyCoord)));
+    const asterism_end_index = @as(usize, @intCast(boundary_end_index + total_num_asterisms * @sizeOf(SkyCoord.ExternSkyCoord)));
 
     // We now know how big the data slice is, so defer freeing all of it
     defer allocator.free(data[0..asterism_end_index]);
 
     // Convert the data slices from u8's to something more accurate. The constellation metadata is in the form of ConstellationInfo's,
     // and the boundary and asterism data are stored as i16 (fixed point) right ascension/declination pairs
-    const constellation_data = @ptrCast([*]ConstellationInfo, @alignCast(@alignOf([*]ConstellationInfo), data[12..constellation_end_index]))[0..num_constellations];
+    const constellation_data = @as([*]ConstellationInfo, @ptrCast(@alignCast(data[12..constellation_end_index])))[0..num_constellations];
     const boundary_data = SkyCoord.ExternSkyCoord.unsafeSliceCast(data[constellation_end_index..boundary_end_index]);
     const asterism_data = SkyCoord.ExternSkyCoord.unsafeSliceCast(data[boundary_end_index..asterism_end_index]);
 
@@ -182,7 +186,7 @@ pub fn initializeConstellations(star_renderer: *StarRenderer, data: [*]u8) void 
 /// Returns a pointer to the pixel data so that it can be rendered on the canvas. Also sets the length of this buffer into the first slot
 /// of result_data.
 pub export fn getImageData(star_renderer: *StarRenderer) [*]u32 {
-    setResult(@intCast(u32, star_renderer.canvas.data.len) * 4, 0);
+    setResult(@as(u32, @intCast(star_renderer.canvas.data.len)) * 4, 0);
     return star_renderer.canvas.data.ptr;
 }
 
@@ -215,7 +219,7 @@ pub export fn getConstellationAtPoint(star_renderer: *StarRenderer, x: f32, y: f
         if (star_renderer.canvas.settings.draw_asterisms) {
             star_renderer.canvas.drawAsterism(star_renderer.constellations[i], Pixel.rgb(255, 255, 255), 3, local_sidereal_time, sin_lat, cos_lat);
         }
-        return @intCast(isize, i);
+        return @as(isize, @intCast(i));
     } else return -1;
 }
 
@@ -256,7 +260,7 @@ pub export fn getCoordForSkyCoord(right_ascension: f32, declination: f32, observ
 /// Get the central point of a given constellation. This point may be outside of the boundaries of a constellation if the constellation is
 /// irregularly shaped. The point is selected to make the constellation centered in the canvas.
 pub export fn getConstellationCentroid(star_renderer: *StarRenderer, constellation_index: u32) void {
-    const centroid = if (constellation_index > star_renderer.constellations.len) SkyCoord{} else star_renderer.constellations[@intCast(usize, constellation_index)].centroid();
+    const centroid = if (constellation_index > star_renderer.constellations.len) SkyCoord{} else star_renderer.constellations[@as(usize, @intCast(constellation_index))].centroid();
     setResult(centroid.right_ascension, centroid.declination);
 }
 
@@ -264,7 +268,7 @@ pub export fn getConstellationCentroid(star_renderer: *StarRenderer, constellati
 fn setResult(a: anytype, b: @TypeOf(a)) void {
     const A = @TypeOf(a);
     comptime if (@sizeOf(A) != 4) @compileError("Result data must be exactly 4 bytes each");
-    const result_ptr = @ptrCast([*]A, @alignCast(@alignOf(A), result_data.ptr));
+    const result_ptr = @as([*]A, @ptrCast(@alignCast(result_data.ptr)));
     result_ptr[0] = a;
     result_ptr[1] = b;
 }
