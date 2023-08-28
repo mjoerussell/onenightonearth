@@ -81,6 +81,9 @@ pub fn TortieServer(comptime ServerContext: type) type {
                     .writing => {
                         if (!client.keep_alive) {
                             tortie.server.deinitClient(client);
+                        } else {
+                            client.zero();
+                            client.state = .reading;
                         }
                     },
                     .disconnecting => {
