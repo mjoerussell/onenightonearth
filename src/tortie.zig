@@ -84,6 +84,10 @@ pub fn TortieServer(comptime ServerContext: type) type {
                         } else {
                             client.zero();
                             client.state = .reading;
+                            tortie.server.recv(client) catch |err| {
+                                log.err("Encountered error during recv: {}", .{err});
+                                tortie.server.deinitClient(client);
+                            };
                         }
                     },
                     .disconnecting => {
