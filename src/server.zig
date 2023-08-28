@@ -44,6 +44,7 @@ pub const WindowsClient = struct {
     response: Response.Writer(std.ArrayList(u8).Writer),
     response_buffer: std.ArrayList(u8),
 
+    keep_alive: bool = false,
     start_ts: i64 = 0,
     state: ClientState = .idle,
     id: isize = -1,
@@ -281,10 +282,12 @@ const LinuxClient = struct {
         if (client.request_buffer.capacity > 1024) {
             client.request_buffer.shrinkAndFree(1024);
         }
+        client.request_buffer.items.len = 0;
 
-        if (client.request_buffer.capacity > 1024) {
+        if (client.response_buffer.capacity > 1024) {
             client.response_buffer.shrinkAndFree(1024);
         }
+        client.response_buffer.items.len = 0;
     }
 };
 

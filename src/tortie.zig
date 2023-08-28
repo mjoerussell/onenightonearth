@@ -61,6 +61,10 @@ pub fn TortieServer(comptime ServerContext: type) type {
                             .data = client.request_buffer.items,
                         };
 
+                        if (client.request.findHeader("Connection")) |conn| {
+                            client.keep_alive = !std.mem.eql(u8, conn, "close");
+                        }
+
                         tortie.handler_fn(client, tortie.context) catch |err| {
                             log.err("Error processing client request: {}", .{err});
                             tortie.server.deinitClient(client);
@@ -75,7 +79,9 @@ pub fn TortieServer(comptime ServerContext: type) type {
                         };
                     },
                     .writing => {
-                        tortie.server.deinitClient(client);
+                        if (!client.keep_alive) {
+                            tortie.server.deinitClient(client);
+                        }
                     },
                     .disconnecting => {
                         tortie.server.acceptClient(client) catch |err| {
