@@ -69,7 +69,7 @@ pub const WindowsClient = struct {
         return client;
     }
 
-    fn zero(client: *WindowsClient) void {
+    pub fn zero(client: *WindowsClient) void {
         client.state = .idle;
         client.request = undefined;
         if (client.request_buffer.capacity > 1024) {
