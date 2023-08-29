@@ -335,7 +335,7 @@ const LinuxServer = struct {
 
         for (&server.clients, 0..) |*client, index| {
             client.* = try LinuxClient.init(allocator);
-            client.id = index;
+            client.id = @intCast(index);
             try server.acceptClient(client);
         }
 
