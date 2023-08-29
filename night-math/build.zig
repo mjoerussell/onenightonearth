@@ -22,21 +22,6 @@ pub fn build(b: *Builder) !void {
     });
 
     lib.import_symbols = true;
-    // lib.export_symbol_names = &.{
-    //     "initialize",
-    //     "updateCanvasSettings",
-    //     "initializeResultData",
-    //     "getImageData",
-    //     "resetImageData",
-    //     "projectStarsAndConstellations",
-    //     "getConstellationAtPoint",
-    //     "dragAndMove",
-    //     "findWaypoints",
-    //     "getCoordForSkyCoord",
-    //     "getConstellationCentroid",
-    //     "_wasm_alloc",
-    //     "_wasm_free",
-    // };
     lib.rdynamic = true;
 
     const lib_install_artifact = b.addInstallArtifact(lib, .{ .dest_dir = .{ .override = .{ .custom = output_dir } } });
