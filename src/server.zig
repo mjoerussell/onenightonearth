@@ -272,7 +272,7 @@ const LinuxClient = struct {
         return client;
     }
 
-    fn zero(client: *LinuxClient) void {
+    pub fn zero(client: *LinuxClient) void {
         client.* = .{
             .socket = undefined,
             .request = undefined,
