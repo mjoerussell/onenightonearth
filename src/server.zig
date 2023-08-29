@@ -305,10 +305,10 @@ const LinuxServer = struct {
 
         const flags = 0;
         var entries: u16 = 4096;
-        server.io_uring = while (entries > 1) {
+        while (entries > 1) {
             if (std.os.linux.IO_Uring.init(@as(u13, @intCast(entries)), flags)) |ring| {
                 log.info("Submission queue created with {} entries", .{entries});
-                break ring;
+                server.io_uring = ring;
             } else |err| switch (err) {
                 error.SystemResources => {
                     entries /= 2;
@@ -316,7 +316,7 @@ const LinuxServer = struct {
                 },
                 else => return err,
             }
-        };
+        } else return error.NotEnoughResources;
 
         server.listen_address = address;
 
