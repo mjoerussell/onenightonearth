@@ -423,7 +423,7 @@ const LinuxServer = struct {
                             client.state = .read_complete;
                         }
 
-                        client.request_buffer.len = total_bytes_recv;
+                        client.request_buffer.items.len = total_bytes_recv;
                     }
                     clients[client_count] = client;
                     client_count += 1;
