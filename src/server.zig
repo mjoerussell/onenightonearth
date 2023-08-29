@@ -44,10 +44,10 @@ pub const WindowsClient = struct {
     response: Response.Writer(std.ArrayList(u8).Writer),
     response_buffer: std.ArrayList(u8),
 
-    keep_alive: bool = false,
     start_ts: i64 = 0,
     state: ClientState = .idle,
     id: isize = -1,
+    keep_alive: bool = false,
 
     overlapped: windows.OVERLAPPED = .{
         .Internal = 0,
@@ -78,7 +78,7 @@ pub const WindowsClient = struct {
         client.request_buffer.items.len = 0;
 
         client.response = undefined;
-        if (client.request_buffer.capacity > 1024) {
+        if (client.response_buffer.capacity > 1024) {
             client.response_buffer.shrinkAndFree(1024);
         }
         client.response_buffer.items.len = 0;
@@ -261,6 +261,8 @@ const LinuxClient = struct {
 
     start_ts: i64 = 0,
     state: ClientState = .idle,
+    id: isize = -1,
+    keep_alive: bool = false,
 
     fn init(allocator: Allocator) !LinuxClient {
         var client: LinuxClient = undefined;
@@ -330,8 +332,9 @@ const LinuxServer = struct {
         try os.listen(server.socket, 128);
         try os.getsockname(server.socket, &server.listen_address.any, &socklen);
 
-        for (&server.clients) |*client| {
+        for (&server.clients, 0..) |*client, index| {
             client.* = try LinuxClient.init(allocator);
+            client.id = index;
             try server.acceptClient(client);
         }
 
