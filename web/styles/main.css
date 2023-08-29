@@ -5,29 +5,23 @@
     --toggle-focus: #0060df;
 }
 
+html {
+    height: 100%;
+}
+
 body {
-    background: linear-gradient(#01020f, #031131);
     font-family: 'Poppins', serif;
     margin: 0;
+    display: flex;
+    height: 100%;
+    box-sizing: border-box;
+    position: relative;
 }
 
 h1 {
     margin: 0 auto;
     font-weight: 600;
-    font-size: 2.8em;
-}
-
-.page-container {
-    width: 65vw;
-    padding: 0 5%;
-    margin-left: 50%;
-    transform: translateX(-50%);
-    background-color: #f5f5ec;
-}
-
-#content {
-    padding: 2% 0;
-    display: flex;
+    font-size: 2.4em;
 }
 
 label {
@@ -38,7 +32,56 @@ label {
 }
 
 #settings {
-    width: 25%;
+    width: 35%;
+    padding: 2em;
+    position: relative;
+    background-color: #fafcfc;
+    overflow-y: scroll;
+}
+
+#settings.hidden {
+    display: none;
+}
+
+#settings > .settings-toggle {
+    bottom: 0;
+    right: 0;
+}
+#settings:not(.hidden) + .settings-toggle {
+    display: none;
+}
+
+#settings.hidden + .settings-toggle {
+    bottom: 0;
+    z-index: 100;
+    color: white;
+}
+
+#header {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+    align-items: center;
+}
+
+#header img {
+    display: inline;
+    max-width: 50%;
+}
+
+.settings-toggle {
+    position: absolute;
+    margin: 1em;
+    
+    font-size: 2em;
+    background: none;
+    border: none;
+    border-radius: 5px;
+}
+
+.settings-toggle:hover {
+    font-weight: bold;
+    cursor: pointer;
 }
 
 .input-row {
@@ -47,8 +90,8 @@ label {
 }
 
 .input-row * {
-    font-size: 1em;
     color: #4d4d4d;
+    font-size: 1em;
 }
 
 .input-row > input {
@@ -106,37 +149,25 @@ label {
 }
 
 .inline-input {
-    background-color: #fff;
-    border: 1px solid #bdbdbd;
-    border-radius: 3px;
     display: flex;
     flex-direction: row;
     justify-content: space-between;
-    padding: 0.2em 0.3em;
+}
+
+.inline-input label {
+    display: inline;
+    width: auto;
 }
 
 .inline-input:focus-within {
     border-color: #065596;
 }
 
-.inline-input input {
-    border: none;
-}
-
-.inline-input input:focus-visible {
-    outline: none;
-    border: none;
-}
-
-.inline-input button.location-button {
-    background-color: #ffffff00;
-    border: none;
-}
-
-.inline-input button.location-button:hover {
-    font-style: italic;
-    color: #222222;
-    cursor: pointer;
+input#latitudeInput, input#longitudeInput {
+    width: 50%;
+    border-radius: 3px;
+    border: 1px solid #bdbdbd;
+    padding: 0.2em 0.3em;
 }
 
 input[type='date'] {
@@ -216,10 +247,10 @@ div.constellation-info.mobile {
 
 .canvas-container {
     position: relative;
-    margin-left: 10%;
-    min-width: 45vw;
-    height: 45vw;
-    transform: translateY(-5%);
+    width: 100%;
+    background: rgb(1,7,19);
+    background: radial-gradient(circle, rgba(1,7,19,1) 54%, rgba(0,9,29,1) 87%, rgba(2,13,38,1) 96%); 
+    box-shadow: -2px 0 6px 2px gray
 }
 
 .canvas-container canvas {
@@ -229,8 +260,8 @@ div.constellation-info.mobile {
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    width: 100%;
-    height: 100%;
+    height: 90%;
+    aspect-ratio: 1 / 1;
 }
 
 .canvas-container canvas.moving {
@@ -239,8 +270,10 @@ div.constellation-info.mobile {
 
 .backdrop {
     background-color: #00091d;
-    width: 100%;
-    height: 100%;
+    border: 2px solid silver;
+    box-shadow: 0 0 18px 10px #1e2b48;
+    height: 90%;
+    aspect-ratio: 1 / 1;
     border-radius: 50%;
     display: inline;
     position: absolute;
@@ -249,45 +282,38 @@ div.constellation-info.mobile {
     transform: translate(-50%, -50%);
 }
 
-@media (max-width: 1550px) {
-    #content {
-        flex-direction: column;
-    }
-
+@media (max-width: 1300px) {
     #settings {
-        width: 100%;
-        height: 15%;
-        display: flex;
-        justify-content: space-evenly;
-    }
-
-    .input-row {
-        margin: 3% 5px 5%;
-    }
-
-    .canvas-container {
-        min-width: 60vw;
-        height: 60vw;
-        margin-left: 0;
-        margin-bottom: 5%;
+        position: absolute;
+        left: 0;
+        z-index: 90;
+        height: 100%;
+        padding-top: 0;
+        padding-bottom: 0;
+        box-shadow: 5px 0 5px 2px gray;
     }
 }
 
 @media only screen and (max-width: 1000px) {
-    :root {
-        font-size: 0.9em;
+    body {
+        font-size: 2em;
     }
 
-    h1 {
-        margin: 0;
+    
+    #settings {
+        width: 55%;
     }
 
-    div.constellation-info.desktop {
-        display: none;
+    .backdrop {
+        width: 90%;
+        height: auto;
+        aspect-ratio: 1 / 1;
     }
 
-    div.constellation-info.mobile {
-        display: block;
-        font-size: 1.5em;
+    .canvas-container canvas {
+        width: 90%;
+        height: auto;
+        aspect-ratio: 1 / 1;
     }
 }
+

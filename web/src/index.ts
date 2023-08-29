@@ -84,12 +84,11 @@ document.addEventListener('DOMContentLoaded', () => {
         );
 
         renderStars(controls);
-        controls.startDetectingResize();
     });
 
-    controls.onResize(() => {
-        window.requestAnimationFrame(() => renderStars(controls));
-    });
+    // controls.onResize(() => {
+    //     window.requestAnimationFrame(() => renderStars(controls));
+    // });
 
     controls.onDateChange(_ => {
         window.requestAnimationFrame(() => renderStars(controls));

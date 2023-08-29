@@ -23,13 +23,9 @@ export class Controls {
     private _constellation_name: string | null = null;
 
     public renderer: Renderer;
-    private canvas_resize_observer: ResizeObserver;
-    private should_detect_resize = false;
 
     private current_latitude = 0;
     private current_longitude = 0;
-
-    private user_changed_location = false;
 
     private timelapse_is_on = false;
 
@@ -46,17 +42,23 @@ export class Controls {
         previous_distance: 0,
     };
 
-    private resizeHandler: () => void = () => {};
-
     constructor() {
         this.renderer = new Renderer('star-canvas');
 
-        const location_input = document.getElementById('locationInput') as HTMLInputElement;
-        location_input.value = '0.0000, 0.0000';
-        location_input?.addEventListener('change', () => {
-            this.user_changed_location = true;
-        });
-        
+        const settings_box = document.getElementById('settings');
+        const toggleSettingsVisibility = () => settings_box?.classList.toggle('hidden');
+        const settings_toggles = document.getElementsByClassName('settings-toggle');
+        for (let i = 0; i < settings_toggles.length; i += 1) {
+            const toggle = settings_toggles.item(i);
+            toggle?.addEventListener('click', toggleSettingsVisibility);
+        }
+
+        document.addEventListener('keyup', event => {
+            if (event.key === ' ' || event.code === 'Space') {
+                toggleSettingsVisibility();
+            }
+        })
+
         const extraContellationControlsContainer = document.getElementById('extraConstellationControls') as HTMLDivElement;
         if (extraContellationControlsContainer) {
             extraContellationControlsContainer.style.display =
@@ -78,25 +80,6 @@ export class Controls {
             }
         });
 
-        const canvas_container = document.getElementById('canvas-container') as HTMLDivElement;
-        this.canvas_resize_observer = new ResizeObserver(entries => {
-            if (!this.should_detect_resize) return;
-            const canvas_container_entry = entries[0];
-            if (canvas_container_entry.contentBoxSize != null) {
-                const content_box: ResizeObserverSize = Array.isArray(canvas_container_entry.contentBoxSize)
-                    ? canvas_container_entry.contentBoxSize[0]
-                    : canvas_container_entry.contentBoxSize;
-                this.renderer.width = content_box.inlineSize;
-                this.renderer.height = content_box.inlineSize;
-            } else {
-                this.renderer.width = canvas_container_entry.contentRect.width;
-                this.renderer.height = canvas_container_entry.contentRect.height;
-            }
-
-            this.resizeHandler();
-        });
-
-        this.canvas_resize_observer.observe(canvas_container);
     }
 
     /**
@@ -150,38 +133,33 @@ export class Controls {
      * @param handler Passes the new coordinate to the callback.
      */
     onLocationUpdate(handler: (_: Coord) => void): void {
-        const update_location_button = document.getElementById('locationUpdate') as HTMLButtonElement;
-        const location_input = document.getElementById('locationInput') as HTMLInputElement;
-        update_location_button?.addEventListener('click', () => {
-            if (this.user_changed_location) {
-                let new_latitude: number;
-                let new_longitude: number;
-                const input_value = location_input?.value ?? '0, 0';
-                let coords = input_value.split(',');
-                if (coords.length === 1) {
-                    coords = input_value.split(' ');
-                    if (coords.length === 1) {
-                        coords = [coords[0], '0'];
-                    }
-                }
-                try {
-                    new_latitude = parseFloat(coords[0]);
-                } catch (err) {
-                    new_latitude = 0;
-                }
-                try {
-                    new_longitude = parseFloat(coords[1]);
-                } catch (err) {
-                    new_longitude = 0;
-                }
+        const updateCoord = (latitude: number, longitude: number) => {
+            const new_lat_rad = latitude * (Math.PI / 180);
+            const new_long_rad = longitude < 0 ? (longitude + 360) * (Math.PI / 180) : longitude * (Math.PI / 180);
 
-                const new_lat_rad = new_latitude * (Math.PI / 180);
-                const new_long_rad = new_longitude < 0 ? (new_longitude + 360) * (Math.PI / 180) : new_longitude * (Math.PI / 180);
-
-                handler({ latitude: new_lat_rad, longitude: new_long_rad });
-
-                this.user_changed_location = false;
+            handler({ latitude: new_lat_rad, longitude: new_long_rad });
+        };
+        
+        const latitude_input = document.getElementById('latitudeInput') as HTMLInputElement;
+        latitude_input?.addEventListener('change', () => {
+            let new_latitude: number;
+            try {
+                new_latitude = parseFloat(latitude_input.value);
+            } catch (err) {
+                new_latitude = 0;
             }
+            updateCoord(new_latitude, this.longitude * (180 / Math.PI));
+        });
+        
+        const longitude_input = document.getElementById('longitudeInput') as HTMLInputElement;
+        longitude_input?.addEventListener('change', () => {
+            let new_longitude: number;
+            try {
+                new_longitude = parseFloat(longitude_input.value);
+            } catch (err) {
+                new_longitude = 0;
+            }
+            updateCoord(this.latitude * (180 / Math.PI), new_longitude);
         });
     }
 
@@ -213,7 +191,8 @@ export class Controls {
      */
     onTimelapse(handler: (next_date: Date) => Date): void {
         const time_travel_button = document.getElementById('timelapse');
-        time_travel_button?.addEventListener('click', () => {
+        time_travel_button?.addEventListener('click', event => {
+            event.stopImmediatePropagation();
             time_travel_button!.innerText = this.timelapse_is_on ? 'Timelapse' : 'Stop';
             if (this.timelapse_is_on) {
                 this.timelapse_is_on = false;
@@ -403,14 +382,6 @@ export class Controls {
         });
     }
 
-    onResize(handler: () => void) {
-        this.resizeHandler = handler;
-    }
-
-    startDetectingResize(): void {
-        this.should_detect_resize = true;
-    }
-
     get date(): Date {
         const date_input = document.getElementById('dateInput') as HTMLInputElement;
         const current_date = date_input?.valueAsDate;
@@ -429,12 +400,11 @@ export class Controls {
     }
 
     set latitude(value: number) {
-        const location_input = document.getElementById('locationInput') as HTMLInputElement;
+        const location_input = document.getElementById('latitudeInput') as HTMLInputElement;
         this.current_latitude = value;
         if (location_input) {
-            const longitude = location_input.value.split(',')[1];
             const lat_degrees = value * (180 / Math.PI);
-            location_input.value = `${lat_degrees.toPrecision(6)}, ${longitude}`;
+            location_input.value = lat_degrees.toPrecision(6);
         }
     }
 
@@ -443,12 +413,11 @@ export class Controls {
     }
 
     set longitude(value: number) {
-        const location_input = document.getElementById('locationInput') as HTMLInputElement;
+        const location_input = document.getElementById('longitudeInput') as HTMLInputElement;
         this.current_longitude = value;
         if (location_input) {
-            const [latitude] = location_input.value.split(',');
             const long_degrees = value > Math.PI ? (value - 2 * Math.PI) * (180 / Math.PI) : value * (180 / Math.PI);
-            location_input.value = `${latitude}, ${long_degrees.toPrecision(6)}`;
+            location_input.value = long_degrees.toPrecision(6);
         }
     }
 
