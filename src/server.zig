@@ -309,6 +309,7 @@ const LinuxServer = struct {
             if (std.os.linux.IO_Uring.init(@as(u13, @intCast(entries)), flags)) |ring| {
                 log.info("Submission queue created with {} entries", .{entries});
                 server.io_uring = ring;
+                break;
             } else |err| switch (err) {
                 error.SystemResources => {
                     entries /= 2;
