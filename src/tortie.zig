@@ -54,7 +54,6 @@ pub fn TortieServer(comptime ServerContext: type) type {
                         };
                     },
                     .read_complete => {
-                        std.debug.print("Handling request using client {}\n", .{client.id});
                         client.response = Response.writer(client.response_buffer.writer());
 
                         client.request = Request{

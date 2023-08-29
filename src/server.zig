@@ -413,7 +413,7 @@ const LinuxServer = struct {
                         client.socket = cqe.res;
                     } else if (client.state == .reading) {
                         const bytes_transferred = @as(usize, @intCast(cqe.res));
-                        const total_bytes_recv = client.request_buffer.len + bytes_transferred;
+                        const total_bytes_recv = client.request_buffer.items.len + bytes_transferred;
                         if (total_bytes_recv == client.request_buffer.capacity) {
                             client.request_buffer.resize(client.request_buffer.capacity + 1024) catch {
                                 log.err("Reached capacity on request_buffer, but could not allocate additional space. Will try to handle the request with the data received so far...", .{});
