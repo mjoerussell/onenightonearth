@@ -1,4 +1,4 @@
 .{ .name = "onenight-server", .version = "1.2.0", .dependencies = .{ .tortie = .{
     .url = "https://github.com/mjoerussell/tortie/archive/feature/dynamic-req-res.tar.gz",
-    .hash = "12201c34713d1a49c32b4690869a5bd4d229e44804437a7782648589bfdefe217bbf",
+    .hash = "1220c194bf5e6b97f9b690ae00b5288f258e90f14fd3f087b13e1e5fdc6c9f800689",
 } } }
