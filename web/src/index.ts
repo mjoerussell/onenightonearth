@@ -53,7 +53,9 @@ document.addEventListener('DOMContentLoaded', () => {
             controls.setConstellations(constellations);
         });
 
-    WebAssembly.instantiateStreaming(fetch('./dist/wasm/night-math.wasm'), {
+    const wasm_fetch = fetch('night-math.wasm');
+
+    WebAssembly.instantiateStreaming(wasm_fetch, {
         env: {
             consoleLog: (msg_ptr: number, msg_len: number) => {
                 const message = wasm_interface.getString(msg_ptr, msg_len);
@@ -82,12 +84,11 @@ document.addEventListener('DOMContentLoaded', () => {
         );
 
         renderStars(controls);
-        controls.startDetectingResize();
     });
 
-    controls.onResize(() => {
-        window.requestAnimationFrame(() => renderStars(controls));
-    });
+    // controls.onResize(() => {
+    //     window.requestAnimationFrame(() => renderStars(controls));
+    // });
 
     controls.onDateChange(_ => {
         window.requestAnimationFrame(() => renderStars(controls));

@@ -36,7 +36,7 @@ pub fn run(renderer: *StarRenderer, observer_latitude: f32, observer_longitude: 
     if (renderer.canvas.settings.draw_constellation_grid or renderer.canvas.settings.draw_asterisms) {
         for (renderer.constellations) |constellation| {
             if (renderer.canvas.settings.zodiac_only and !constellation.is_zodiac) continue;
-            
+
             if (renderer.canvas.settings.draw_constellation_grid) {
                 renderer.canvas.drawGrid(constellation, line_color, 1, local_sidereal_time, sin_latitude, cos_latitude);
             }

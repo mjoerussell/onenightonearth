@@ -33,18 +33,18 @@ pub const ObserverPosition = struct {
 
 fn getPartialLocalSiderealTime(timestamp: i64) f32 {
     const j2000_offset_millis = 949_428_000_000;
-    const days_since_j2000 = @intToFloat(f64, timestamp - j2000_offset_millis) / 86_400_000.0;
-    const lst = ((100.46 + (0.985647 * days_since_j2000) + @intToFloat(f64, 15 * timestamp)) * (math.pi / 180.0));
-    return @floatCast(f32, math_utils.floatMod(lst, 2 * math.pi));
+    const days_since_j2000 = @as(f64, @floatFromInt(timestamp - j2000_offset_millis)) / 86_400_000.0;
+    const lst = ((100.46 + (0.985647 * days_since_j2000) + @as(f64, @floatFromInt(15 * timestamp))) * (math.pi / 180.0));
+    return @as(f32, @floatCast(math_utils.floatMod(lst, 2 * math.pi)));
 }
 
 /// Get the constellation that's currently at the point on the canvas.
 pub fn getConstellationAtPoint(canvas: Canvas, point: Point, constellations: []Constellation, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) ?usize {
     if (!canvas.isInsideCircle(point)) return null;
 
-    for (constellations) |c, constellation_index| {
+    for (constellations, 0..) |c, constellation_index| {
         if (canvas.settings.zodiac_only and !c.is_zodiac) continue;
-        
+
         if (c.isPointInside(canvas, point, local_sidereal_time, sin_latitude, cos_latitude)) {
             return constellation_index;
         }
@@ -92,4 +92,3 @@ pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_e
         .longitude = new_relative_longitude,
     };
 }
-

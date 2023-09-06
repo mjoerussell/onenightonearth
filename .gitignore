@@ -10,3 +10,4 @@ dist/
 profiles
 *.wast
 zig-server/compressed
+zig-server/vendor

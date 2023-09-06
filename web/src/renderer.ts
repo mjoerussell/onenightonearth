@@ -45,7 +45,7 @@ interface Canvas {
 
 export class Renderer {
     public static readonly DefaultDragSpeed = 1.3;
-    public static readonly DefaultMobileDragSpeed = 1.5;
+    public static readonly DefaultMobileDragSpeed = 1;
     /**
      * The main canvas is the one that's shown to the user. It's only drawn to in single batches, once the workers
      * have finished drawing everything to the offscreen buffer.

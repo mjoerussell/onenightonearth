@@ -33,13 +33,12 @@ pub const Pixel = packed struct {
     }
 
     pub fn asU32(pixel: Pixel) u32 {
-        return @ptrCast(*const u32, @alignCast(4, &pixel)).*;
+        return @as(*const u32, @ptrCast(@alignCast(&pixel))).*;
     }
 
     pub fn fromU32(value: u32) Pixel {
-        return @ptrCast(*align(4) const Pixel, &value).*;
+        return @as(*align(4) const Pixel, @ptrCast(&value)).*;
     }
-
 };
 
 pub const Settings = struct {
@@ -68,12 +67,11 @@ pub fn init(allocator: Allocator, settings: Settings) !Canvas {
     }
 
     var pixel_mask = try allocator.alloc(u32, num_pixels);
-    for (pixel_mask) |*p, p_index| {
-        const x = @intToFloat(f32, p_index % canvas.settings.width);
-        const y = @intToFloat(f32, @divFloor(p_index, canvas.settings.width));
-        const mask_value = 
-            if (canvas.isInsideCircle(.{ .x = x, .y = y })) Pixel.rgba(255, 255, 255, 255)
-            else Pixel.rgba(0, 0, 0, 0);
+    for (pixel_mask, 0..) |*p, p_index| {
+        const x = @as(f32, @floatFromInt(p_index % canvas.settings.width));
+        const y = @as(f32, @floatFromInt(@divFloor(p_index, canvas.settings.width)));
+        const mask_value =
+            if (canvas.isInsideCircle(.{ .x = x, .y = y })) Pixel.rgba(255, 255, 255, 255) else Pixel.rgba(0, 0, 0, 0);
         p.* = mask_value.asU32();
     }
 
@@ -82,7 +80,7 @@ pub fn init(allocator: Allocator, settings: Settings) !Canvas {
 }
 
 pub fn resetImageData(canvas: *Canvas) void {
-    @memset(@ptrCast([*]u8, canvas.data.ptr), 0, canvas.data.len * @sizeOf(u32));
+    @memset(canvas.data, 0);
 }
 
 pub fn setPixelAt(canvas: *Canvas, point: Point, new_pixel: Pixel) void {
@@ -91,12 +89,12 @@ pub fn setPixelAt(canvas: *Canvas, point: Point, new_pixel: Pixel) void {
     }
 
     if (point.x < 0 or point.y < 0) return;
-    if (point.x > @intToFloat(f32, canvas.settings.width) or point.y > @intToFloat(f32, canvas.settings.height)) return;
+    if (point.x > @as(f32, @floatFromInt(canvas.settings.width)) or point.y > @as(f32, @floatFromInt(canvas.settings.height))) return;
 
-    const x = @floatToInt(usize, point.x);
-    const y = @floatToInt(usize, point.y);
+    const x = @as(usize, @intFromFloat(point.x));
+    const y = @as(usize, @intFromFloat(point.y));
 
-    const p_index: usize = (y * @intCast(usize, canvas.settings.width)) + x;
+    const p_index: usize = (y * @as(usize, @intCast(canvas.settings.width))) + x;
     if (p_index >= canvas.data.len) return;
 
     canvas.data[p_index] = canvas.pixel_mask[p_index] & new_pixel.asU32();
@@ -104,21 +102,21 @@ pub fn setPixelAt(canvas: *Canvas, point: Point, new_pixel: Pixel) void {
 
 pub fn projectAndRenderStarsWide(canvas: *Canvas, sky_coords: std.MultiArrayList(Star), local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
     const f32x4 = @Vector(4, f32);
-    
+
     // Constants for calculating sky coord-to-point
-    const radius_x4 = @splat(4, @as(f32, 2 / math.pi)); 
-    const lst_x4 = @splat(4, local_sidereal_time);
-    const sin_lat_x4 = @splat(4, sin_latitude);
-    const cos_lat_x4 = @splat(4, cos_latitude);
+    const radius_x4: f32x4 = @splat(@as(f32, 2.0 / math.pi));
+    const lst_x4: f32x4 = @splat(local_sidereal_time);
+    const sin_lat_x4: f32x4 = @splat(sin_latitude);
+    const cos_lat_x4: f32x4 = @splat(cos_latitude);
 
     // Constants for translatePoint
-    const center_x = @splat(4, @intToFloat(f32, canvas.settings.width) / 2);
-    const center_y = @splat(4, @intToFloat(f32, canvas.settings.height) / 2);
-    const direction_modifier: f32x4 = if (canvas.settings.draw_north_up) @splat(4, @as(f32, 1)) else @splat(4, @as(f32, -1));
-    const translate_factor = direction_modifier * @splat(4, canvas.settings.background_radius) * @splat(4, canvas.settings.zoom_factor);
+    const center_x: f32x4 = @splat(@as(f32, @floatFromInt(canvas.settings.width)) / 2);
+    const center_y: f32x4 = @splat(@as(f32, @floatFromInt(canvas.settings.height)) / 2);
+    const direction_modifier: f32x4 = if (canvas.settings.draw_north_up) @splat(@as(f32, 1)) else @splat(@as(f32, -1));
+    const translate_factor = direction_modifier * @as(f32x4, @splat(canvas.settings.background_radius)) * @as(f32x4, @splat(canvas.settings.zoom_factor));
 
     const coord_slice = sky_coords.slice();
-    
+
     const right_ascensions = coord_slice.items(.right_ascension);
     const sin_decs = coord_slice.items(.sin_declination);
     const cos_decs = coord_slice.items(.cos_declination);
@@ -132,17 +130,27 @@ pub fn projectAndRenderStarsWide(canvas: *Canvas, sky_coords: std.MultiArrayList
 
         const hour_angle = lst_x4 - ra_x4;
         const sin_alt = sin_dec_x4 * sin_lat_x4 + cos_dec_x4 * cos_lat_x4 * @cos(hour_angle);
-        
-        const altitude: f32x4 = .{ math.asin(sin_alt[0]), math.asin(sin_alt[1]), math.asin(sin_alt[2]), math.asin(sin_alt[3]), };
+
+        const altitude: f32x4 = .{
+            math.asin(sin_alt[0]),
+            math.asin(sin_alt[1]),
+            math.asin(sin_alt[2]),
+            math.asin(sin_alt[3]),
+        };
 
         const cos_azi = (sin_dec_x4 - sin_alt * sin_lat_x4) / (@cos(altitude) * cos_lat_x4);
-        const azi: f32x4 = [_]f32{ math.acos(cos_azi[0]), math.acos(cos_azi[1]), math.acos(cos_azi[2]), math.acos(cos_azi[3]), };
-        const pred = @sin(hour_angle) < @splat(4, @as(f32, 0));
+        const azi: f32x4 = [_]f32{
+            math.acos(cos_azi[0]),
+            math.acos(cos_azi[1]),
+            math.acos(cos_azi[2]),
+            math.acos(cos_azi[3]),
+        };
+        const pred = @sin(hour_angle) < @as(f32x4, @splat(0));
         // If the sin(hour_angle) is less than zero (pred), then use -azimuth instead of the regular calculated azimuth
         const azimuth = @select(f32, pred, -azi, azi);
-        
-        const s = @splat(4, @as(f32, 1)) - (radius_x4 * altitude);
-    
+
+        const s = @as(f32x4, @splat(1)) - (radius_x4 * altitude);
+
         const x_x4 = s * @sin(azimuth);
         const y_x4 = s * cos_azi;
 
@@ -166,7 +174,7 @@ pub fn coordToPoint(canvas: Canvas, sky_coord: SkyCoord, local_sidereal_time: f3
 
     const hour_angle = local_sidereal_time - right_ascension;
     const sin_dec = math.sin(declination);
-    
+
     const sin_alt = sin_dec * sin_latitude + math.cos(declination) * cos_latitude * math.cos(hour_angle);
     const altitude = math.asin(sin_alt);
     if (filter_below_horizon and altitude < 0) {
@@ -184,11 +192,11 @@ pub fn coordToPoint(canvas: Canvas, sky_coord: SkyCoord, local_sidereal_time: f3
         const s = 1.0 - (radius * altitude);
 
         // Convert from polar to cartesian coordinates
-        break :blk Point{ 
+        break :blk Point{
             // @note without negating x here, the whole chart is rendered backwards. Not sure if this is where the negations
             // is SUPPOSED to go, or if I messed up a negation somewhere else and this is just a hack that makes it work
-            .x = -s * math.sin(azimuth), 
-            .y = s * cos_azi
+            .x = -s * math.sin(azimuth),
+            .y = s * cos_azi,
         };
     };
 
@@ -197,8 +205,8 @@ pub fn coordToPoint(canvas: Canvas, sky_coord: SkyCoord, local_sidereal_time: f3
 
 pub fn translatePoint(self: Canvas, pt: Point) Point {
     const center = Point{
-        .x = @intToFloat(f32, self.settings.width) / 2.0,
-        .y = @intToFloat(f32, self.settings.height) / 2.0,
+        .x = @as(f32, @floatFromInt(self.settings.width)) / 2.0,
+        .y = @as(f32, @floatFromInt(self.settings.height)) / 2.0,
     };
 
     // A multiplier used to convert a coordinate between [-1, 1] to a coordinate on the actual canvas, taking into
@@ -206,16 +214,13 @@ pub fn translatePoint(self: Canvas, pt: Point) Point {
     const direction_modifier: f32 = if (self.settings.draw_north_up) 1.0 else -1.0;
     const translate_factor: f32 = direction_modifier * self.settings.background_radius * self.settings.zoom_factor;
 
-    return Point{
-        .x = center.x + (translate_factor * pt.x),
-        .y = center.y - (translate_factor * pt.y)
-    };
+    return Point{ .x = center.x + (translate_factor * pt.x), .y = center.y - (translate_factor * pt.y) };
 }
 
 pub fn isInsideCircle(self: Canvas, point: Point) bool {
     const center = Point{
-        .x = @intToFloat(f32, self.settings.width) / 2.0,
-        .y = @intToFloat(f32, self.settings.height) / 2.0,
+        .x = @as(f32, @floatFromInt(self.settings.width)) / 2.0,
+        .y = @as(f32, @floatFromInt(self.settings.height)) / 2.0,
     };
 
     return point.getDist(center) <= self.settings.background_radius;
@@ -233,12 +238,11 @@ pub fn drawGrid(canvas: *Canvas, constellation: Constellation, color: Pixel, lin
         }
 
         var line_index: f32 = 0;
-        while (line_index < @intToFloat(f32, line_width)) : (line_index += 1) {
+        while (line_index < @as(f32, @floatFromInt(line_width))) : (line_index += 1) {
             const start = Point{ .x = point_a.x + line_index, .y = point_a.y + line_index };
             const end = Point{ .x = point_b.x + line_index, .y = point_b.y + line_index };
             canvas.drawLine(Line{ .a = start, .b = end }, color);
         }
-        
     }
 }
 
@@ -252,9 +256,9 @@ pub fn drawAsterism(canvas: *Canvas, constellation: Constellation, color: Pixel,
         if (!canvas.isInsideCircle(point_a) and !canvas.isInsideCircle(point_b)) {
             continue;
         }
-        
+
         var line_index: f32 = 0;
-        while (line_index < @intToFloat(f32, line_width)) : (line_index += 1) {
+        while (line_index < @as(f32, @floatFromInt(line_width))) : (line_index += 1) {
             const start = Point{ .x = point_a.x + line_index, .y = point_a.y + line_index };
             const end = Point{ .x = point_b.x + line_index, .y = point_b.y + line_index };
             canvas.drawLine(Line{ .a = start, .b = end }, color);
@@ -270,12 +274,12 @@ pub fn drawLine(self: *Canvas, line: Line, color: Pixel) void {
         y: i32,
 
         fn toPoint(int_point: @This()) Point {
-            return .{ .x = @intToFloat(f32, int_point.x), .y = @intToFloat(f32, int_point.y) };
+            return .{ .x = @as(f32, @floatFromInt(int_point.x)), .y = @as(f32, @floatFromInt(int_point.y)) };
         }
     };
 
-    var a = IntPoint{ .x = @floatToInt(i32, line.a.x), .y = @floatToInt(i32, line.a.y) };
-    var b = IntPoint{ .x = @floatToInt(i32, line.b.x), .y = @floatToInt(i32, line.b.y) };
+    var a = IntPoint{ .x = @as(i32, @intFromFloat(line.a.x)), .y = @as(i32, @intFromFloat(line.a.y)) };
+    var b = IntPoint{ .x = @as(i32, @intFromFloat(line.b.x)), .y = @as(i32, @intFromFloat(line.b.y)) };
 
     const dist_x = math.absInt(b.x - a.x) catch unreachable;
     const dist_y = -(math.absInt(b.y - a.y) catch unreachable);
@@ -334,5 +338,4 @@ test "coord to point conversion" {
     const point_to_coord = canvas.pointToCoord(coord_to_point, original_coord).?;
 
     try std.testing.expectEqual(original_sky_coord, point_to_coord);
-
 }

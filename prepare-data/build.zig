@@ -9,14 +9,21 @@ pub fn build(b: *std.build.Builder) void {
 
     // Standard release options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
-    const mode = b.standardReleaseOptions();
+    const mode = b.standardOptimizeOption(.{});
 
-    const exe = b.addExecutable("parse-data", "src/main.zig");
-    exe.setTarget(target);
-    exe.setBuildMode(mode);
-    exe.install();
+    // const exe = b.addExecutable("parse-data", "src/main.zig");
+    const exe = b.addExecutable(.{
+        .name = "parse-data",
+        .root_source_file = std.build.FileSource{ .path = "src/main.zig" },
+        .target = target,
+        .optimize = mode,
+    });
 
-    const run_cmd = exe.run();
+    const install_artifact_step = b.addInstallArtifact(exe);
+    _ = install_artifact_step;
+
+    // const run_cmd = exe.run();
+    const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
         run_cmd.addArgs(args);

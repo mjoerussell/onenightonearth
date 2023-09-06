@@ -27,7 +27,7 @@ pub const ExternStar = packed struct {
 
     pub fn getColor(star: ExternStar) Pixel {
         var base_color = star.spec_type.getColor();
-        base_color.a = @intCast(u8, std.math.clamp(@intCast(u16, star.brightness) + 30, 0, @as(u16, 255)));
+        base_color.a = @as(u8, @intCast(std.math.clamp(@as(u16, @intCast(star.brightness)) + 30, 0, @as(u16, 255))));
 
         return base_color;
     }
@@ -66,7 +66,7 @@ pub const SpectralType = enum(u8) {
             // Orange
             .K => Pixel.rgb(240, 129, 50),
             // Red
-            .M => Pixel.rgb(207, 32, 23)
+            .M => Pixel.rgb(207, 32, 23),
         };
     }
 };

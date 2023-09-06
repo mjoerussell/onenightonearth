@@ -7,71 +7,79 @@
         <script src="./dist/bundle.js"></script>
         <meta charset="UTF-8" />
         <title>One Night on Earth</title>
-        <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
-        <link async href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet" />
+        <link rel="icon" href="./assets/favicon.ico" type="image/x-icon" />
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet" />
     </head>
     <body>
-        <div class="page-container">
-            <h1>One night, on Earth...</h1>
-            <div id="content">
-                <div id="settings">
-                    <div class="input-row">
-                        <input id="dateInput" type="date" required />
-                        <div class="button-row">
-                            <button id="timelapse">Timelapse</button>
-                            <!-- <button id="today">Today</button> -->
-                        </div>
-                    </div>
-                    <div class="input-row">
-                        <div class="inline-input">
-                            <input id="locationInput" type="text" placeholder="Latitude, Longitude" />
-                            <button class="location-button" id="locationUpdate">Go</button>
-                        </div>
-                        <button id="currentPosition">Use My Location</button>
-                    </div>
-                    <div class="input-row">
-                        <label class="toggle">
-                            Constellations
-                            <div class="toggle">
-                                <input id="showAsterism" type="checkbox" />
-                                <span></span>
-                            </div>
-                        </label>
-                        <label class="toggle">
-                            Constellation Boundaries
-                            <div class="toggle">
-                                <input id="showGrid" type="checkbox" />
-                                <span></span>
-                            </div>
-                        </label>
-                        <div id="extraConstellationControls">
-                            <label class="toggle">
-                                Zodiac Only
-                                <div class="toggle">
-                                    <input id="onlyZodiac" type="checkbox" />
-                                    <span></span>
-                                </div>
-                            </label>
-                            <select id="selectConstellation">
-                                <option value="-1">Select a Constellation to View</option>
-                            </select>
-                        </div>
-                        <div class="constellation-info desktop">
-                            <span class="constellation-name"></span>
-                        </div>
-                    </div>
+        <div id="settings">
+            <div id="header">
+                <img src="./assets/favicon.ico" />
+                <h1>One night, on Earth...</h1>
+            </div>
+            <div class="input-row">
+                <input id="dateInput" type="date" required />
+                <div class="button-row">
+                    <button id="timelapse">Timelapse</button>
+                    <!-- <button id="today">Today</button> -->
                 </div>
-                
-                <div id="canvas-container" class="canvas-container">
-                    <div class="backdrop"></div>
-                    <canvas id="star-canvas"></canvas>
+            </div>
+            <div class="input-row">
+                <div class="inline-input">
+                    <label for="latitudeInput">
+                        Latitude
+                        <input id="latitudeInput" type="number" step="0.01" placeholder="0.0" />
+                    </label>
+                    <label for="longitudeInput">
+                        Longitude
+                        <input id="longitudeInput" type="number" step="0.01" placeholder="0.0" />
+                    </label>
                 </div>
-
+                <button id="currentPosition">Use My Location</button>
+            </div>
+            <div class="input-row">
+                <label class="toggle">
+                    Constellations
+                    <div class="toggle">
+                        <input id="showAsterism" type="checkbox" />
+                        <span></span>
+                    </div>
+                </label>
+                <label class="toggle">
+                    Constellation Boundaries
+                    <div class="toggle">
+                        <input id="showGrid" type="checkbox" />
+                        <span></span>
+                    </div>
+                </label>
+                <div id="extraConstellationControls">
+                    <label class="toggle">
+                        Zodiac Only
+                        <div class="toggle">
+                            <input id="onlyZodiac" type="checkbox" />
+                            <span></span>
+                        </div>
+                    </label>
+                    <select id="selectConstellation">
+                        <option value="-1">Select a Constellation to View</option>
+                    </select>
+                </div>
+                <div class="constellation-info desktop">
+                    <span class="constellation-name"></span>
+                </div>
                 <div class="constellation-info mobile">
                     <span class="constellation-name"></span>
                 </div>
             </div>
-            
+            <button class="settings-toggle">☰</button>
+        </div>
+        
+        <button class="settings-toggle">☰</button>
+        
+        <div id="canvas-container" class="canvas-container">
+            <div class="backdrop"></div>
+            <canvas id="star-canvas"></canvas>
         </div>
     </body>
 </html>
