@@ -24,6 +24,8 @@ pub const log_level = switch (builtin.mode) {
     else => .info,
 };
 
+pub const log = std.log.scoped(.night_server);
+
 const StaticFile = struct {
     const InitOptions = struct {
         path: ?[]const u8 = null,
@@ -113,7 +115,7 @@ const StaticContent = struct {
 
         for (content.file_info, 0..) |info, index| {
             var file = cwd.openFile(info.file_name, .{}) catch |err| {
-                std.log.err("Error ocurred when trying to open file {s}: {}", .{ info.file_name, err });
+                log.err("Error ocurred when trying to open file {s}: {}", .{ info.file_name, err });
                 file_content_markers[index] = .{ .start = 0, .end = 0 };
                 continue;
             };
@@ -177,10 +179,10 @@ pub fn main() anyerror!void {
     var server = try TortieServer(ServerContext).init(allocator, localhost, context, handleRequest);
 
     static_content = try StaticContent.init(allocator, &static_files);
-    std.log.info("{d:.3}Mb of static content loaded", .{@as(f32, @floatFromInt(static_content.buffer.len)) / (1024 * 1024)});
+    log.info("{d:.3}Mb of static content loaded", .{@as(f32, @floatFromInt(static_content.buffer.len)) / (1024 * 1024)});
 
-    std.log.info("Listening on port {}", .{port});
-    std.log.debug("Build is single threaded: {}", .{builtin.single_threaded});
+    log.info("Listening on port {}", .{port});
+    log.debug("Build is single threaded: {}", .{builtin.single_threaded});
 
     while (true) {
         server.run() catch {};
@@ -190,17 +192,20 @@ pub fn main() anyerror!void {
 fn handleRequest(client: *tortie.Client, context: ServerContext) !void {
     handleRequestError(client, context) catch |err| {
         const status: tortie.Response.ResponseStatus = if (err == error.NotFound) .not_found else .internal_server_error;
-        try client.response.writeStatus(status);
+        if (status == .not_found) {
+            log.warn("Requested path \"{s}\" not found", .{client.buffers.request().getPath() catch "unknown"});
+        }
+        try client.buffers.responseWriter().writeStatus(status);
     };
 }
 
 fn handleRequestError(client: *tortie.Client, context: ServerContext) !void {
-    const request_path = client.request.getPath() catch blk: {
-        std.log.warn("Could not parse path, defaulting to /", .{});
+    const request_path = client.buffers.request().getPath() catch blk: {
+        log.warn("Could not parse path, defaulting to /", .{});
         break :blk "/";
     };
 
-    std.log.info("Handling request {s}", .{request_path});
+    log.info("Handling request {s}", .{request_path});
 
     for (static_content.file_info) |*info| {
         if (std.mem.eql(u8, request_path, info.path)) {
@@ -221,25 +226,27 @@ fn serveStaticFile(client: *tortie.Client, allocator: Allocator, options: *Stati
         break :blk options.content orelse return error.NotFound;
     };
 
-    try client.response.writeStatus(.ok);
-    try client.response.writeHeader("Content-Type", options.content_type);
-    try client.response.writeHeader("Content-Length", content.len);
+    var response = client.buffers.responseWriter();
+
+    try response.writeStatus(.ok);
+    try response.writeHeader("Content-Type", options.content_type);
+    try response.writeHeader("Content-Length", content.len);
 
     if (client.keep_alive) {
-        try client.response.writeHeader("Connection", "keep-alive");
-        try client.response.writeHeader("Keep-Alive", "timeout=5");
+        try response.writeHeader("Connection", "keep-alive");
+        try response.writeHeader("Keep-Alive", "timeout=5");
     }
 
     if (options.secure_context) {
-        try client.response.writeHeader("Cross-Origin-Opener-Policy", "same-origin");
-        try client.response.writeHeader("Cross-Origin-Embedder-Policy", "require-corp");
+        try response.writeHeader("Cross-Origin-Opener-Policy", "same-origin");
+        try response.writeHeader("Cross-Origin-Embedder-Policy", "require-corp");
     }
 
     if (options.compress) {
-        try client.response.writeHeader("Content-Encoding", "deflate");
+        try response.writeHeader("Content-Encoding", "deflate");
     }
 
-    try client.response.writeBody(content);
+    try response.writeBody(content);
 }
 
 fn getMimeType(file_name: []const u8) []const u8 {
