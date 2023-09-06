@@ -143,10 +143,12 @@ pub fn Writer(comptime W: type) type {
     return struct {
         const Self = @This();
 
+        body_started: bool = false,
+
         writer: W,
 
         pub fn writeStatus(self: Self, status: ResponseStatus) !void {
-            try self.writer.print("HTTP/1.1 {} {s}\r\n", .{ @enumToInt(status), status.getMessage() });
+            try self.writer.print("HTTP/1.1 {} {s}\r\n", .{ @intFromEnum(status), status.getMessage() });
         }
 
         pub fn writeHeader(self: Self, header_name: []const u8, header_value: anytype) !void {
@@ -158,8 +160,11 @@ pub fn Writer(comptime W: type) type {
             try self.writer.print(format_string, .{ header_name, header_value });
         }
 
-        pub fn writeBody(self: Self, body: []const u8) !void {
-            try self.writer.writeAll("\r\n");
+        pub fn writeBody(self: *Self, body: []const u8) !void {
+            if (!self.body_started) {
+                try self.writer.writeAll("\r\n");
+                self.body_started = true;
+            }
             try self.writer.writeAll(body);
         }
 

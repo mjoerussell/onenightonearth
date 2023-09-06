@@ -22,9 +22,9 @@ pub fn TortieServer(comptime ServerContext: type) type {
         server: Server,
         context: ServerContext,
 
-        pub fn init(address: std.net.Address, context: ServerContext, handler_fn: *const HandlerFn(ServerContext)) !Self {
+        pub fn init(allocator: Allocator, address: std.net.Address, context: ServerContext, handler_fn: *const HandlerFn(ServerContext)) !Self {
             return Self{
-                .server = try Server.init(address),
+                .server = try Server.init(allocator, address),
                 .handler_fn = handler_fn,
                 .context = context,
             };
@@ -41,24 +41,30 @@ pub fn TortieServer(comptime ServerContext: type) type {
                 switch (client.state) {
                     .accepting => {
                         client.start_ts = std.time.microTimestamp();
+                        client.buffers.request_buffer.items.len = 0;
                         tortie.server.recv(client) catch |err| {
                             log.err("Encountered error during recv(): {}", .{err});
                             tortie.server.deinitClient(client);
                         };
                     },
                     .reading => {
-                        var fbs = std.io.fixedBufferStream(&client.buffer);
-                        client.response = Response.writer(fbs.writer());
+                        tortie.server.recv(client) catch |err| {
+                            log.err("Encountered error during recv: {}", .{err});
+                            tortie.server.deinitClient(client);
+                        };
+                    },
+                    .read_complete => {
+                        if (client.buffers.request().findHeader("Connection")) |conn| {
+                            client.keep_alive = !std.mem.eql(u8, conn, "close");
+                        }
 
-                        client.request = Request{ .data = client.buffer[0..client.len] };
                         tortie.handler_fn(client, tortie.context) catch |err| {
                             log.err("Error processing client request: {}", .{err});
                             tortie.server.deinitClient(client);
                             continue;
                         };
 
-                        client.response.complete() catch {};
-                        client.len = fbs.pos;
+                        client.buffers.responseWriter().complete() catch {};
 
                         tortie.server.send(client) catch |err| {
                             std.log.err("Encountered error during send(): {}", .{err});
@@ -66,7 +72,22 @@ pub fn TortieServer(comptime ServerContext: type) type {
                         };
                     },
                     .writing => {
-                        tortie.server.deinitClient(client);
+                        tortie.server.send(client) catch |err| {
+                            std.log.err("Encountered error during send: {}", .{err});
+                            tortie.server.deinitClient(client);
+                        };
+                    },
+                    .write_complete => {
+                        if (!client.keep_alive) {
+                            tortie.server.deinitClient(client);
+                        } else {
+                            tortie.server.resetClient(client);
+                            client.state = .reading;
+                            tortie.server.recv(client) catch |err| {
+                                log.err("Encountered error during recv: {}", .{err});
+                                tortie.server.deinitClient(client);
+                            };
+                        }
                     },
                     .disconnecting => {
                         tortie.server.acceptClient(client) catch |err| {
