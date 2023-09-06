@@ -9,5 +9,4 @@ dist/
 **/const_meta.json
 profiles
 *.wast
-zig-server/compressed
-zig-server/vendor
+server/vendor

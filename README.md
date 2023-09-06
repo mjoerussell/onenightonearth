@@ -19,24 +19,9 @@ The controls currently available on the site are:
 
 ## Running Locally
 
-### Docker
+There are a few steps to get started:
 
-The easiest way to run locally is to build and run the included `Dockerfile`. Simply run the command
-
-```
-docker build . -t one-night
-docker run -p 8080:8080 -d one-night
-```
-
-> Note: You can replace `one-night` with anything you want
-
-Then visit `localhost:8080` in your browser.
-
-### Without Docker
-
-If you don't have Docker, or would rather run the app directly, there's a few steps to get started:
-
-**Prerequisites**
+**Pre-Requisites**
 
 - Zig - See [Zig on GitHub](https://github.com/ziglang/zig) for more instructions.
 - Node - See https://nodejs.org/en/download/
@@ -44,8 +29,7 @@ If you don't have Docker, or would rather run the app directly, there's a few st
 **On First Run Only:**
 
 1. Run `cd web && npm install`
-2. *(Optional)* To run using the node backend, run `cd server && npm install`
-3. Run `cd prepare-data && zig build run -Drelease-fast -- ../zig-server/star_data.bin ../zig-server/const_data.bin ../zig-server/const_meta.json`. This will create all of the data files that the server needs in order to run.
+2. Run `cd prepare-data && zig build run -Drelease-fast -- ../zig-server/star_data.bin ../zig-server/const_data.bin ../zig-server/const_meta.json`. This will create all of the data files that the server needs in order to run.
 
 **Each Run:**
 
