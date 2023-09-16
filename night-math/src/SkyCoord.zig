@@ -12,12 +12,11 @@ pub const ExternSkyCoord = extern struct {
     right_ascension: i16,
     declination: i16,
 
-    pub inline fn unsafeSliceCast(data: []u8) []ExternSkyCoord {
-        var result: []ExternSkyCoord = undefined;
-        result.ptr = @as([*]ExternSkyCoord, @ptrCast(@alignCast(data.ptr)));
+    pub inline fn unsafeSliceCast(data: []const u8) []const ExternSkyCoord {
+        var result: []const ExternSkyCoord = undefined;
+        result.ptr = @as([*]const ExternSkyCoord, @ptrCast(@alignCast(data.ptr)));
         result.len = data.len / @sizeOf(ExternSkyCoord);
         return result;
-        // return @ptrCast([]ExternSkyCoord, data);
     }
 
     pub fn toSkyCoord(sky_coord: ExternSkyCoord) SkyCoord {

@@ -34,6 +34,9 @@ var waypoints: [num_waypoints]Coord = undefined;
 
 var result_data: []u8 = undefined;
 
+const embeded_star_data = @embedFile("star_data.bin");
+const embeded_const_data = @embedFile("const_data.bin");
+
 pub const ExternCanvasSettings = packed struct {
     width: u32,
     height: u32,
@@ -60,9 +63,9 @@ pub const ExternCanvasSettings = packed struct {
     }
 };
 
-pub fn initializeStars(star_renderer: *StarRenderer, stars: []ExternStar) void {
+pub fn initializeStars(star_renderer: *StarRenderer, stars: []const ExternStar) void {
     star_renderer.stars = std.MultiArrayList(Star){};
-    star_renderer.stars.ensureTotalCapacity(allocator, stars.len) catch {
+    star_renderer.stars.ensureTotalCapacity(allocator, embeded_star_data.len) catch {
         log.err("Ran out of memory trying to ensureCapacity to {} stars", .{stars.len});
         unreachable;
     };
@@ -74,12 +77,14 @@ pub fn initializeStars(star_renderer: *StarRenderer, stars: []ExternStar) void {
     allocator.free(stars);
 }
 
-pub export fn initialize(stars: [*]ExternStar, num_stars: u32, constellation_data: [*]u8, settings: *ExternCanvasSettings) *StarRenderer {
+pub export fn initialize(settings: *ExternCanvasSettings) *StarRenderer {
     var star_renderer = allocator.create(StarRenderer) catch {
         log.err("Could not create StarRenderer, needs {} bytes", .{@sizeOf(StarRenderer)});
         unreachable;
     };
-    initializeStars(star_renderer, stars[0..num_stars]);
+
+    const stars = std.mem.bytesAsSlice(ExternStar, embeded_star_data);
+    initializeStars(star_renderer, @alignCast(stars));
 
     star_renderer.canvas = Canvas.init(allocator, settings.getCanvasSettings()) catch {
         const num_pixels = star_renderer.canvas.settings.width * star_renderer.canvas.settings.height;
@@ -87,7 +92,7 @@ pub export fn initialize(stars: [*]ExternStar, num_stars: u32, constellation_dat
         unreachable;
     };
 
-    initializeConstellations(star_renderer, constellation_data);
+    initializeConstellations(star_renderer, embeded_const_data);
 
     return star_renderer;
 }
@@ -111,7 +116,7 @@ pub export fn initializeResultData() [*]u8 {
 
 /// Initialize the constellation boundaries, asterisms, and zodiac flags. Because each constellation has a variable number of boundaries and
 /// asterisms, the data layout is slightly complicated.
-pub fn initializeConstellations(star_renderer: *StarRenderer, data: [*]u8) void {
+pub fn initializeConstellations(star_renderer: *StarRenderer, data: [*]const u8) void {
     // Constellation data layout:
     // num_constellations | num_boundary_coords | num_asterism_coords | ...constellations | ...constellation_boundaries | ...constellation asterisms
     // constellations size = num_constellations * @sizeOf(ConstellationInfo)
@@ -143,7 +148,7 @@ pub fn initializeConstellations(star_renderer: *StarRenderer, data: [*]u8) void 
 
     // Convert the data slices from u8's to something more accurate. The constellation metadata is in the form of ConstellationInfo's,
     // and the boundary and asterism data are stored as i16 (fixed point) right ascension/declination pairs
-    const constellation_data = @as([*]ConstellationInfo, @ptrCast(@alignCast(data[12..constellation_end_index])))[0..num_constellations];
+    const constellation_data = @as([*]const ConstellationInfo, @ptrCast(@alignCast(data[12..constellation_end_index])))[0..num_constellations];
     const boundary_data = SkyCoord.ExternSkyCoord.unsafeSliceCast(data[constellation_end_index..boundary_end_index]);
     const asterism_data = SkyCoord.ExternSkyCoord.unsafeSliceCast(data[boundary_end_index..asterism_end_index]);
 
@@ -243,8 +248,6 @@ pub export fn findWaypoints(start_lat: f32, start_long: f32, end_lat: f32, end_l
     while (waypoint_iter.next()) |waypoint| : (waypoint_index += 1) {
         waypoints[waypoint_index] = waypoint;
     }
-
-    // std.mem.copy(Coord, waypoints[0..], great_circle.waypoints[0..]);
 
     return &waypoints;
 }
