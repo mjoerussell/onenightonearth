@@ -19,10 +19,6 @@ pub fn build(b: *std.build.Builder) void {
         .optimize = mode,
     });
 
-    const install_artifact_step = b.addInstallArtifact(exe);
-    _ = install_artifact_step;
-
-    // const run_cmd = exe.run();
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
