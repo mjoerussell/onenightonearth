@@ -27,23 +27,12 @@ export class WasmInterface {
      * @param constellation_data The constellation data to use when rendering.
      * @param canvas_settings The initial canvas settings.
      */
-    initialize(star_data: Uint8Array, constellation_data: Uint8Array, canvas_settings: wasm.ExternCanvasSettings): void {
+    initialize(canvas_settings: wasm.ExternCanvasSettings): void {
         const init_start = performance.now();
-
-        console.log(`Star byteLength: ${star_data.byteLength / 1024} k`);
-        const star_ptr = this.allocBytes(star_data.byteLength);
-        const star_view = new Uint8Array(this.memory, star_ptr);
-        star_view.set(star_data);
-
-        const const_ptr = this.allocBytes(constellation_data.byteLength);
-        const const_view = new Uint8Array(this.memory, const_ptr);
-        const_view.set(constellation_data);
-
-        const num_stars = star_data.byteLength / wasm.sizeOf(wasm.sizedExternStar);
 
         this.settings_ptr = this.allocObject(canvas_settings, wasm.sizedExternCanvasSettings);
 
-        this.renderer_ptr = this.lib.initialize(star_ptr, num_stars, const_ptr, this.settings_ptr);
+        this.renderer_ptr = this.lib.initialize(this.settings_ptr);
 
         this.result_ptr = this.lib.initializeResultData();
 

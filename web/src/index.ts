@@ -53,9 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
             controls.setConstellations(constellations);
         });
 
-    const wasm_fetch = fetch('night-math.wasm');
-
-    WebAssembly.instantiateStreaming(wasm_fetch, {
+    WebAssembly.instantiateStreaming(fetch('night-math.wasm'), {
         env: {
             consoleLog: (msg_ptr: number, msg_len: number) => {
                 const message = wasm_interface.getString(msg_ptr, msg_len);
@@ -72,23 +70,13 @@ document.addEventListener('DOMContentLoaded', () => {
         },
     }).then(async wasm_result => {
         wasm_interface = new WasmInterface(wasm_result.instance);
-        const [star_bin, constellation_bin] = await Promise.all([
-            fetch('/stars').then(s => s.arrayBuffer()),
-            fetch('/constellations').then(s => s.arrayBuffer()),
-        ]);
 
         wasm_interface.initialize(
-            new Uint8Array(star_bin),
-            new Uint8Array(constellation_bin),
             controls.renderer.getCanvasSettings().toExtern()
         );
 
         renderStars(controls);
     });
-
-    // controls.onResize(() => {
-    //     window.requestAnimationFrame(() => renderStars(controls));
-    // });
 
     controls.onDateChange(_ => {
         window.requestAnimationFrame(() => renderStars(controls));

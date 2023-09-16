@@ -144,7 +144,7 @@ export const sizedExternSkyCoord: Sized<ExternSkyCoord> = {
 
 export interface WasmModule {
 	memory: WebAssembly.Memory;
-	initialize: (arg_0: pointer, arg_1: number, arg_2: pointer, arg_3: pointer) => pointer;
+	initialize: (arg_0: pointer) => pointer;
 	updateCanvasSettings: (arg_0: pointer, arg_1: pointer) => pointer;
 	initializeResultData: () => pointer;
 	getImageData: (arg_0: pointer) => pointer;
