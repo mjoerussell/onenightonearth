@@ -169,14 +169,14 @@ const ServerContext = struct {
 
 pub fn main() anyerror!void {
     const port = 8080;
-    var localhost = try std.net.Address.parseIp("0.0.0.0", port);
+    const localhost = try std.net.Address.parseIp("0.0.0.0", port);
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
     const allocator = gpa.allocator();
 
-    var context = ServerContext{ .allocator = allocator };
+    const context = ServerContext{ .allocator = allocator };
     var server = try TortieServer(ServerContext).init(allocator, localhost, context, handleRequest);
 
     static_content = try StaticContent.init(allocator, &static_files);

@@ -82,7 +82,7 @@ pub fn init(start: Coord, end: Coord) GreatCircle {
     const cos_d = sin_start_latitude * sin_end_latitude + cos_start_latitude * cos_end_latitude * math.cos(long_diff);
     great_circle.distance = math_utils.boundedACos(cos_d) catch 0;
 
-    var cos_c = (sin_end_latitude - sin_start_latitude * math.cos(great_circle.distance)) / (cos_start_latitude * math.sin(great_circle.distance));
+    const cos_c = (sin_end_latitude - sin_start_latitude * math.cos(great_circle.distance)) / (cos_start_latitude * math.sin(great_circle.distance));
     great_circle.course_angle = math_utils.boundedACos(cos_c) catch 0;
 
     return great_circle;

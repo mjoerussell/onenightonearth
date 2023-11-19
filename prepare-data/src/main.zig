@@ -108,7 +108,7 @@ pub const Constellation = struct {
                 _ = line_split.next();
                 const name = line_split.next().?;
                 const trimmed_name = std.mem.trim(u8, name, " ");
-                var name_copy = try allocator.alloc(u8, trimmed_name.len);
+                const name_copy = try allocator.alloc(u8, trimmed_name.len);
                 std.mem.copy(u8, name_copy, trimmed_name);
                 constellation.name = name_copy;
                 continue;
@@ -119,7 +119,7 @@ pub const Constellation = struct {
                 _ = line_split.next();
                 const epithet = line_split.next().?;
                 const trimmed_epithet = std.mem.trim(u8, epithet, " ");
-                var epithet_copy = try allocator.alloc(u8, trimmed_epithet.len);
+                const epithet_copy = try allocator.alloc(u8, trimmed_epithet.len);
                 std.mem.copy(u8, epithet_copy, trimmed_epithet);
                 constellation.epithet = epithet_copy;
                 continue;
@@ -148,8 +148,8 @@ pub const Constellation = struct {
                         const right_ascension = std.mem.trim(u8, parts.next().?, " ");
                         const declination = std.mem.trim(u8, parts.next().?, " ");
 
-                        var ra_value = try std.fmt.parseFloat(f32, right_ascension);
-                        var dec_value = try std.fmt.parseFloat(f32, declination);
+                        const ra_value = try std.fmt.parseFloat(f32, right_ascension);
+                        const dec_value = try std.fmt.parseFloat(f32, declination);
 
                         const star_coord = SkyCoord{
                             .right_ascension = FixedPoint.fromFloat(degToRadLong(ra_value)),
@@ -182,7 +182,7 @@ pub const Constellation = struct {
 
                         const right_ascension = @as(f32, @floatFromInt(ra_hours * 15)) + ((@as(f32, @floatFromInt(ra_minutes)) / 60) * 15) + ((ra_seconds / 3600) * 15);
                         const dec_value = try std.fmt.parseFloat(f32, std.mem.trim(u8, declination, " "));
-                        var boundary_coord = SkyCoord{
+                        const boundary_coord = SkyCoord{
                             .right_ascension = FixedPoint.fromFloat(degToRadLong(right_ascension)),
                             .declination = FixedPoint.fromFloat(degToRad(dec_value)),
                         };
@@ -298,14 +298,14 @@ pub fn main() anyerror!void {
 
     const allocator = arena.allocator();
 
-    var args = try std.process.argsAlloc(allocator);
+    const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
     const arguments = try Arguments.init(args);
 
     if (arguments.stars) |star_args| {
         std.debug.print("Generating star data: {s} -> {s}\n", .{ star_args.source, star_args.dest });
-        var stars = try readSaoCatalog(allocator, star_args.source);
+        const stars = try readSaoCatalog(allocator, star_args.source);
         try writeStarData(stars, star_args.dest);
     }
 
@@ -389,12 +389,12 @@ fn writeStarData(stars: []Star, out_filename: []const u8) !void {
     var out_file = try cwd.createFile(out_filename, .{});
     defer out_file.close();
 
-    var out_file_writer = out_file.writer();
+    const out_file_writer = out_file.writer();
     var buffered_writer = std.io.bufferedWriter(out_file_writer);
 
     var writer = buffered_writer.writer();
 
-    var bytes = std.mem.sliceAsBytes(stars);
+    const bytes = std.mem.sliceAsBytes(stars);
     _ = try writer.write(bytes);
 
     try buffered_writer.flush();
@@ -424,7 +424,7 @@ fn readConstellationFiles(allocator: Allocator, constellation_dir_name: []const 
         if (entry.kind != .file) continue;
         if (!std.mem.endsWith(u8, entry.basename, ".sky")) continue;
 
-        var name_copy = try allocator.alloc(u8, entry.basename.len);
+        const name_copy = try allocator.alloc(u8, entry.basename.len);
         std.mem.copy(u8, name_copy, entry.basename);
         try constellation_filenames.append(name_copy);
     }
@@ -458,7 +458,7 @@ fn writeConstellationData(constellations: []Constellation, out_filename: []const
     var out_file = try cwd.createFile(out_filename, .{});
     defer out_file.close();
 
-    var out_file_writer = out_file.writer();
+    const out_file_writer = out_file.writer();
     var buffered_writer = std.io.bufferedWriter(out_file_writer);
 
     var writer = buffered_writer.writer();
@@ -500,10 +500,10 @@ fn writeConstellationMetadata(allocator: Allocator, constellations: []Constellat
     var out_file = try cwd.createFile(filename, .{});
     defer out_file.close();
 
-    var out_file_writer = out_file.writer();
+    const out_file_writer = out_file.writer();
     var buffered_writer = std.io.bufferedWriter(out_file_writer);
 
-    var writer = buffered_writer.writer();
+    const writer = buffered_writer.writer();
 
     var metadata_json = std.ArrayList(std.json.Value).init(allocator);
     for (constellations) |constellation| {

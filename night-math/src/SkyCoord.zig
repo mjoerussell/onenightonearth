@@ -32,7 +32,7 @@ declination: f32 = 0,
 
 pub fn getCoord(sky_coord: SkyCoord, observer_timestamp: i64) Coord {
     const partial_lst = getPartialLocalSiderealTime(observer_timestamp);
-    var longitude = sky_coord.right_ascension - partial_lst;
+    const longitude = sky_coord.right_ascension - partial_lst;
 
     return Coord{ .latitude = sky_coord.declination, .longitude = longitude };
 }

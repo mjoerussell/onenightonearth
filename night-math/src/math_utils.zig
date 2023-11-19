@@ -120,8 +120,8 @@ pub fn floatMod(num: anytype, denom: @TypeOf(num)) FloatModResult(@TypeOf(num)) 
     const numerator = if (T == comptime_float) @as(f128, @floatCast(num)) else num;
     const denominator = if (T == comptime_float) @as(f128, @floatCast(denom)) else denom;
 
-    const div = math.floor(@fabs(numerator / denominator));
-    const whole_part = @fabs(denominator) * div;
+    const div = math.floor(@abs(numerator / denominator));
+    const whole_part = @abs(denominator) * div;
 
     return if (num < 0) num + whole_part else num - whole_part;
 }

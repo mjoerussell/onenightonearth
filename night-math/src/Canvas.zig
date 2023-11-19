@@ -2,8 +2,8 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const math = std.math;
 
-const log = @import("./log.zig");
-const math_utils = @import("./math_utils.zig");
+const log = @import("log.zig");
+const math_utils = @import("math_utils.zig");
 const Point = math_utils.Point;
 const Line = math_utils.Line;
 
@@ -11,7 +11,7 @@ const Constellation = @import("Constellation.zig");
 const Star = @import("Star.zig");
 
 const SkyCoord = @import("SkyCoord.zig");
-const star_math = @import("./star_math.zig");
+const star_math = @import("star_math.zig");
 const ObserverPosition = star_math.ObserverPosition;
 
 const FixedPoint = @import("fixed_point.zig").DefaultFixedPoint;
@@ -66,7 +66,7 @@ pub fn init(allocator: Allocator, settings: Settings) !Canvas {
         p.* = 0;
     }
 
-    var pixel_mask = try allocator.alloc(u32, num_pixels);
+    const pixel_mask = try allocator.alloc(u32, num_pixels);
     for (pixel_mask, 0..) |*p, p_index| {
         const x = @as(f32, @floatFromInt(p_index % canvas.settings.width));
         const y = @as(f32, @floatFromInt(@divFloor(p_index, canvas.settings.width)));
@@ -278,11 +278,11 @@ pub fn drawLine(self: *Canvas, line: Line, color: Pixel) void {
         }
     };
 
-    var a = IntPoint{ .x = @as(i32, @intFromFloat(line.a.x)), .y = @as(i32, @intFromFloat(line.a.y)) };
-    var b = IntPoint{ .x = @as(i32, @intFromFloat(line.b.x)), .y = @as(i32, @intFromFloat(line.b.y)) };
+    const a = IntPoint{ .x = @as(i32, @intFromFloat(line.a.x)), .y = @as(i32, @intFromFloat(line.a.y)) };
+    const b = IntPoint{ .x = @as(i32, @intFromFloat(line.b.x)), .y = @as(i32, @intFromFloat(line.b.y)) };
 
-    const dist_x = math.absInt(b.x - a.x) catch unreachable;
-    const dist_y = -(math.absInt(b.y - a.y) catch unreachable);
+    const dist_x: i32 = @intCast(@abs(b.x - a.x));
+    const dist_y: i32 = -@as(i32, @intCast(@abs(b.y - a.y)));
 
     const step_x: i32 = if (a.x < b.x) 1 else -1;
     const step_y: i32 = if (a.y < b.y) 1 else -1;
@@ -290,7 +290,7 @@ pub fn drawLine(self: *Canvas, line: Line, color: Pixel) void {
     var curr_point = a;
     var err = dist_x + dist_y;
     while (true) {
-        var f_point = curr_point.toPoint();
+        const f_point = curr_point.toPoint();
         self.setPixelAt(f_point, color);
 
         if (curr_point.x == b.x and curr_point.y == b.y) break;
