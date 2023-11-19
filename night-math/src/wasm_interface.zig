@@ -1,14 +1,14 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const log = @import("./log.zig");
+const log = @import("log.zig");
 
-const Canvas = @import("./Canvas.zig");
+const Canvas = @import("Canvas.zig");
 const Pixel = Canvas.Pixel;
 
-const Point = @import("./math_utils.zig").Point;
+const Point = @import("math_utils.zig").Point;
 
-const StarRenderer = @import("./StarRenderer.zig");
+const StarRenderer = @import("StarRenderer.zig");
 
 const Star = @import("Star.zig");
 const ExternStar = Star.ExternStar;
@@ -16,7 +16,7 @@ const ExternStar = Star.ExternStar;
 const Constellation = @import("Constellation.zig");
 const SkyCoord = @import("SkyCoord.zig");
 
-const star_math = @import("./star_math.zig");
+const star_math = @import("star_math.zig");
 const Coord = star_math.Coord;
 const ObserverPosition = star_math.ObserverPosition;
 
@@ -34,8 +34,8 @@ var waypoints: [num_waypoints]Coord = undefined;
 
 var result_data: []u8 = undefined;
 
-const embeded_star_data = @embedFile("star_data.bin");
-const embeded_const_data = @embedFile("const_data.bin");
+const embeded_star_data = @embedFile("star_data");
+const embeded_const_data = @embedFile("const_data");
 
 pub const ExternCanvasSettings = packed struct {
     width: u32,

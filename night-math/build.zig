@@ -9,10 +9,27 @@ pub fn build(b: *Builder) !void {
     const mode = b.standardOptimizeOption(.{});
     const default_target = b.standardTargetOptions(.{});
 
-    const generate_static_data = b.option(bool, "prepare-data", "Generate artifact files from star and constellation data.") orelse false;
-    const skip_ts_gen = b.option(bool, "no-ts-gen", "Skip generating a .ts file containing type definitions for exported functions and extern-compatible types.") orelse false;
+    // Process raw star/constellation data and generate binary coordinate data.
+    // These will be embedded in the final library
+    const data_gen = b.addExecutable(.{
+        .name = "prepare-data",
+        .root_source_file = std.build.FileSource{ .path = "../prepare-data/src/main.zig" },
+        .optimize = .ReleaseFast,
+        .target = default_target,
+    });
 
-    const lib = b.addSharedLibrary(.{
+    const run_data_gen = b.addRunArtifact(data_gen);
+
+    run_data_gen.addArg("--stars");
+    run_data_gen.addFileArg(.{ .path = "../data/sao_catalog" });
+    const star_output = run_data_gen.addOutputFileArg("star_data.bin");
+
+    run_data_gen.addArg("--constellations");
+    run_data_gen.addDirectoryArg(.{ .path = "../data/constellations/iau" });
+    const const_output = run_data_gen.addOutputFileArg("const_data.bin");
+
+    // Main library
+    const lib = b.addStaticLibrary(.{
         .name = "night-math",
         .root_source_file = std.build.FileSource{ .path = "src/main.zig" },
         .target = try std.zig.CrossTarget.parse(.{
@@ -22,41 +39,27 @@ pub fn build(b: *Builder) !void {
         .optimize = mode,
     });
 
-    lib.import_symbols = true;
-    lib.rdynamic = true;
+    lib.addAnonymousModule("star_data", .{ .source_file = star_output });
+    lib.addAnonymousModule("const_data", .{ .source_file = const_output });
 
     const lib_install_artifact = b.addInstallArtifact(lib, .{ .dest_dir = .{ .override = .{ .custom = output_dir } } });
     b.getInstallStep().dependOn(&lib_install_artifact.step);
 
-    if (generate_static_data) {
-        const data_gen = b.addExecutable(.{
-            .name = "prepare-data",
-            .root_source_file = std.build.FileSource{ .path = "../prepare-data/src/main.zig" },
-            .optimize = .ReleaseFast,
-            .target = default_target,
-        });
+    // This executable will generate a Typescript file with types that can be applied to the imported WASM module.
+    // This makes it easier to make adjustments to the lib, because changes in the interface will be reflected as type errors.
+    const ts_gen = b.addExecutable(.{
+        .name = "gen",
+        .root_source_file = std.build.FileSource{ .path = "generate_interface.zig" },
+        .optimize = .ReleaseSafe,
+        .target = default_target,
+    });
 
-        const run_data_gen = b.addRunArtifact(data_gen);
-        run_data_gen.addArgs(&.{ "--stars", "../data/sao_catalog", "./src/star_data.bin" });
-        run_data_gen.addArgs(&.{ "--constellations", "../data/constellations/iau", "./src/const_data.bin" });
-        run_data_gen.step.dependOn(&data_gen.step);
-        run_data_gen.has_side_effects = true;
+    ts_gen.addAnonymousModule("star_data", .{ .source_file = star_output });
+    ts_gen.addAnonymousModule("const_data", .{ .source_file = const_output });
 
-        lib_install_artifact.step.dependOn(&run_data_gen.step);
-    }
+    const run_generator = b.addRunArtifact(ts_gen);
+    run_generator.step.dependOn(&ts_gen.step);
+    run_generator.has_side_effects = true;
 
-    if (!skip_ts_gen) {
-        const ts_gen = b.addExecutable(.{
-            .name = "gen",
-            .root_source_file = std.build.FileSource{ .path = "generate_interface.zig" },
-            .optimize = .ReleaseSafe,
-            .target = default_target,
-        });
-
-        const run_generator = b.addRunArtifact(ts_gen);
-        run_generator.step.dependOn(&ts_gen.step);
-        run_generator.has_side_effects = true;
-
-        lib_install_artifact.step.dependOn(&run_generator.step);
-    }
+    lib_install_artifact.step.dependOn(&run_generator.step);
 }
