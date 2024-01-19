@@ -14,7 +14,9 @@ jobs:
       - uses: actions/setup-node@v4
       - id: build-web
         working-directory: web
-        run: npm run build
+        run: |
+          npm install
+          npm run build
       - id: build-night-math
         working-directory: night-math
         run: zig build -Doptimize=ReleaseFast
