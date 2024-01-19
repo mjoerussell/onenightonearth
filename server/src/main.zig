@@ -64,7 +64,9 @@ const StaticFile = struct {
 
     fn deinit(static_file: *StaticFile, allocator: Allocator) void {
         if (!static_file.is_standalone) return;
-        allocator.free(static_file.content);
+        if (static_file.content) |content| {
+            allocator.free(content);
+        }
     }
 
     fn loadContent(static_file: *StaticFile, allocator: Allocator) ![]const u8 {
@@ -154,33 +156,61 @@ const StaticContent = struct {
     }
 
     fn deinit(content: *StaticContent, allocator: Allocator) void {
-        for (&content.file_info) |*info| {
-            info.deinit();
+        for (content.file_info) |*info| {
+            info.deinit(allocator);
         }
         allocator.free(content.buffer);
     }
 };
 
-var static_content: StaticContent = undefined;
+const GlobalState = struct {
+    gpa: *std.heap.GeneralPurposeAllocator(.{}),
+    allocator: std.mem.Allocator,
+    content: StaticContent,
 
-const ServerContext = struct {
-    allocator: Allocator,
+    fn init(gpa: *std.heap.GeneralPurposeAllocator(.{})) !GlobalState {
+        var state = GlobalState{
+            .gpa = gpa,
+            .content = undefined,
+            .allocator = undefined,
+        };
+
+        state.allocator = state.gpa.allocator();
+        state.content = try StaticContent.init(state.allocator, &static_files);
+
+        return state;
+    }
+
+    fn deinit(state: *GlobalState) void {
+        state.content.deinit(state.allocator);
+        _ = state.gpa.deinit();
+    }
 };
+
+var global_state: GlobalState = undefined;
+var server: TortieServer(GlobalState) = undefined;
+
+fn ctrlCHandler(_: u32) callconv(.C) c_int {
+    server.deinit();
+    global_state.deinit();
+    return 0;
+}
 
 pub fn main() anyerror!void {
     const port = 8080;
     const localhost = try std.net.Address.parseIp("0.0.0.0", port);
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
+    global_state = try GlobalState.init(&gpa);
 
-    const allocator = gpa.allocator();
+    switch (builtin.os.tag) {
+        .windows => try std.os.windows.SetConsoleCtrlHandler(ctrlCHandler, true),
+        else => try std.os.sigaction(std.os.SIG.INT, ctrlCHandler, null),
+    }
 
-    const context = ServerContext{ .allocator = allocator };
-    var server = try TortieServer(ServerContext).init(allocator, localhost, context, handleRequest);
+    server = try TortieServer(GlobalState).init(global_state.allocator, localhost, global_state, handleRequest);
 
-    static_content = try StaticContent.init(allocator, &static_files);
-    log.info("{d:.3}Mb of static content loaded", .{@as(f32, @floatFromInt(static_content.buffer.len)) / (1024 * 1024)});
+    log.info("{d:.3}Mb of static content loaded", .{@as(f32, @floatFromInt(global_state.content.buffer.len)) / (1024 * 1024)});
 
     log.info("Listening on port {}", .{port});
     log.debug("Build is single threaded: {}", .{builtin.single_threaded});
@@ -190,7 +220,7 @@ pub fn main() anyerror!void {
     }
 }
 
-fn handleRequest(client: *tortie.Client, context: ServerContext) !void {
+fn handleRequest(client: *tortie.Client, context: GlobalState) !void {
     handleRequestError(client, context) catch |err| {
         const status: tortie.Response.ResponseStatus = if (err == error.NotFound) .not_found else .internal_server_error;
         if (status == .not_found) {
@@ -200,7 +230,7 @@ fn handleRequest(client: *tortie.Client, context: ServerContext) !void {
     };
 }
 
-fn handleRequestError(client: *tortie.Client, context: ServerContext) !void {
+fn handleRequestError(client: *tortie.Client, context: GlobalState) !void {
     const request_path = client.buffers.request().getPath() catch blk: {
         log.warn("Could not parse path, defaulting to /", .{});
         break :blk "/";
@@ -208,7 +238,7 @@ fn handleRequestError(client: *tortie.Client, context: ServerContext) !void {
 
     log.info("Handling request {s}", .{request_path});
 
-    for (static_content.file_info) |*info| {
+    for (context.content.file_info) |*info| {
         if (std.mem.eql(u8, request_path, info.path)) {
             try serveStaticFile(client, context.allocator, info);
             return;
@@ -226,6 +256,9 @@ fn serveStaticFile(client: *tortie.Client, allocator: Allocator, options: *Stati
 
         break :blk options.content orelse return error.NotFound;
     };
+    defer options.deinit(allocator);
+
+    log.info("Loaded content for {s}", .{options.path});
 
     var response = client.buffers.responseWriter();
 
