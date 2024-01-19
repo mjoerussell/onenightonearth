@@ -258,6 +258,15 @@ const WindowsServer = struct {
 
                 // We wrote to the buffer directly, so the len wasn't automatically updated.
                 client.buffers.request_buffer.items.len = total_bytes_recv;
+            } else if (client.state == .writing) {
+                if (bytes_transferred == 0 or bytes_transferred == client.buffers.response_buffer.items.len) {
+                    client.state = .write_complete;
+                } else {
+                    const current_len = client.buffers.response_buffer.items.len;
+                    const remaining_data_len = current_len - bytes_transferred;
+                    std.mem.copyForwards(u8, client.buffers.response_buffer.items[0..], client.buffers.response_buffer.items[bytes_transferred..]);
+                    client.buffers.response_buffer.items.len = remaining_data_len;
+                }
             }
             clients[client_index] = client;
         }
