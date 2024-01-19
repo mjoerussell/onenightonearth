@@ -48,6 +48,11 @@ pub fn build(b: *Build) !void {
             .output = "const_data.bin",
             .import_name = "const_data",
         },
+        .{
+            .arg = "--metadata",
+            .input = .{ .dir = "../data/constellations/iau" },
+            .output = "const_meta.json",
+        },
     });
 
     // Install the artifact in a custom directory - will be emitted in web/dist/wasm
@@ -84,7 +89,7 @@ const DataConfig = struct {
     arg: []const u8,
     input: Input,
     output: []const u8,
-    import_name: []const u8,
+    import_name: ?[]const u8 = null,
 };
 
 fn generateStarData(b: *Build, main_exe: *Build.Step.Compile, generator_exe: *Build.Step.Compile, data_configs: []const DataConfig) void {
@@ -98,6 +103,10 @@ fn generateStarData(b: *Build, main_exe: *Build.Step.Compile, generator_exe: *Bu
         }
 
         const output = run_data_gen.addOutputFileArg(config.output);
-        main_exe.root_module.addAnonymousImport(config.import_name, .{ .root_source_file = output });
+        if (config.import_name) |import_name| {
+            main_exe.root_module.addAnonymousImport(import_name, .{ .root_source_file = output });
+        } else {
+            b.getInstallStep().dependOn(&b.addInstallFileWithDir(output, .prefix, config.output).step);
+        }
     }
 }

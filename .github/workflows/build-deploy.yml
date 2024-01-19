@@ -29,7 +29,7 @@ jobs:
       - id: create-artifact
         name: Bundle package
         run:
-          tar -cvf one-night.tar server/zig-out/bin/zig-server web/dist web/assets web/styles web/index.html
+          tar -cvf one-night.tar night-math/zig-out/const_meta.json server/zig-out/bin/zig-server web/dist web/assets web/styles web/index.html
       - name: Upload Bundle
         uses: actions/upload-artifact@v4
         with:
@@ -63,6 +63,7 @@ jobs:
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} <<< '
             tar -xf one-night.tar
+            kill $(lsof -t -i:8080)
             cd server
             nohup ./zig-out/bin/zig-server > logs.out &
           '

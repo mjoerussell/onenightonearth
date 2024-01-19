@@ -9,7 +9,7 @@ const http = tortie.http;
 
 var static_files = [_]StaticFile{
     StaticFile.init("../web/index.html", .{ .path = "/" }),
-    StaticFile.init("const_meta.json", .{ .path = "/constellations/meta", .content_type = "application/json" }),
+    StaticFile.init("../night-math/zig-out/const_meta.json", .{ .path = "/constellations/meta", .content_type = "application/json" }),
     StaticFile.init("../web/styles/main.css", .{ .relative_to = "../web" }),
     StaticFile.init("../web/dist/bundle.js", .{ .relative_to = "../web", .compress = true }),
     StaticFile.init("../web/dist/bundle.js.map", .{ .relative_to = "../web", .compress = true }),
