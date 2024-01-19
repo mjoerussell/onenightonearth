@@ -55,7 +55,7 @@ jobs:
       - name: Download Bundle
         uses: actions/download-artifact@v4
         with:
-          name: one-night-${{ github.ref }}
+          name: one-night-${{ github.sha }}
       - name: Copy build files
         run: |
           sftp $USER_NAME:${{ github.secrets.SSH_HOST }} <<< '
