@@ -151,13 +151,13 @@ pub fn Writer(comptime W: type) type {
             try self.writer.print("HTTP/1.1 {} {s}\r\n", .{ @intFromEnum(status), status.getMessage() });
         }
 
-        pub fn writeHeader(self: Self, header_name: []const u8, header_value: anytype) !void {
-            const format_string = comptime if (std.meta.trait.isZigString(@TypeOf(header_value)))
-                "{s}: {s}\r\n"
-            else
-                "{s}: {}\r\n";
+        pub fn printHeader(self: Self, comptime header_format_string: []const u8, header_values: anytype) !void {
+            const format_string = header_format_string ++ "\r\n";
+            try self.writer.print(format_string, header_values);
+        }
 
-            try self.writer.print(format_string, .{ header_name, header_value });
+        pub fn writeHeader(self: Self, header: []const u8) !void {
+            try self.writer.print("{s}\r\n", .{header});
         }
 
         pub fn writeBody(self: *Self, body: []const u8) !void {
