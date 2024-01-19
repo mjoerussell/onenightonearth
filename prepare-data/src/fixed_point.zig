@@ -1,8 +1,6 @@
 const std = @import("std");
 
 pub fn FixedPoint(comptime Int: type, comptime fractional_bits: u8) type {
-    if (!std.meta.trait.isIntegral(Int)) @compileError("FixedPoint requires an integer type as the target conversion");
-
     return packed struct {
         const Self = @This();
 

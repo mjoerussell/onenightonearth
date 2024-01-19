@@ -61,7 +61,7 @@ pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_e
     // Usually atan2 is used with the parameters in the reverse order (atan2(y, x)).
     // The order here (x, y) is intentional, since otherwise horizontal drags would result in vertical movement
     // and vice versa
-    const dist_phi = math.atan2(f32, dist_x, dist_y);
+    const dist_phi = math.atan2(dist_x, dist_y);
 
     // drag_distance is the angular distance between the starting location and the result location after a single drag
     // Higher = move more with smaller cursor movements, and vice versa

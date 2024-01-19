@@ -1,65 +1,103 @@
 const std = @import("std");
-const Builder = std.build.Builder;
-const Target = std.build.Target;
+const Build = std.Build;
+const Target = Build.Target;
 
 const output_dir = "../../web/dist/wasm";
 const test_files = [_][]const u8{ "src/star_math.zig", "src/math_utils.zig", "src/render.zig" };
 
-pub fn build(b: *Builder) !void {
+pub fn build(b: *Build) !void {
     const mode = b.standardOptimizeOption(.{});
     const default_target = b.standardTargetOptions(.{});
+
+    const wasm_target = try std.Target.Query.parse(.{
+        .arch_os_abi = "wasm32-freestanding",
+        .cpu_features = "generic+simd128",
+    });
+
+    // Main library
+    // Must build as an EXE since https://github.com/ziglang/zig/pull/17815
+    const exe = b.addExecutable(.{
+        .name = "night-math",
+        .root_source_file = Build.LazyPath{ .path = "src/main.zig" },
+        .target = b.resolveTargetQuery(wasm_target),
+        .link_libc = false,
+        .optimize = mode,
+    });
+    exe.entry = .disabled;
+    exe.rdynamic = true;
 
     // Process raw star/constellation data and generate binary coordinate data.
     // These will be embedded in the final library
     const data_gen = b.addExecutable(.{
         .name = "prepare-data",
-        .root_source_file = std.build.FileSource{ .path = "../prepare-data/src/main.zig" },
+        .root_source_file = Build.LazyPath{ .path = "../prepare-data/src/main.zig" },
         .optimize = .ReleaseFast,
         .target = default_target,
     });
 
-    const run_data_gen = b.addRunArtifact(data_gen);
-
-    run_data_gen.addArg("--stars");
-    run_data_gen.addFileArg(.{ .path = "../data/sao_catalog" });
-    const star_output = run_data_gen.addOutputFileArg("star_data.bin");
-
-    run_data_gen.addArg("--constellations");
-    run_data_gen.addDirectoryArg(.{ .path = "../data/constellations/iau" });
-    const const_output = run_data_gen.addOutputFileArg("const_data.bin");
-
-    // Main library
-    const lib = b.addStaticLibrary(.{
-        .name = "night-math",
-        .root_source_file = std.build.FileSource{ .path = "src/main.zig" },
-        .target = try std.zig.CrossTarget.parse(.{
-            .arch_os_abi = "wasm32-freestanding",
-            .cpu_features = "generic+simd128",
-        }),
-        .optimize = mode,
+    generateStarData(b, exe, data_gen, &.{
+        .{
+            .arg = "--stars",
+            .input = .{ .file = "../data/sao_catalog" },
+            .output = "star_data.bin",
+            .import_name = "star_data",
+        },
+        .{
+            .arg = "--constellations",
+            .input = .{ .dir = "../data/constellations/iau" },
+            .output = "const_data.bin",
+            .import_name = "const_data",
+        },
     });
 
-    lib.addAnonymousModule("star_data", .{ .source_file = star_output });
-    lib.addAnonymousModule("const_data", .{ .source_file = const_output });
-
-    const lib_install_artifact = b.addInstallArtifact(lib, .{ .dest_dir = .{ .override = .{ .custom = output_dir } } });
+    // Install the artifact in a custom directory - will be emitted in web/dist/wasm
+    const lib_install_artifact = b.addInstallArtifact(exe, .{ .dest_dir = .{ .override = .{ .custom = output_dir } } });
     b.getInstallStep().dependOn(&lib_install_artifact.step);
 
     // This executable will generate a Typescript file with types that can be applied to the imported WASM module.
     // This makes it easier to make adjustments to the lib, because changes in the interface will be reflected as type errors.
     const ts_gen = b.addExecutable(.{
         .name = "gen",
-        .root_source_file = std.build.FileSource{ .path = "generate_interface.zig" },
+        .root_source_file = Build.LazyPath{ .path = "generate_interface.zig" },
         .optimize = .ReleaseSafe,
         .target = default_target,
     });
 
-    ts_gen.addAnonymousModule("star_data", .{ .source_file = star_output });
-    ts_gen.addAnonymousModule("const_data", .{ .source_file = const_output });
+    // ts_gen.addAnonymousModule("star_data", .{ .source_file = star_output });
+    // ts_gen.addAnonymousModule("const_data", .{ .source_file = const_output });
 
     const run_generator = b.addRunArtifact(ts_gen);
     run_generator.step.dependOn(&ts_gen.step);
     run_generator.has_side_effects = true;
 
-    lib_install_artifact.step.dependOn(&run_generator.step);
+    // b.getInstallStep().dependOn(&run_generator.step);
+
+    // lib_install_artifact.step.dependOn(&run_generator.step);
+}
+
+const DataConfig = struct {
+    const Input = union(enum) {
+        file: []const u8,
+        dir: []const u8,
+    };
+
+    arg: []const u8,
+    input: Input,
+    output: []const u8,
+    import_name: []const u8,
+};
+
+fn generateStarData(b: *Build, main_exe: *Build.Step.Compile, generator_exe: *Build.Step.Compile, data_configs: []const DataConfig) void {
+    const run_data_gen = b.addRunArtifact(generator_exe);
+
+    for (data_configs) |config| {
+        run_data_gen.addArg(config.arg);
+        switch (config.input) {
+            .file => |path| run_data_gen.addFileArg(.{ .path = path }),
+            .dir => |path| run_data_gen.addDirectoryArg(.{ .path = path }),
+        }
+
+        const output = run_data_gen.addOutputFileArg(config.output);
+        main_exe.root_module.addAnonymousImport(config.import_name, .{ .root_source_file = output });
+    }
 }

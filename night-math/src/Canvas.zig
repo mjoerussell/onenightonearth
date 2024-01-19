@@ -104,7 +104,7 @@ pub fn projectAndRenderStarsWide(canvas: *Canvas, sky_coords: std.MultiArrayList
     const f32x4 = @Vector(4, f32);
 
     // Constants for calculating sky coord-to-point
-    const radius_x4: f32x4 = @splat(@as(f32, 2.0 / math.pi));
+    const radius_x4: f32x4 = @splat(2.0 / math.pi);
     const lst_x4: f32x4 = @splat(local_sidereal_time);
     const sin_lat_x4: f32x4 = @splat(sin_latitude);
     const cos_lat_x4: f32x4 = @splat(cos_latitude);
@@ -112,7 +112,7 @@ pub fn projectAndRenderStarsWide(canvas: *Canvas, sky_coords: std.MultiArrayList
     // Constants for translatePoint
     const center_x: f32x4 = @splat(@as(f32, @floatFromInt(canvas.settings.width)) / 2);
     const center_y: f32x4 = @splat(@as(f32, @floatFromInt(canvas.settings.height)) / 2);
-    const direction_modifier: f32x4 = if (canvas.settings.draw_north_up) @splat(@as(f32, 1)) else @splat(@as(f32, -1));
+    const direction_modifier: f32x4 = if (canvas.settings.draw_north_up) @splat(1) else @splat(-1);
     const translate_factor = direction_modifier * @as(f32x4, @splat(canvas.settings.background_radius)) * @as(f32x4, @splat(canvas.settings.zoom_factor));
 
     const coord_slice = sky_coords.slice();
@@ -139,7 +139,7 @@ pub fn projectAndRenderStarsWide(canvas: *Canvas, sky_coords: std.MultiArrayList
         };
 
         const cos_azi = (sin_dec_x4 - sin_alt * sin_lat_x4) / (@cos(altitude) * cos_lat_x4);
-        const azi: f32x4 = [_]f32{
+        const azi: f32x4 = .{
             math.acos(cos_azi[0]),
             math.acos(cos_azi[1]),
             math.acos(cos_azi[2]),

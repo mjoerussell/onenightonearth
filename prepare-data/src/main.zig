@@ -109,7 +109,7 @@ pub const Constellation = struct {
                 const name = line_split.next().?;
                 const trimmed_name = std.mem.trim(u8, name, " ");
                 const name_copy = try allocator.alloc(u8, trimmed_name.len);
-                std.mem.copy(u8, name_copy, trimmed_name);
+                @memcpy(name_copy, trimmed_name);
                 constellation.name = name_copy;
                 continue;
             }
@@ -120,7 +120,7 @@ pub const Constellation = struct {
                 const epithet = line_split.next().?;
                 const trimmed_epithet = std.mem.trim(u8, epithet, " ");
                 const epithet_copy = try allocator.alloc(u8, trimmed_epithet.len);
-                std.mem.copy(u8, epithet_copy, trimmed_epithet);
+                @memcpy(epithet_copy, trimmed_epithet);
                 constellation.epithet = epithet_copy;
                 continue;
             }
@@ -355,7 +355,7 @@ fn readSaoCatalog(allocator: Allocator, catalog_filename: []const u8) ![]Star {
                 // If it gets to the end of the buffer without reaching the end of the line, move the current in-progress
                 // line to the beginning of the buffer, reset the indices to their new positions, and read more data into
                 // the buffer
-                std.mem.copy(u8, read_buffer[0..], read_buffer[line_start_index..]);
+                std.mem.copyForwards(u8, read_buffer[0..], read_buffer[line_start_index..]);
                 line_end_index -= line_start_index;
                 read_start_index = line_end_index;
                 line_start_index = 0;
@@ -406,7 +406,7 @@ fn readConstellationFiles(allocator: Allocator, constellation_dir_name: []const 
     errdefer constellations.deinit();
 
     const cwd = fs.cwd();
-    var constellation_dir = try cwd.openIterableDir(constellation_dir_name, .{});
+    var constellation_dir = try cwd.openDir(constellation_dir_name, .{ .iterate = true });
     defer constellation_dir.close();
 
     var constellation_dir_walker = try constellation_dir.walk(allocator);
@@ -425,7 +425,7 @@ fn readConstellationFiles(allocator: Allocator, constellation_dir_name: []const 
         if (!std.mem.endsWith(u8, entry.basename, ".sky")) continue;
 
         const name_copy = try allocator.alloc(u8, entry.basename.len);
-        std.mem.copy(u8, name_copy, entry.basename);
+        @memcpy(name_copy, entry.basename);
         try constellation_filenames.append(name_copy);
     }
 
@@ -440,7 +440,7 @@ fn readConstellationFiles(allocator: Allocator, constellation_dir_name: []const 
     std.sort.insertion([]const u8, constellation_filenames.items, @as(u32, 0), string_sort);
 
     for (constellation_filenames.items) |basename| {
-        var sky_file = try constellation_dir.dir.openFile(basename, .{});
+        var sky_file = try constellation_dir.openFile(basename, .{});
         defer sky_file.close();
 
         const bytes_read = try sky_file.readAll(read_buffer[0..]);

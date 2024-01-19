@@ -66,9 +66,9 @@ pub fn centroid(constellation: Constellation) SkyCoord {
     y /= @as(f32, @floatFromInt(constellation.boundaries.len));
     z /= @as(f32, @floatFromInt(constellation.boundaries.len));
 
-    const central_long = math.atan2(f32, y, x);
+    const central_long = math.atan2(y, x);
     const central_sqrt = math.sqrt(x * x + y * y);
-    const central_lat = math.atan2(f32, z, central_sqrt);
+    const central_lat = math.atan2(z, central_sqrt);
 
     return SkyCoord{
         .right_ascension = central_long,
