@@ -38,7 +38,7 @@ jobs:
     env:
       USER_NAME: ${{ github.secrets.SSH_USER }}
     steps:
-      - use: actions/checkout@v4
+      - uses: actions/checkout@v4
       - name: Write SSH Keys
         run: |
           install -m 600 -D /dev/null ~/.ssh/id_rsa 
