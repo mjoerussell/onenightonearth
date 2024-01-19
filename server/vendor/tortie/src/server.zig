@@ -41,7 +41,7 @@ pub const ClientBuffers = struct {
     pub fn init(allocator: Allocator) !ClientBuffers {
         var request_buffer = try std.ArrayList(u8).initCapacity(allocator, min_capacity);
         errdefer request_buffer.deinit();
-        var response_buffer = try std.ArrayList(u8).initCapacity(allocator, min_capacity);
+        const response_buffer = try std.ArrayList(u8).initCapacity(allocator, min_capacity);
 
         return ClientBuffers{
             .request_buffer = request_buffer,
@@ -156,7 +156,7 @@ const WindowsServer = struct {
     pub fn acceptClient(server: *WindowsServer, client: *Client) !void {
         server.resetClient(client);
         client.state = .accepting;
-        var client_overlapped = server.overlappedFromClient(client) orelse return;
+        const client_overlapped = server.overlappedFromClient(client) orelse return;
 
         winsock.acceptEx(server.socket, client.socket, client.buffers.request_buffer.items, &client.buffers.request_buffer.items.len, client_overlapped) catch |err| switch (err) {
             error.IoPending, error.ConnectionReset => {},
@@ -168,7 +168,7 @@ const WindowsServer = struct {
     }
 
     pub fn deinitClient(server: *WindowsServer, client: *Client) void {
-        var client_overlapped = server.overlappedFromClient(client) orelse return;
+        const client_overlapped = server.overlappedFromClient(client) orelse return;
 
         winsock.disconnectEx(client.socket, client_overlapped, true) catch |err| {
             switch (err) {
@@ -195,7 +195,7 @@ const WindowsServer = struct {
 
     pub fn resetClient(server: *WindowsServer, client: *Client) void {
         client.reset();
-        var client_overlapped = server.overlappedFromClient(client) orelse return;
+        const client_overlapped = server.overlappedFromClient(client) orelse return;
         client_overlapped.* = .{
             .Internal = 0,
             .InternalHigh = 0,
@@ -211,7 +211,7 @@ const WindowsServer = struct {
 
     pub fn recv(server: *WindowsServer, client: *Client) !void {
         client.state = .reading;
-        var client_overlapped = server.overlappedFromClient(client) orelse return;
+        const client_overlapped = server.overlappedFromClient(client) orelse return;
 
         winsock.wsaRecv(client.socket, client.buffers.request_buffer.unusedCapacitySlice(), client_overlapped) catch |err| switch (err) {
             error.IoPending => return,
@@ -221,7 +221,7 @@ const WindowsServer = struct {
 
     pub fn send(server: *WindowsServer, client: *Client) !void {
         client.state = .writing;
-        var client_overlapped = server.overlappedFromClient(client) orelse return;
+        const client_overlapped = server.overlappedFromClient(client) orelse return;
 
         winsock.wsaSend(client.socket, client.buffers.response_buffer.items, client_overlapped) catch |err| switch (err) {
             error.IoPending => return,
