@@ -40,8 +40,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build
-    env:
-      USER_NAME: ${{ secrets.SSH_USER }}
     steps:
       - uses: actions/checkout@v4
       - name: Write SSH Keys
@@ -58,12 +56,12 @@ jobs:
           name: one-night-${{ github.sha }}
       - name: Copy build files
         run: |
-          sftp $USER_NAME:${{ secrets.SSH_HOST }} <<< '
+          sftp ${{ secrets.SSH_USER }}:${{ secrets.SSH_HOST }} <<< '
             put one-night.tar 
           '
       - name: Start Server
         run: |
-          ssh $USER_NAME:${{ secrets.SSH_HOST }} <<< '
+          ssh ${{ secrets.SSH_USER }}:${{ secrets.SSH_HOST }} <<< '
             tar -xf one-night.tar
             cd server
             nohup ./zig-out/bin/zig-server > logs.out &
