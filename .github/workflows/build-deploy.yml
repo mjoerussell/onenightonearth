@@ -1,0 +1,62 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: korandoru/setup-zig@v1
+        with:
+          zig-version: 0.12.0-dev.2236+32e88251e
+      - uses: actions/setup-node@v4
+      - id: build-web
+        working-directory: web
+        run: npm run build
+      - id: build-night-math
+        working-directory: night-math
+        run: zig build -Doptimize=ReleaseFast
+      - id: build-server
+        working-directory: server
+        run: zig build -Doptimize=ReleaseSafe
+      - id: create-artifact
+        name: Bundle package
+        run:
+          tar -cvf one-night.tar server/zig-out/bin/zig-server web/dist web/assets web/styles web/index.html
+      - name: Upload Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: one-night-${{ github.ref }}
+          path: one-night.tar
+          overwrite: true
+          retention-days: 3
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    env:
+      USER_NAME: ${{ github.secrets.SSH_USER }}
+    steps:
+      - use: actions/checkout@v4
+      - name: Write SSH Keys
+        run: |
+          install -m 600 -D /dev/null ~/.ssh/id_rsa 
+          echo "${{ github.secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ github.secrets.SSH_HOST }}" > ~/.ssh/known_hosts
+      - name: Download Bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: one-night-${{ github.ref }}
+      - name: Copy build files
+        run: |
+          sftp $USER_NAME:${{ github.secrets.SSH_HOST }} <<< '
+            put one-night.tar 
+          '
+      - name: Start Server
+        run: |
+          ssh $USER_NAME:${{ github.secrets.SSH_HOST }} <<< '
+            tar -xf one-night.tar
+            cd server
+            nohup ./zig-out/bin/zig-server > logs.out &
+          '

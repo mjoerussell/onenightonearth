@@ -188,10 +188,18 @@ const GlobalState = struct {
 var global_state: GlobalState = undefined;
 var server: TortieServer(GlobalState) = undefined;
 
-fn ctrlCHandler(_: u32) callconv(.C) c_int {
+fn ctrlCHandlerWindows(_: u32) callconv(.C) c_int {
+    gracefulDeinit();
+    return 0;
+}
+
+fn ctrlCHandlerLinux(_: c_int) callconv(.C) void {
+    gracefulDeinit();
+}
+
+fn gracefulDeinit() void {
     server.deinit();
     global_state.deinit();
-    return 0;
 }
 
 pub fn main() anyerror!void {
@@ -202,8 +210,8 @@ pub fn main() anyerror!void {
     global_state = try GlobalState.init(&gpa);
 
     switch (builtin.os.tag) {
-        .windows => try std.os.windows.SetConsoleCtrlHandler(ctrlCHandler, true),
-        else => try std.os.sigaction(std.os.SIG.INT, ctrlCHandler, null),
+        .windows => try std.os.windows.SetConsoleCtrlHandler(ctrlCHandlerWindows, true),
+        else => try std.os.sigaction(std.os.SIG.INT, &.{ .handler = .{ .handler = ctrlCHandlerLinux }, .mask = std.mem.zeroes([32]u32), .flags = 0 }, null),
     }
 
     server = try TortieServer(GlobalState).init(global_state.allocator, localhost, global_state, handleRequest);
