@@ -13,14 +13,17 @@ jobs:
           version: 0.12.0-dev.2236+32e88251e
       - uses: actions/setup-node@v4
       - id: build-web
+        name: Build web assets
         working-directory: web
         run: |
           npm install
           npm run build
       - id: build-night-math
+        name: Build WASM library
         working-directory: night-math
         run: zig build -Doptimize=ReleaseFast
       - id: build-server
+        name: Build server
         working-directory: server
         run: zig build -Doptimize=ReleaseSafe
       - id: create-artifact
@@ -43,7 +46,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Write SSH Keys
         run: |
-          install -m 600 -D /dev/null ~/.ssh/id_rsa 
           echo "${{ github.secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           ssh-keyscan -H "${{ github.secrets.SSH_HOST }}" > ~/.ssh/known_hosts
       - name: Download Bundle
