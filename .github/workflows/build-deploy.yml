@@ -21,11 +21,11 @@ jobs:
       - id: build-night-math
         name: Build WASM library
         working-directory: night-math
-        run: zig build -Doptimize=ReleaseFast
+        run: zig build -Doptimize=ReleaseSmall --summary all
       - id: build-server
         name: Build server
         working-directory: server
-        run: zig build -Doptimize=ReleaseSafe
+        run: zig build -Doptimize=Debug --summary all
       - id: create-artifact
         name: Bundle package
         run:

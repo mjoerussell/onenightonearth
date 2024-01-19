@@ -75,17 +75,7 @@ const StaticFile = struct {
         var file = try cwd.openFile(static_file.file_name, .{});
         defer file.close();
 
-        var content = std.ArrayList(u8).init(allocator);
-        var buffer: [1024]u8 = undefined;
-
-        while (true) {
-            const bytes_read = try file.readAll(&buffer);
-            try content.appendSlice(buffer[0..bytes_read]);
-
-            if (bytes_read < buffer.len) break;
-        }
-
-        static_file.content = try content.toOwnedSlice();
+        static_file.content = try file.readToEndAlloc(allocator, std.math.maxInt(usize));
         return static_file.content.?;
     }
 };
