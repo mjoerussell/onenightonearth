@@ -8,9 +8,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: korandoru/setup-zig@v1
+      - uses: goto-bus-stop/setup-zig@v2
         with:
-          zig-version: 0.12.0-dev.2236+32e88251e
+          version: 0.12.0-dev.2236+32e88251e
       - uses: actions/setup-node@v4
       - id: build-web
         working-directory: web
