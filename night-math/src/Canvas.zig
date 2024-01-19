@@ -123,7 +123,7 @@ pub fn projectAndRenderStarsWide(canvas: *Canvas, sky_coords: std.MultiArrayList
     const pixels = coord_slice.items(.pixel);
 
     var index: usize = 0;
-    while (index < right_ascensions.len) : (index += 4) {
+    while (index + 4 <= right_ascensions.len) : (index += 4) {
         const ra_x4: f32x4 = .{ right_ascensions[index], right_ascensions[index + 1], right_ascensions[index + 2], right_ascensions[index + 3] };
         const sin_dec_x4: f32x4 = .{ sin_decs[index], sin_decs[index + 1], sin_decs[index + 2], sin_decs[index + 3] };
         const cos_dec_x4: f32x4 = .{ cos_decs[index], cos_decs[index + 1], cos_decs[index + 2], cos_decs[index + 3] };

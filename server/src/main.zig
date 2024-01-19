@@ -9,8 +9,6 @@ const http = tortie.http;
 
 var static_files = [_]StaticFile{
     StaticFile.init("../web/index.html", .{ .path = "/" }),
-    StaticFile.init("star_data.bin", .{ .path = "/stars", .content_type = "octet-stream", .compress = true }),
-    StaticFile.init("const_data.bin", .{ .path = "/constellations", .content_type = "octet-stream" }),
     StaticFile.init("const_meta.json", .{ .path = "/constellations/meta", .content_type = "application/json" }),
     StaticFile.init("../web/styles/main.css", .{ .relative_to = "../web" }),
     StaticFile.init("../web/dist/bundle.js", .{ .relative_to = "../web", .compress = true }),

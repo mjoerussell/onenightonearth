@@ -34,8 +34,8 @@ var waypoints: [num_waypoints]Coord = undefined;
 
 var result_data: []u8 = undefined;
 
-const embeded_star_data = @embedFile("star_data");
-const embeded_const_data = @embedFile("const_data");
+const embeded_star_data align(@alignOf(ExternStar)) = @embedFile("star_data").*;
+const embeded_const_data = @embedFile("const_data").*;
 
 pub const ExternCanvasSettings = packed struct {
     width: u32,
@@ -73,26 +73,17 @@ pub fn initializeStars(star_renderer: *StarRenderer, stars: []const ExternStar) 
     for (stars) |star| {
         star_renderer.stars.appendAssumeCapacity(star.toStar());
     }
-
-    allocator.free(stars);
 }
 
 pub export fn initialize(settings: *ExternCanvasSettings) *StarRenderer {
-    var star_renderer = allocator.create(StarRenderer) catch {
-        log.err("Could not create StarRenderer, needs {} bytes", .{@sizeOf(StarRenderer)});
-        unreachable;
-    };
+    var star_renderer = allocator.create(StarRenderer) catch @panic("OOM for StarRenderer");
+    const stars = std.mem.bytesAsSlice(ExternStar, embeded_star_data[0..]);
 
-    const stars = std.mem.bytesAsSlice(ExternStar, embeded_star_data);
     initializeStars(star_renderer, @alignCast(stars));
 
-    star_renderer.canvas = Canvas.init(allocator, settings.getCanvasSettings()) catch {
-        const num_pixels = star_renderer.canvas.settings.width * star_renderer.canvas.settings.height;
-        log.err("Ran out of memory during canvas intialization (needed {} kB for {} pixels)", .{ (num_pixels * @sizeOf(Pixel)) / 1000, num_pixels });
-        unreachable;
-    };
+    star_renderer.canvas = Canvas.init(allocator, settings.getCanvasSettings()) catch @panic("OOM for Canvas");
 
-    initializeConstellations(star_renderer, embeded_const_data);
+    initializeConstellations(star_renderer, embeded_const_data[0..]);
 
     return star_renderer;
 }
@@ -116,13 +107,12 @@ pub export fn initializeResultData() [*]u8 {
 
 /// Initialize the constellation boundaries, asterisms, and zodiac flags. Because each constellation has a variable number of boundaries and
 /// asterisms, the data layout is slightly complicated.
-pub fn initializeConstellations(star_renderer: *StarRenderer, data: [*]const u8) void {
-    // Constellation data layout:
-    // num_constellations | num_boundary_coords | num_asterism_coords | ...constellations | ...constellation_boundaries | ...constellation asterisms
-    // constellations size = num_constellations * @sizeOf(ConstellationInfo)
-    // constellation_boundaries size = num_boundary_coords * { i16, i16 }
-    // constellation_asterisms size = num_asterism_coords * { i16, i16 }
-
+/// Constellation data layout:
+/// num_constellations | num_boundary_coords | num_asterism_coords | ...constellations | ...constellation_boundaries | ...constellation asterisms
+/// constellations size = num_constellations * @sizeOf(ConstellationInfo)
+/// constellation_boundaries size = num_boundary_coords * { i16, i16 }
+/// constellation_asterisms size = num_asterism_coords * { i16, i16 }
+pub fn initializeConstellations(star_renderer: *StarRenderer, data: []const u8) void {
     const ConstellationInfo = packed struct {
         num_boundaries: u8,
         num_asterisms: u8,
@@ -130,32 +120,19 @@ pub fn initializeConstellations(star_renderer: *StarRenderer, data: [*]const u8)
     };
 
     // Get some metadata about the constellation data that we're about to read.
-    // This first set is the total number of constellations, followed by the total number of boundary coordinates,
-    // and finally the total number of asterism coordinates
     const num_constellations = std.mem.bytesToValue(u32, data[0..4]);
     const total_num_boundaries = std.mem.bytesToValue(u32, data[4..8]);
-    const total_num_asterisms = std.mem.bytesToValue(u32, data[8..12]);
 
-    // Here we'll figure out the byte index where the rest of the constellation metadata stops, and then
-    // the byte index where the boundary data stops, and then the byte index where the asterism data stops.
-    // That will also be the end of the entire dataset
-    const constellation_end_index = @as(usize, @intCast(12 + num_constellations * @sizeOf(ConstellationInfo)));
-    const boundary_end_index = @as(usize, @intCast(constellation_end_index + total_num_boundaries * @sizeOf(SkyCoord.ExternSkyCoord)));
-    const asterism_end_index = @as(usize, @intCast(boundary_end_index + total_num_asterisms * @sizeOf(SkyCoord.ExternSkyCoord)));
-
-    // We now know how big the data slice is, so defer freeing all of it
-    defer allocator.free(data[0..asterism_end_index]);
+    const constellation_end_index: usize = @intCast(12 + num_constellations * @sizeOf(ConstellationInfo));
+    const boundary_end_index: usize = @intCast(constellation_end_index + total_num_boundaries * @sizeOf(SkyCoord.ExternSkyCoord));
 
     // Convert the data slices from u8's to something more accurate. The constellation metadata is in the form of ConstellationInfo's,
     // and the boundary and asterism data are stored as i16 (fixed point) right ascension/declination pairs
-    const constellation_data = @as([*]const ConstellationInfo, @ptrCast(@alignCast(data[12..constellation_end_index])))[0..num_constellations];
-    const boundary_data = SkyCoord.ExternSkyCoord.unsafeSliceCast(data[constellation_end_index..boundary_end_index]);
-    const asterism_data = SkyCoord.ExternSkyCoord.unsafeSliceCast(data[boundary_end_index..asterism_end_index]);
+    const constellation_data = std.mem.bytesAsSlice(ConstellationInfo, data[12..constellation_end_index]);
+    const boundary_data = std.mem.bytesAsSlice(SkyCoord.ExternSkyCoord, data[constellation_end_index..boundary_end_index]);
+    const asterism_data = std.mem.bytesAsSlice(SkyCoord.ExternSkyCoord, data[boundary_end_index..]);
 
-    star_renderer.constellations = allocator.alloc(Constellation, num_constellations) catch {
-        log.err("Error while allocating constellations: tried to allocate {} constellations\n", .{num_constellations});
-        unreachable;
-    };
+    star_renderer.constellations = allocator.alloc(Constellation, num_constellations) catch @panic("OOM for constellations");
 
     // Initialize the actual constellation data
     var c_bound_start: usize = 0;
