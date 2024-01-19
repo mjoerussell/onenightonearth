@@ -30,7 +30,7 @@ jobs:
       - name: Upload Bundle
         uses: actions/upload-artifact@v4
         with:
-          name: one-night-${{ github.ref }}
+          name: one-night-${{ github.sha }}
           path: one-night.tar
           overwrite: true
           retention-days: 3
