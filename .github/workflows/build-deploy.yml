@@ -56,12 +56,12 @@ jobs:
           name: one-night-${{ github.sha }}
       - name: Copy build files
         run: |
-          sftp ${{ secrets.SSH_USER }}:${{ secrets.SSH_HOST }} <<< '
+          sftp ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} <<< '
             put one-night.tar 
           '
       - name: Start Server
         run: |
-          ssh ${{ secrets.SSH_USER }}:${{ secrets.SSH_HOST }} <<< '
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} <<< '
             tar -xf one-night.tar
             cd server
             nohup ./zig-out/bin/zig-server > logs.out &
