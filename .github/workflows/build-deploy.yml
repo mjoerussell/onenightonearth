@@ -65,5 +65,5 @@ jobs:
             tar -xf one-night.tar
             kill $(lsof -t -i:8080)
             cd server
-            nohup ./zig-out/bin/zig-server > logs.out &
+            nohup ./zig-out/bin/zig-server > logs.out 2>&1 &
           '
