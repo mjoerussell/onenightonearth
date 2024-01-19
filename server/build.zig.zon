@@ -5,7 +5,7 @@
     .dependencies = .{ 
         .tortie = .{
             .url = "https://github.com/mjoerussell/tortie/archive/main.tar.gz",
-            .hash = "122096541fad8c7cfc80d61f2bf5bcee331962383172f6e6afc80d0b4f12bd431f43",
+            .hash = "12209414076882abacec081aef35494fb0ca950006fd34e4852cad986ebb4a170dfe",
         } 
     } 
 }
