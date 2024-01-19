@@ -263,21 +263,21 @@ fn serveStaticFile(client: *tortie.Client, allocator: Allocator, options: *Stati
     var response = client.buffers.responseWriter();
 
     try response.writeStatus(.ok);
-    try response.writeHeader("Content-Type", options.content_type);
-    try response.writeHeader("Content-Length", content.len);
+    try response.printHeader("Content-Type: {s}", .{options.content_type});
+    try response.printHeader("Content-Length: {}", .{content.len});
 
     if (client.keep_alive) {
-        try response.writeHeader("Connection", "keep-alive");
-        try response.writeHeader("Keep-Alive", "timeout=5");
+        try response.writeHeader("Connection: keep-alive");
+        try response.writeHeader("Keep-Alive: timeout=5");
     }
 
     if (options.secure_context) {
-        try response.writeHeader("Cross-Origin-Opener-Policy", "same-origin");
-        try response.writeHeader("Cross-Origin-Embedder-Policy", "require-corp");
+        try response.writeHeader("Cross-Origin-Opener-Policy: same-origin");
+        try response.writeHeader("Cross-Origin-Embedder-Policy: require-corp");
     }
 
     if (options.compress) {
-        try response.writeHeader("Content-Encoding", "deflate");
+        try response.writeHeader("Content-Encoding: deflate");
     }
 
     try response.writeBody(content);
