@@ -92,6 +92,10 @@ pub const Client = struct {
         };
     }
 
+    fn deinit(client: *Client) void {
+        client.buffers.deinit();
+    }
+
     fn reset(client: *Client) void {
         client.state = .idle;
         client.buffers.reset();
@@ -124,7 +128,9 @@ const WindowsServer = struct {
         _ = os.windows.ws2_32.ioctlsocket(socket, os.windows.ws2_32.FIONBIO, &io_mode);
 
         server.socket = socket;
-        errdefer server.deinit();
+        server.overlapped = try allocator.alloc(windows.OVERLAPPED, client_count);
+
+        errdefer server.deinit(allocator);
 
         var socklen = address.getOsSockLen();
         try os.bind(socket, &address.any, socklen);
@@ -132,8 +138,6 @@ const WindowsServer = struct {
         try os.getsockname(socket, &server.listen_address.any, &socklen);
 
         _ = try os.windows.CreateIoCompletionPort(socket, server.io_port, undefined, 0);
-
-        server.overlapped = try allocator.alloc(windows.OVERLAPPED, client_count);
 
         // Init all clients to a mostly empty, but usable, state
         for (&server.clients, 0..) |*client, index| {
@@ -147,10 +151,9 @@ const WindowsServer = struct {
         return server;
     }
 
-    pub fn deinit(server: *WindowsServer) void {
-        os.closeSocket(server.socket);
-        server.socket = undefined;
-        server.listen_address = undefined;
+    pub fn deinit(server: *WindowsServer, allocator: Allocator) void {
+        allocator.free(server.overlapped);
+        for (&server.clients) |*client| client.deinit();
     }
 
     pub fn acceptClient(server: *WindowsServer, client: *Client) !void {
@@ -342,10 +345,9 @@ const LinuxServer = struct {
         return server;
     }
 
-    pub fn deinit(server: *LinuxServer) void {
+    pub fn deinit(server: *LinuxServer, _: Allocator) void {
         os.closeSocket(server.socket);
-        server.socket = undefined;
-        server.listen_address = undefined;
+        for (&server.clients) |*client| client.deinit();
     }
 
     pub fn acceptClient(server: *LinuxServer, client: *Client) !void {
