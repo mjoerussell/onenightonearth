@@ -18,7 +18,7 @@ pub fn build(b: *Build) !void {
     // Must build as an EXE since https://github.com/ziglang/zig/pull/17815
     const exe = b.addExecutable(.{
         .name = "night-math",
-        .root_source_file = Build.LazyPath{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = b.resolveTargetQuery(wasm_target),
         .link_libc = false,
         .optimize = mode,
@@ -30,7 +30,7 @@ pub fn build(b: *Build) !void {
     // These will be embedded in the final library
     const data_gen = b.addExecutable(.{
         .name = "prepare-data",
-        .root_source_file = Build.LazyPath{ .path = "../prepare-data/src/main.zig" },
+        .root_source_file = b.path("../prepare-data/src/main.zig"),
         .optimize = .ReleaseFast,
         .target = default_target,
     });
@@ -63,21 +63,14 @@ pub fn build(b: *Build) !void {
     // This makes it easier to make adjustments to the lib, because changes in the interface will be reflected as type errors.
     const ts_gen = b.addExecutable(.{
         .name = "gen",
-        .root_source_file = Build.LazyPath{ .path = "generate_interface.zig" },
+        .root_source_file = b.path("generate_interface.zig"),
         .optimize = .ReleaseSafe,
         .target = default_target,
     });
 
-    // ts_gen.addAnonymousModule("star_data", .{ .source_file = star_output });
-    // ts_gen.addAnonymousModule("const_data", .{ .source_file = const_output });
-
     const run_generator = b.addRunArtifact(ts_gen);
     run_generator.step.dependOn(&ts_gen.step);
     run_generator.has_side_effects = true;
-
-    // b.getInstallStep().dependOn(&run_generator.step);
-
-    // lib_install_artifact.step.dependOn(&run_generator.step);
 }
 
 const DataConfig = struct {
@@ -98,8 +91,8 @@ fn generateStarData(b: *Build, main_exe: *Build.Step.Compile, generator_exe: *Bu
     for (data_configs) |config| {
         run_data_gen.addArg(config.arg);
         switch (config.input) {
-            .file => |path| run_data_gen.addFileArg(.{ .path = path }),
-            .dir => |path| run_data_gen.addDirectoryArg(.{ .path = path }),
+            .file => |path| run_data_gen.addFileArg(b.path(path)),
+            .dir => |path| run_data_gen.addDirectoryArg(b.path(path)),
         }
 
         const output = run_data_gen.addOutputFileArg(config.output);

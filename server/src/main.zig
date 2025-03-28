@@ -94,8 +94,8 @@ const StaticContent = struct {
         errdefer buffer.deinit();
 
         var main_buffer_writer = buffer.writer();
-        var compressor = try std.compress.deflate.compressor(allocator, main_buffer_writer, .{ .level = .best_compression });
-        defer compressor.deinit();
+
+        var compressor = try std.compress.flate.compressor(main_buffer_writer, .{ .level = .best });
 
         const Marker = struct { start: usize, end: usize };
 
@@ -127,8 +127,7 @@ const StaticContent = struct {
             }
 
             if (info.compress) {
-                try compressor.close();
-                compressor.reset(main_buffer_writer);
+                try compressor.finish();
             }
 
             file_content_markers[index] = .{ .start = content_start_index, .end = buffer.items.len };
@@ -203,6 +202,11 @@ pub fn main() anyerror!void {
         .windows => try std.os.windows.SetConsoleCtrlHandler(ctrlCHandlerWindows, true),
         else => try std.os.sigaction(std.os.SIG.INT, &.{ .handler = .{ .handler = ctrlCHandlerLinux }, .mask = std.mem.zeroes([32]u32), .flags = 0 }, null),
     }
+
+    // const data = try global_state.allocator.alloc(u8, 2048);
+    // const base_server = try localhost.listen(.{});
+
+    // server = try Server.init(base_server, data);
 
     server = try TortieServer(GlobalState).init(global_state.allocator, localhost, global_state, handleRequest);
 

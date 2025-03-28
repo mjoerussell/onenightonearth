@@ -91,7 +91,7 @@ pub const Constellation = struct {
         var asterism_list = std.ArrayList(SkyCoord).init(allocator);
         errdefer asterism_list.deinit();
 
-        var line_iter = std.mem.split(u8, data, "\r\n");
+        var line_iter = std.mem.splitSequence(u8, data, "\r\n");
 
         var parse_state: ParseState = .stars;
 
@@ -104,7 +104,7 @@ pub const Constellation = struct {
             }
 
             if (std.mem.indexOf(u8, line, "@name")) |_| {
-                var line_split = std.mem.split(u8, line, "=");
+                var line_split = std.mem.splitScalar(u8, line, '=');
                 _ = line_split.next();
                 const name = line_split.next().?;
                 const trimmed_name = std.mem.trim(u8, name, " ");
@@ -115,7 +115,7 @@ pub const Constellation = struct {
             }
 
             if (std.mem.indexOf(u8, line, "@epithet")) |_| {
-                var line_split = std.mem.split(u8, line, "=");
+                var line_split = std.mem.splitScalar(u8, line, '=');
                 _ = line_split.next();
                 const epithet = line_split.next().?;
                 const trimmed_epithet = std.mem.trim(u8, epithet, " ");
@@ -143,7 +143,7 @@ pub const Constellation = struct {
             if (!std.mem.startsWith(u8, line, "@")) {
                 switch (parse_state) {
                     .stars => {
-                        var parts = std.mem.split(u8, line, ",");
+                        var parts = std.mem.splitScalar(u8, line, ',');
                         const star_name = std.mem.trim(u8, parts.next().?, " ");
                         const right_ascension = std.mem.trim(u8, parts.next().?, " ");
                         const declination = std.mem.trim(u8, parts.next().?, " ");
@@ -159,7 +159,7 @@ pub const Constellation = struct {
                         try stars.put(star_name, star_coord);
                     },
                     .asterism => {
-                        var parts = std.mem.split(u8, line, ",");
+                        var parts = std.mem.splitScalar(u8, line, ',');
                         const star_a_name = std.mem.trim(u8, parts.next().?, " ");
                         const star_b_name = std.mem.trim(u8, parts.next().?, " ");
 
@@ -171,11 +171,11 @@ pub const Constellation = struct {
                         }
                     },
                     .boundaries => {
-                        var parts = std.mem.split(u8, line, ",");
+                        var parts = std.mem.splitScalar(u8, line, ',');
                         const right_ascension_long = std.mem.trim(u8, parts.next().?, " ");
                         const declination = std.mem.trim(u8, parts.next().?, " ");
 
-                        var right_ascension_parts = std.mem.split(u8, right_ascension_long, " ");
+                        var right_ascension_parts = std.mem.splitScalar(u8, right_ascension_long, ' ');
                         const ra_hours = try std.fmt.parseInt(u32, right_ascension_parts.next().?, 10);
                         const ra_minutes = try std.fmt.parseInt(u32, right_ascension_parts.next().?, 10);
                         const ra_seconds = try std.fmt.parseFloat(f32, right_ascension_parts.next().?);
@@ -209,7 +209,7 @@ pub const Star = packed struct {
     fn parse(data: []const u8) !Star {
         var star: Star = undefined;
 
-        var parts_iter = std.mem.split(u8, data, "|");
+        var parts_iter = std.mem.splitScalar(u8, data, '|');
         var part_index: u8 = 0;
 
         var right_ascension: f32 = 0;
@@ -270,7 +270,7 @@ const Arguments = struct {
 
         var arg_index: usize = 0;
         while (arg_index < args.len) : (arg_index += 1) {
-            inline for (@typeInfo(Arguments).Struct.fields) |field| {
+            inline for (@typeInfo(Arguments).@"struct".fields) |field| {
                 const arg_name = "--" ++ field.name;
                 if (std.mem.eql(u8, args[arg_index], arg_name)) {
                     if (args.len < arg_index + 2) {
@@ -339,7 +339,7 @@ fn readSaoCatalog(allocator: Allocator, catalog_filename: []const u8) ![]Star {
     var star_list = try std.ArrayList(Star).initCapacity(allocator, 75000);
     errdefer star_list.deinit();
 
-    var read_buffer: [std.mem.page_size]u8 = undefined;
+    var read_buffer: [4096]u8 = undefined;
     var read_start_index: usize = 0;
     var line_start_index: usize = 0;
     var line_end_index: usize = 0;

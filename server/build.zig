@@ -21,14 +21,14 @@ pub fn build(b: *std.Build) !void {
 
     const exe = b.addExecutable(.{
         .name = "zig-server",
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .cwd_relative = "src/main.zig" },
         .optimize = mode,
         .target = if (target_linux) b.resolveTargetQuery(default_linux_target) else target,
         .single_threaded = is_single_threaded orelse false,
     });
 
     const tortie_module = if (use_vendored_deps)
-        b.createModule(.{ .root_source_file = .{ .path = vendor_dir ++ "tortie/src/tortie.zig" } })
+        b.createModule(.{ .root_source_file = .{ .cwd_relative = vendor_dir ++ "tortie/src/tortie.zig" } })
     else
         b.dependency("tortie", .{}).module("tortie");
     exe.root_module.addImport("tortie", tortie_module);

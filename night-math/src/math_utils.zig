@@ -108,8 +108,7 @@ pub fn boundedASin(x: anytype) OperationError!@TypeOf(x) {
 
 fn FloatModResult(comptime input_type: type) type {
     return switch (@typeInfo(input_type)) {
-        .ComptimeFloat => f128,
-        .Float => input_type,
+        .float => input_type,
         else => @compileError("floatMod is not implemented for type " ++ @typeName(input_type)),
     };
 }

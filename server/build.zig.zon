@@ -1,11 +1,12 @@
-.{ 
-    .name = "onenight-server", 
+.{
+    .name = .onenight_server,
     .version = "1.2.0",
-    .paths = .{ "" },
-    .dependencies = .{ 
+    .paths = .{""},
+    .fingerprint = 0xbdad6f02f82f5bff,
+    .dependencies = .{
         .tortie = .{
             .url = "https://github.com/mjoerussell/tortie/archive/main.tar.gz",
-            .hash = "12209414076882abacec081aef35494fb0ca950006fd34e4852cad986ebb4a170dfe",
-        } 
-    } 
+            .hash = "N-V-__8AAOm3AADlkhJtqk4wh76Z3S0ye7UNDs3qFsDFoon6",
+        },
+    },
 }
