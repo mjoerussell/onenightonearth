@@ -8,14 +8,13 @@ const TortieServer = tortie.TortieServer;
 const http = tortie.http;
 
 var static_files = [_]StaticFile{
-    StaticFile.init("../web/index.html", .{ .path = "/" }),
-    StaticFile.init("../night-math/zig-out/const_meta.json", .{ .path = "/constellations/meta", .content_type = "application/json" }),
-    StaticFile.init("../web/styles/main.css", .{ .relative_to = "../web" }),
-    StaticFile.init("../web/dist/bundle.js", .{ .relative_to = "../web", .compress = true }),
-    StaticFile.init("../web/dist/bundle.js.map", .{ .relative_to = "../web", .compress = true }),
-    StaticFile.init("../web/styles/main.css", .{ .relative_to = "../web" }),
-    StaticFile.init("../web/assets/favicon.ico", .{ .relative_to = "../web" }),
-    StaticFile.init("../web/dist/wasm/night-math.wasm", .{ .relative_to = "../web/dist/wasm", .compress = true }),
+    StaticFile.init("web/index.html", .{ .path = "/" }),
+    StaticFile.init("zig-out/const_meta.json", .{ .path = "/constellations/meta", .content_type = "application/json" }),
+    StaticFile.init("web/styles/main.css", .{ .relative_to = "web" }),
+    StaticFile.init("web/assets/favicon.ico", .{ .relative_to = "web" }),
+    StaticFile.init("dist/bundle.js", .{ .relative_to = "dist", .compress = true }),
+    StaticFile.init("dist/bundle.js.map", .{ .relative_to = "dist", .compress = true }),
+    StaticFile.init("dist/wasm/night-math.wasm", .{ .relative_to = "dist/wasm", .compress = true }),
 };
 
 pub const log_level = switch (builtin.mode) {
@@ -202,11 +201,6 @@ pub fn main() anyerror!void {
         .windows => try std.os.windows.SetConsoleCtrlHandler(ctrlCHandlerWindows, true),
         else => try std.os.sigaction(std.os.SIG.INT, &.{ .handler = .{ .handler = ctrlCHandlerLinux }, .mask = std.mem.zeroes([32]u32), .flags = 0 }, null),
     }
-
-    // const data = try global_state.allocator.alloc(u8, 2048);
-    // const base_server = try localhost.listen(.{});
-
-    // server = try Server.init(base_server, data);
 
     server = try TortieServer(GlobalState).init(global_state.allocator, localhost, global_state, handleRequest);
 

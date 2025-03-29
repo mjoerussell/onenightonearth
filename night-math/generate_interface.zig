@@ -15,10 +15,10 @@ const imports = struct {
 
 fn writeTypescriptPrimative(comptime T: type, writer: anytype) !void {
     switch (@typeInfo(T)) {
-        .Int, .Float, .Bool => {
+        .int, .float, .bool => {
             try writer.writeAll("WasmPrimative." ++ @typeName(T));
         },
-        .Enum => |enum_info| {
+        .@"enum" => |enum_info| {
             try writeTypescriptPrimative(enum_info.tag_type, writer);
         },
         else => @compileError("Cannot write Typescript primative for type " ++ @typeName(T)),
@@ -27,26 +27,26 @@ fn writeTypescriptPrimative(comptime T: type, writer: anytype) !void {
 
 fn writeTypescriptTypeName(comptime T: type, writer: anytype) !void {
     switch (@typeInfo(T)) {
-        .Int => |info| {
+        .int => |info| {
             if (info.bits >= 64) {
                 try writer.writeAll("BigInt");
             } else {
                 try writer.writeAll("number");
             }
         },
-        .Float => try writer.writeAll("number"),
-        .Pointer => |info| switch (info.size) {
-            .One, .Many, .C => try writer.writeAll("pointer"),
+        .float => try writer.writeAll("number"),
+        .pointer => |info| switch (info.size) {
+            .one, .many, .c => try writer.writeAll("pointer"),
             else => @compileError("Slices are not valid as arguments in an exported function"),
         },
-        .Optional => |info| {
+        .optional => |info| {
             try writeTypescriptTypeName(info.child, writer);
             if (@typeInfo(info.child) != .Pointer) {
                 try writer.writeAll(" | null");
             }
         },
-        .Void => try writer.writeAll("void"),
-        .Enum => try writer.writeAll("number"),
+        .void => try writer.writeAll("void"),
+        .@"enum" => try writer.writeAll("number"),
         else => @compileError("Cannot generate Typescript type for Zig type " ++ @typeName(T)),
     }
 }
@@ -54,7 +54,10 @@ fn writeTypescriptTypeName(comptime T: type, writer: anytype) !void {
 pub fn main() !void {
     const cwd = fs.cwd();
 
-    try cwd.makePath("../web/src/wasm");
+    cwd.makePath("../web/src/wasm") catch |err| switch (err) {
+        error.PathAlreadyExists => {},
+        else => return err,
+    };
 
     var out_file = try cwd.createFile("../web/src/wasm/wasm_module.ts", .{});
     defer out_file.close();
@@ -132,14 +135,14 @@ pub fn main() !void {
 
     // Write out all of the public packed or extern structs in standard interface format, and write out their
     // Sized<T> instances. This will allow them to be easily allocated and used from Typescript code.
-    inline for (@typeInfo(imports).Struct.decls) |import_decl| {
+    inline for (@typeInfo(imports).@"struct".decls) |import_decl| {
         const ImportDecl = @field(imports, import_decl.name);
-        inline for (@typeInfo(ImportDecl).Struct.decls) |decl| {
+        inline for (@typeInfo(ImportDecl).@"struct".decls) |decl| {
             const Decl = @field(ImportDecl, decl.name);
             switch (@typeInfo(@TypeOf(Decl))) {
-                .Type => switch (@typeInfo(Decl)) {
-                    .Struct => |struct_info| {
-                        if (struct_info.layout == .Extern or struct_info.layout == .Packed) {
+                .type => switch (@typeInfo(Decl)) {
+                    .@"struct" => |struct_info| {
+                        if (struct_info.layout == .@"extern" or struct_info.layout == .@"packed") {
                             try writer.print("export type {s} = {{\n", .{decl.name});
                             inline for (struct_info.fields) |field| {
                                 try writer.print("\t{s}: ", .{field.name});
@@ -167,14 +170,14 @@ pub fn main() !void {
     // can then be used in Typescript by casting WebAssembly.Interface.exports to it.
     try writer.writeAll("export interface WasmModule {\n");
     try writer.writeAll("\tmemory: WebAssembly.Memory;\n");
-    inline for (@typeInfo(imports).Struct.decls) |import_decl| {
+    inline for (@typeInfo(imports).@"struct".decls) |import_decl| {
         const ImportDecl = @field(imports, import_decl.name);
-        inline for (@typeInfo(ImportDecl).Struct.decls) |decl| {
+        inline for (@typeInfo(ImportDecl).@"struct".decls) |decl| {
             const Decl = @field(ImportDecl, decl.name);
             switch (@typeInfo(@TypeOf(Decl))) {
-                .Fn => |func_info| {
+                .@"fn" => |func_info| {
                     // hack to get around missing support for func.is_export
-                    if (func_info.calling_convention == .C) {
+                    if (func_info.calling_convention == .c) {
                         // const func_info = @typeInfo(func.fn_type).Fn;
                         try writer.print("\t{s}: (", .{decl.name});
                         if (func_info.params.len > 0) {

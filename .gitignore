@@ -10,4 +10,4 @@ dist/
 **/const_meta.json
 profiles
 *.wast
-server/vendor
+vendor

@@ -304,13 +304,13 @@ pub fn main() anyerror!void {
     const arguments = try Arguments.init(args);
 
     if (arguments.stars) |star_args| {
-        std.debug.print("Generating star data: {s} -> {s}\n", .{ star_args.source, star_args.dest });
+        log.debug("Generating star data: {s} -> {s}\n", .{ star_args.source, star_args.dest });
         const stars = try readSaoCatalog(allocator, star_args.source);
         try writeStarData(stars, star_args.dest);
     }
 
     if (arguments.constellations) |const_args| {
-        std.debug.print("Generating constellation data: {s} -> {s}\n", .{ const_args.source, const_args.dest });
+        log.debug("Generating constellation data: {s} -> {s}\n", .{ const_args.source, const_args.dest });
         const constellations = try readConstellationFiles(allocator, const_args.source);
         defer {
             for (constellations) |*c| c.deinit(allocator);

@@ -10,7 +10,7 @@ function getSettingsFromArguments() {
 
 function getBuildConfig(settings, plugins = []) {
   return {
-    entryPoints: ['src/index.ts'],
+    entryPoints: ['web/src/index.ts'],
     bundle: true,
     sourcemap: settings.production !== true,
     minify: settings.production === true,

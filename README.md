@@ -26,15 +26,6 @@ There are a few steps to get started:
 - Zig - See [Zig on GitHub](https://github.com/ziglang/zig) for more instructions.
 - Node - See https://nodejs.org/en/download/
 
-**On First Run Only:**
+Run `zig build` to build the project, `zig build run` to build the project and start the server.
 
-1. Run `cd web && npm install`
-2. Run `cd prepare-data && zig build run -Drelease-fast -- ../zig-server/star_data.bin ../zig-server/const_data.bin ../zig-server/const_meta.json`. This will create all of the data files that the server needs in order to run.
-
-**Each Run:**
-
-1. In one terminal, run `cd zig-server && zig build run`.
-2. Run `cd night-math && zig build -Drelease-fast`. This will create the WASM module as well as the module TS interfaces.
-3. In another terminal, run `cd web && npm start`.
-
-Now you're ready! Like before, visit `localhost:8080` to view the site.
+Now you're ready! Visit `localhost:8080` to view the site.
