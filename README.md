@@ -29,3 +29,5 @@ There are a few steps to get started:
 Run `zig build` to build the project, `zig build run` to build the project and start the server.
 
 Now you're ready! Visit `localhost:8080` to view the site.
+
+If you want to have hotreloading enabled for the frontend, you can run `npm run watch` alongside the server.

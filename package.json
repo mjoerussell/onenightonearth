@@ -4,9 +4,7 @@
     "description": "A Star Map App",
     "main": "index.ts",
     "scripts": {
-        "start": "node esbuild.config.mjs --watch",
-        "build": "node esbuild.config.mjs --prod",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "watch": "node esbuild.config.mjs --watch"
     },
     "author": "mjoerussell",
     "license": "ISC",
