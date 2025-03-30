@@ -1,28 +1,23 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const nightsky = @import("nightsky");
 
 const log = @import("log.zig");
 
-const Canvas = @import("Canvas.zig");
+const Canvas = nightsky.Canvas;
 const Pixel = Canvas.Pixel;
-
-const Point = @import("math_utils.zig").Point;
-
-const StarRenderer = @import("StarRenderer.zig");
-
-const Star = @import("Star.zig");
+const Point = nightsky.math.Point;
+const StarRenderer = nightsky.StarRenderer;
+const Star = nightsky.Star;
 const ExternStar = Star.ExternStar;
+const Constellation = nightsky.Constellation;
+const SkyCoord = nightsky.SkyCoord;
+const GreatCircle = nightsky.GreatCircle;
+const FixedPoint = nightsky.DefaultFixedPoint;
 
-const Constellation = @import("Constellation.zig");
-const SkyCoord = @import("SkyCoord.zig");
-
-const star_math = @import("star_math.zig");
+const star_math = nightsky.star_math;
 const Coord = star_math.Coord;
 const ObserverPosition = star_math.ObserverPosition;
-
-const GreatCircle = @import("GreatCircle.zig");
-
-const FixedPoint = @import("fixed_point.zig").DefaultFixedPoint;
 
 const allocator = switch (builtin.cpu.arch) {
     .wasm32, .wasm64 => std.heap.wasm_allocator,

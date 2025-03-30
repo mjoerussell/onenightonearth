@@ -2,8 +2,12 @@ const std = @import("std");
 const fs = std.fs;
 const Allocator = std.mem.Allocator;
 
-const fp = @import("fixed_point.zig");
-const FixedPoint = fp.FixedPoint(i16, 12);
+const nightsky = @import("nightsky");
+const FixedPoint = nightsky.DefaultFixedPoint;
+const ExternStar = nightsky.Star.ExternStar;
+const ExternConstellation = nightsky.Constellation.ExternConstellation;
+const SpectralType = nightsky.Star.SpectralType;
+const ExternSkyCoord = nightsky.SkyCoord.ExternSkyCoord;
 
 const log = std.log.scoped(.prepare_data);
 
@@ -20,75 +24,42 @@ pub fn degToRadLong(degrees: anytype) @TypeOf(degrees) {
     return degToRad(norm_deg);
 }
 
-pub const SpectralType = enum(u8) {
-    O,
-    B,
-    A,
-    F,
-    G,
-    K,
-    M,
+pub fn spectralTypeFromChar(char: u8) ?SpectralType {
+    return switch (char) {
+        'o', 'O' => .O,
+        'b', 'B' => .B,
+        'a', 'A' => .A,
+        'f', 'F' => .F,
+        'g', 'G' => .G,
+        'k', 'K' => .K,
+        'm', 'M' => .M,
+        else => null,
+    };
+}
 
-    pub fn fromChar(char: u8) ?SpectralType {
-        return switch (char) {
-            'o', 'O' => .O,
-            'b', 'B' => .B,
-            'a', 'A' => .A,
-            'f', 'F' => .F,
-            'g', 'G' => .G,
-            'k', 'K' => .K,
-            'm', 'M' => .M,
-            else => null,
-        };
-    }
-};
-
-pub const SkyCoord = packed struct {
-    right_ascension: i16,
-    declination: i16,
-};
-
-pub const ConstellationInfo = packed struct {
-    num_boundaries: u8,
-    num_asterisms: u8,
-    is_zodiac: u8,
-};
-
-pub const Constellation = struct {
+const SkyFile = struct {
     name: []const u8,
     epithet: []const u8,
-    boundaries: []SkyCoord,
-    asterism: []SkyCoord,
-    is_zodiac: bool = false,
+    constellation: ExternConstellation,
 
-    pub fn deinit(self: *Constellation, allocator: Allocator) void {
-        allocator.free(self.boundaries);
-        allocator.free(self.asterism);
-        allocator.free(self.name);
-        allocator.free(self.epithet);
-    }
-
-    pub fn getInfo(self: Constellation) ConstellationInfo {
-        return .{ .num_boundaries = @as(u8, @intCast(self.boundaries.len)), .num_asterisms = @as(u8, @intCast(self.asterism.len)), .is_zodiac = if (self.is_zodiac) @as(u8, 1) else @as(u8, 0) };
-    }
-
-    pub fn parseSkyFile(allocator: Allocator, data: []const u8) !Constellation {
+    pub fn parse(allocator: Allocator, data: []const u8) !SkyFile {
         const ParseState = enum {
             stars,
             asterism,
             boundaries,
         };
 
-        var constellation: Constellation = undefined;
-        constellation.is_zodiac = false;
+        var sky_file: SkyFile = undefined;
 
-        var stars = std.StringHashMap(SkyCoord).init(allocator);
+        sky_file.constellation.is_zodiac = false;
+
+        var stars = std.StringHashMap(ExternSkyCoord).init(allocator);
         defer stars.deinit();
 
-        var boundary_list = std.ArrayList(SkyCoord).init(allocator);
+        var boundary_list = std.ArrayList(ExternSkyCoord).init(allocator);
         errdefer boundary_list.deinit();
 
-        var asterism_list = std.ArrayList(SkyCoord).init(allocator);
+        var asterism_list = std.ArrayList(ExternSkyCoord).init(allocator);
         errdefer asterism_list.deinit();
 
         var line_iter = std.mem.splitSequence(u8, data, "\r\n");
@@ -99,7 +70,7 @@ pub const Constellation = struct {
             if (std.mem.trim(u8, line, " ").len == 0) continue;
 
             if (std.mem.indexOf(u8, line, "#zodiac")) |_| {
-                constellation.is_zodiac = true;
+                sky_file.constellation.is_zodiac = true;
                 continue;
             }
 
@@ -110,7 +81,7 @@ pub const Constellation = struct {
                 const trimmed_name = std.mem.trim(u8, name, " ");
                 const name_copy = try allocator.alloc(u8, trimmed_name.len);
                 @memcpy(name_copy, trimmed_name);
-                constellation.name = name_copy;
+                sky_file.name = name_copy;
                 continue;
             }
 
@@ -121,7 +92,7 @@ pub const Constellation = struct {
                 const trimmed_epithet = std.mem.trim(u8, epithet, " ");
                 const epithet_copy = try allocator.alloc(u8, trimmed_epithet.len);
                 @memcpy(epithet_copy, trimmed_epithet);
-                constellation.epithet = epithet_copy;
+                sky_file.epithet = epithet_copy;
                 continue;
             }
 
@@ -151,7 +122,7 @@ pub const Constellation = struct {
                         const ra_value = try std.fmt.parseFloat(f32, right_ascension);
                         const dec_value = try std.fmt.parseFloat(f32, declination);
 
-                        const star_coord = SkyCoord{
+                        const star_coord = ExternSkyCoord{
                             .right_ascension = FixedPoint.fromFloat(degToRadLong(ra_value)),
                             .declination = FixedPoint.fromFloat(degToRad(dec_value)),
                         };
@@ -182,7 +153,7 @@ pub const Constellation = struct {
 
                         const right_ascension = @as(f32, @floatFromInt(ra_hours * 15)) + ((@as(f32, @floatFromInt(ra_minutes)) / 60) * 15) + ((ra_seconds / 3600) * 15);
                         const dec_value = try std.fmt.parseFloat(f32, std.mem.trim(u8, declination, " "));
-                        const boundary_coord = SkyCoord{
+                        const boundary_coord = ExternSkyCoord{
                             .right_ascension = FixedPoint.fromFloat(degToRadLong(right_ascension)),
                             .declination = FixedPoint.fromFloat(degToRad(dec_value)),
                         };
@@ -193,66 +164,59 @@ pub const Constellation = struct {
             }
         }
 
-        constellation.boundaries = try boundary_list.toOwnedSlice();
-        constellation.asterism = try asterism_list.toOwnedSlice();
+        sky_file.constellation.boundaries = try boundary_list.toOwnedSlice();
+        sky_file.constellation.asterism = try asterism_list.toOwnedSlice();
 
-        return constellation;
+        return sky_file;
     }
 };
 
-pub const Star = packed struct {
-    right_ascension: i16,
-    declination: i16,
-    brightness: u8,
-    spec_type: SpectralType,
+fn parseStar(data: []const u8) !ExternStar {
+    var star: ExternStar = undefined;
 
-    fn parse(data: []const u8) !Star {
-        var star: Star = undefined;
+    var parts_iter = std.mem.splitScalar(u8, data, '|');
+    var part_index: u8 = 0;
 
-        var parts_iter = std.mem.splitScalar(u8, data, '|');
-        var part_index: u8 = 0;
+    var right_ascension: f32 = 0;
+    var declination: f32 = 0;
+    while (parts_iter.next()) |part| : (part_index += 1) {
+        if (part_index > 14) break;
+        switch (part_index) {
+            1 => right_ascension = try std.fmt.parseFloat(f32, part),
+            5 => declination = try std.fmt.parseFloat(f32, part),
+            13 => {
+                const dimmest_visible: f32 = 18.6;
+                const brightest_value: f32 = -4.6;
+                const v_mag = std.fmt.parseFloat(f32, part) catch dimmest_visible;
+                const mag_display_factor = (dimmest_visible - (v_mag - brightest_value)) / dimmest_visible;
 
-        var right_ascension: f32 = 0;
-        var declination: f32 = 0;
-        while (parts_iter.next()) |part| : (part_index += 1) {
-            if (part_index > 14) break;
-            switch (part_index) {
-                1 => right_ascension = try std.fmt.parseFloat(f32, part),
-                5 => declination = try std.fmt.parseFloat(f32, part),
-                13 => {
-                    const dimmest_visible: f32 = 18.6;
-                    const brightest_value: f32 = -4.6;
-                    const v_mag = std.fmt.parseFloat(f32, part) catch dimmest_visible;
-                    const mag_display_factor = (dimmest_visible - (v_mag - brightest_value)) / dimmest_visible;
-
-                    star.brightness = blk: {
-                        const b = mag_display_factor + 0.15;
-                        if (b >= 1.0) {
-                            break :blk 255;
-                        } else if (b <= 0.45) {
-                            break :blk 0;
-                        } else {
-                            break :blk @as(u8, @intFromFloat(b * 255.0));
-                        }
-                    };
-                },
-                14 => {
-                    if (part.len < 1) {
-                        star.spec_type = .A;
-                        continue;
+                star.brightness = blk: {
+                    const b = mag_display_factor + 0.15;
+                    if (b >= 1.0) {
+                        break :blk 255;
+                    } else if (b <= 0.45) {
+                        break :blk 0;
+                    } else {
+                        break :blk @as(u8, @intFromFloat(b * 255.0));
                     }
-                    star.spec_type = SpectralType.fromChar(part[0]) orelse .A;
-                },
-                else => {},
-            }
+                };
+            },
+            14 => {
+                if (part.len < 1) {
+                    star.spec_type = .A;
+                    continue;
+                }
+                star.spec_type = spectralTypeFromChar(part[0]) orelse .A;
+            },
+            else => {},
         }
-
-        star.right_ascension = FixedPoint.fromFloat(degToRadLong(right_ascension));
-        star.declination = FixedPoint.fromFloat(degToRad(declination));
-
-        return star;
     }
-};
+
+    star.right_ascension = FixedPoint.fromFloat(degToRadLong(right_ascension));
+    star.declination = FixedPoint.fromFloat(degToRad(declination));
+
+    return star;
+}
 
 const Arguments = struct {
     const SourceDest = struct {
@@ -311,32 +275,32 @@ pub fn main() anyerror!void {
 
     if (arguments.constellations) |const_args| {
         log.debug("Generating constellation data: {s} -> {s}\n", .{ const_args.source, const_args.dest });
-        const constellations = try readConstellationFiles(allocator, const_args.source);
+        const sky_files = try readSkyFiles(allocator, const_args.source);
         defer {
-            for (constellations) |*c| c.deinit(allocator);
-            allocator.free(constellations);
+            for (sky_files) |*f| f.constellation.deinit(allocator);
+            allocator.free(sky_files);
         }
 
-        try writeConstellationData(constellations, const_args.dest);
+        try writeConstellationData(sky_files, const_args.dest);
     }
 
     if (arguments.metadata) |meta_args| {
         log.info("Generating constellation metadata: {s} -> {s}", .{ meta_args.source, meta_args.dest });
-        const constellations = try readConstellationFiles(allocator, meta_args.source);
+        const sky_files = try readSkyFiles(allocator, meta_args.source);
         defer {
-            for (constellations) |*c| c.deinit(allocator);
-            allocator.free(constellations);
+            for (sky_files) |*f| f.constellation.deinit(allocator);
+            allocator.free(sky_files);
         }
-        try writeConstellationMetadata(allocator, constellations, meta_args.dest);
+        try writeConstellationMetadata(allocator, sky_files, meta_args.dest);
     }
 }
 
-fn readSaoCatalog(allocator: Allocator, catalog_filename: []const u8) ![]Star {
+fn readSaoCatalog(allocator: Allocator, catalog_filename: []const u8) ![]ExternStar {
     const cwd = fs.cwd();
     const sao_catalog = try cwd.openFile(catalog_filename, .{});
     defer sao_catalog.close();
 
-    var star_list = try std.ArrayList(Star).initCapacity(allocator, 75000);
+    var star_list = try std.ArrayList(ExternStar).initCapacity(allocator, 75000);
     errdefer star_list.deinit();
 
     var read_buffer: [4096]u8 = undefined;
@@ -364,7 +328,7 @@ fn readSaoCatalog(allocator: Allocator, catalog_filename: []const u8) ![]Star {
 
             const line = read_buffer[line_start_index..line_end_index];
             if (std.mem.startsWith(u8, line, "SAO")) {
-                if (Star.parse(line)) |star| {
+                if (parseStar(line)) |star| {
                     if (star.brightness > 0) {
                         try star_list.append(star);
                     }
@@ -383,7 +347,7 @@ fn readSaoCatalog(allocator: Allocator, catalog_filename: []const u8) ![]Star {
     return try star_list.toOwnedSlice();
 }
 
-fn writeStarData(stars: []Star, out_filename: []const u8) !void {
+fn writeStarData(stars: []ExternStar, out_filename: []const u8) !void {
     const cwd = fs.cwd();
 
     var out_file = try cwd.createFile(out_filename, .{});
@@ -401,9 +365,9 @@ fn writeStarData(stars: []Star, out_filename: []const u8) !void {
 }
 
 /// Read and parse all of the constellation files in a given directory.
-fn readConstellationFiles(allocator: Allocator, constellation_dir_name: []const u8) ![]Constellation {
-    var constellations = std.ArrayList(Constellation).init(allocator);
-    errdefer constellations.deinit();
+fn readSkyFiles(allocator: Allocator, constellation_dir_name: []const u8) ![]SkyFile {
+    var sky_files = std.ArrayList(SkyFile).init(allocator);
+    errdefer sky_files.deinit();
 
     const cwd = fs.cwd();
     var constellation_dir = try cwd.openDir(constellation_dir_name, .{ .iterate = true });
@@ -445,14 +409,14 @@ fn readConstellationFiles(allocator: Allocator, constellation_dir_name: []const 
 
         const bytes_read = try sky_file.readAll(read_buffer[0..]);
 
-        const constellation = try Constellation.parseSkyFile(allocator, read_buffer[0..bytes_read]);
-        try constellations.append(constellation);
+        const sky_file_data = try SkyFile.parse(allocator, read_buffer[0..bytes_read]);
+        try sky_files.append(sky_file_data);
     }
 
-    return try constellations.toOwnedSlice();
+    return try sky_files.toOwnedSlice();
 }
 
-fn writeConstellationData(constellations: []Constellation, out_filename: []const u8) !void {
+fn writeConstellationData(sky_files: []SkyFile, out_filename: []const u8) !void {
     const cwd = fs.cwd();
 
     var out_file = try cwd.createFile(out_filename, .{});
@@ -465,28 +429,28 @@ fn writeConstellationData(constellations: []Constellation, out_filename: []const
 
     var num_boundaries: u32 = 0;
     var num_asterisms: u32 = 0;
-    for (constellations) |constellation| {
-        num_boundaries += @as(u32, @intCast(constellation.boundaries.len));
-        num_asterisms += @as(u32, @intCast(constellation.asterism.len));
+    for (sky_files) |sky_file| {
+        num_boundaries += @as(u32, @intCast(sky_file.constellation.boundaries.len));
+        num_asterisms += @as(u32, @intCast(sky_file.constellation.asterism.len));
     }
 
-    _ = try writer.write(std.mem.toBytes(@as(u32, @intCast(constellations.len)))[0..]);
+    _ = try writer.write(std.mem.toBytes(@as(u32, @intCast(sky_files.len)))[0..]);
     _ = try writer.write(std.mem.toBytes(num_boundaries)[0..]);
     _ = try writer.write(std.mem.toBytes(num_asterisms)[0..]);
 
-    for (constellations) |constellation| {
-        const info = constellation.getInfo();
+    for (sky_files) |sky_file| {
+        const info = sky_file.constellation.getInfo();
         _ = try writer.write(std.mem.toBytes(info)[0..]);
     }
 
-    for (constellations) |constellation| {
-        for (constellation.boundaries) |boundary_coord| {
+    for (sky_files) |sky_file| {
+        for (sky_file.constellation.boundaries) |boundary_coord| {
             _ = try writer.write(std.mem.toBytes(boundary_coord)[0..]);
         }
     }
 
-    for (constellations) |constellation| {
-        for (constellation.asterism) |asterism_coord| {
+    for (sky_files) |sky_file| {
+        for (sky_file.constellation.asterism) |asterism_coord| {
             _ = try writer.write(std.mem.toBytes(asterism_coord)[0..]);
         }
     }
@@ -494,7 +458,7 @@ fn writeConstellationData(constellations: []Constellation, out_filename: []const
     try buffered_writer.flush();
 }
 
-fn writeConstellationMetadata(allocator: Allocator, constellations: []Constellation, filename: []const u8) !void {
+fn writeConstellationMetadata(allocator: Allocator, sky_files: []SkyFile, filename: []const u8) !void {
     const cwd = fs.cwd();
 
     var out_file = try cwd.createFile(filename, .{});
@@ -506,10 +470,10 @@ fn writeConstellationMetadata(allocator: Allocator, constellations: []Constellat
     const writer = buffered_writer.writer();
 
     var metadata_json = std.ArrayList(std.json.Value).init(allocator);
-    for (constellations) |constellation| {
+    for (sky_files) |sky_file| {
         var c_map = std.json.ObjectMap.init(allocator);
-        try c_map.putNoClobber("name", std.json.Value{ .string = constellation.name });
-        try c_map.putNoClobber("epithet", std.json.Value{ .string = constellation.epithet });
+        try c_map.putNoClobber("name", std.json.Value{ .string = sky_file.name });
+        try c_map.putNoClobber("epithet", std.json.Value{ .string = sky_file.epithet });
 
         const val = std.json.Value{ .object = c_map };
         try metadata_json.append(val);

@@ -4,6 +4,7 @@ const math = std.math;
 const FixedPoint = @import("fixed_point.zig").DefaultFixedPoint;
 
 const SkyCoord = @import("SkyCoord.zig");
+const ExternSkyCoord = SkyCoord.ExternSkyCoord;
 
 const Canvas = @import("Canvas.zig");
 const math_utils = @import("math_utils.zig");
@@ -11,6 +12,27 @@ const Line = math_utils.Line;
 const Point = math_utils.Point;
 
 const Constellation = @This();
+
+pub const ExternConstellation = struct {
+    pub const Info = packed struct {
+        num_boundaries: u8,
+        num_asterisms: u8,
+        is_zodiac: u8,
+    };
+
+    asterism: []ExternSkyCoord,
+    boundaries: []ExternSkyCoord,
+    is_zodiac: bool,
+
+    pub fn getInfo(self: ExternConstellation) Info {
+        return .{ .num_boundaries = @as(u8, @intCast(self.boundaries.len)), .num_asterisms = @as(u8, @intCast(self.asterism.len)), .is_zodiac = if (self.is_zodiac) @as(u8, 1) else @as(u8, 0) };
+    }
+
+    pub fn deinit(self: ExternConstellation, allocator: std.mem.Allocator) void {
+        allocator.free(self.asterism);
+        allocator.free(self.boundaries);
+    }
+};
 
 /// Iterate over the boundaries two at a time. The iteration goes like this:
 ///
@@ -42,7 +64,7 @@ asterism: []SkyCoord,
 boundaries: []SkyCoord,
 is_zodiac: bool,
 
-pub fn boundary_iter(self: Constellation) BoundaryIter {
+pub fn boundaryIter(self: Constellation) BoundaryIter {
     return .{ .constellation = self };
 }
 
@@ -87,7 +109,7 @@ pub fn isPointInside(constellation: Constellation, canvas: Canvas, point: Point,
 
     // Loop over all of the boundaries and count how many times both rays intersect with the boundary line
     // If they intersect inside the canvas circle, then add that to the left or right intersection counter
-    var iter = constellation.boundary_iter();
+    var iter = constellation.boundaryIter();
     while (iter.next()) |bound| {
         const b_a = canvas.coordToPoint(bound[0], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
         const b_b = canvas.coordToPoint(bound[1], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;

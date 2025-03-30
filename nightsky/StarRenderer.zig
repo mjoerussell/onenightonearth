@@ -2,8 +2,6 @@ const std = @import("std");
 const math = std.math;
 const Allocator = std.mem.Allocator;
 
-const log = @import("log.zig");
-
 const Canvas = @import("Canvas.zig");
 const Pixel = Canvas.Pixel;
 
@@ -16,9 +14,6 @@ const Constellation = @import("Constellation.zig");
 const StarRenderer = @This();
 
 canvas: Canvas,
-// observer_latitude: f32,
-// observer_longitude: f32,
-// observer_timestamp: i64,
 
 stars: std.MultiArrayList(Star),
 constellations: []Constellation,

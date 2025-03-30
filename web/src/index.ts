@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
             controls.setConstellations(constellations);
         });
 
-    WebAssembly.instantiateStreaming(fetch('night-math.wasm'), {
+    WebAssembly.instantiateStreaming(fetch('nightsky_render.wasm'), {
         env: {
             consoleLog: (msg_ptr: number, msg_len: number) => {
                 const message = wasm_interface.getString(msg_ptr, msg_len);

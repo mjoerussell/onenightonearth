@@ -2,7 +2,6 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const math = std.math;
 
-const log = @import("log.zig");
 const math_utils = @import("math_utils.zig");
 const Point = math_utils.Point;
 const Line = math_utils.Line;
@@ -228,7 +227,7 @@ pub fn isInsideCircle(self: Canvas, point: Point) bool {
 
 /// Draw the boundaries of a constellation.
 pub fn drawGrid(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
-    var iter = constellation.boundary_iter();
+    var iter = constellation.boundaryIter();
     while (iter.next()) |bound| {
         const point_a = canvas.coordToPoint(bound[0], local_sidereal_time, sin_latitude, cos_latitude, false).?;
         const point_b = canvas.coordToPoint(bound[1], local_sidereal_time, sin_latitude, cos_latitude, false).?;

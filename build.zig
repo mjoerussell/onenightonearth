@@ -18,7 +18,11 @@ pub fn build(b: *Build) !void {
         .use_vendor = b.option(bool, "use-vendor", "Use vendored versions of listed dependencies (put dependencies under a vendor/ directory)") orelse false,
     };
 
-    try buildWeb(b, options);
+    const nightsky = b.createModule(.{
+        .root_source_file = b.path("nightsky/root.zig"),
+    });
+
+    try buildWeb(b, nightsky, options);
 
     const default_linux_target = try std.Target.Query.parse(.{ .arch_os_abi = "x86_64-linux" });
 
@@ -48,7 +52,7 @@ pub fn build(b: *Build) !void {
     run_step.dependOn(&run_cmd.step);
 }
 
-fn buildWeb(b: *Build, options: Options) !void {
+fn buildWeb(b: *Build, nightsky: *Build.Module, options: Options) !void {
     var install_step = b.getInstallStep();
 
     const wasm_target = try std.Target.Query.parse(.{
@@ -57,17 +61,19 @@ fn buildWeb(b: *Build, options: Options) !void {
     });
 
     // Main WASM library
-    const night_math = b.addExecutable(.{
-        .name = "night-math",
-        .root_source_file = b.path("night-math/main.zig"),
+    const wasm_renderer = b.addExecutable(.{
+        .name = "nightsky_render",
+        .root_source_file = b.path("nightsky-render/main.zig"),
         .target = b.resolveTargetQuery(wasm_target),
         .link_libc = false,
         .optimize = options.mode,
     });
-    night_math.entry = .disabled;
-    night_math.rdynamic = true;
+    wasm_renderer.entry = .disabled;
+    wasm_renderer.rdynamic = true;
 
-    generateStarData(b, night_math, options, &.{
+    wasm_renderer.root_module.addImport("nightsky", nightsky);
+
+    generateStarData(b, wasm_renderer, nightsky, options, &.{
         .{
             .arg = "--stars",
             .input = .{ .file = "data/sao_catalog" },
@@ -89,7 +95,7 @@ fn buildWeb(b: *Build, options: Options) !void {
 
     var node_run = try buildNode(b, options);
     // Install the artifact in dist/wasm
-    const lib_install_artifact = b.addInstallArtifact(night_math, .{ .dest_dir = .{ .override = .{ .custom = "../dist/wasm" } } });
+    const lib_install_artifact = b.addInstallArtifact(wasm_renderer, .{ .dest_dir = .{ .override = .{ .custom = "../dist/wasm" } } });
 
     lib_install_artifact.step.dependOn(&node_run.step);
     install_step.dependOn(&lib_install_artifact.step);
@@ -135,13 +141,15 @@ const StarDataConfig = struct {
 
 // Process raw star/constellation data and generate binary coordinate data.
 // These will be embedded in the final library
-fn generateStarData(b: *Build, main_exe: *Build.Step.Compile, options: Options, data_configs: []const StarDataConfig) void {
+fn generateStarData(b: *Build, main_exe: *Build.Step.Compile, nightsky: *Build.Module, options: Options, data_configs: []const StarDataConfig) void {
     const data_gen = b.addExecutable(.{
         .name = "prepare-data",
         .root_source_file = b.path("prepare-data/main.zig"),
         .optimize = .ReleaseFast,
         .target = options.target,
     });
+
+    data_gen.root_module.addImport("nightsky", nightsky);
 
     const run_data_gen = b.addRunArtifact(data_gen);
 

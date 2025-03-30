@@ -14,7 +14,7 @@ var static_files = [_]StaticFile{
     StaticFile.init("web/assets/favicon.ico", .{ .relative_to = "web" }),
     StaticFile.init("dist/bundle.js", .{ .relative_to = "dist", .compress = true }),
     StaticFile.init("dist/bundle.js.map", .{ .relative_to = "dist", .compress = true }),
-    StaticFile.init("dist/wasm/night-math.wasm", .{ .relative_to = "dist/wasm", .compress = true }),
+    StaticFile.init("dist/wasm/nightsky_render.wasm", .{ .relative_to = "dist/wasm", .compress = true }),
 };
 
 pub const log_level = switch (builtin.mode) {
