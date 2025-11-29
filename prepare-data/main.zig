@@ -1,6 +1,7 @@
 const std = @import("std");
 const fs = std.fs;
 const Allocator = std.mem.Allocator;
+const Io = std.Io;
 
 const nightsky = @import("nightsky");
 const FixedPoint = nightsky.DefaultFixedPoint;
@@ -56,11 +57,11 @@ const SkyFile = struct {
         var stars = std.StringHashMap(ExternSkyCoord).init(allocator);
         defer stars.deinit();
 
-        var boundary_list = std.ArrayList(ExternSkyCoord).init(allocator);
-        errdefer boundary_list.deinit();
+        var boundary_list: std.ArrayList(ExternSkyCoord) = .empty;
+        errdefer boundary_list.deinit(allocator);
 
-        var asterism_list = std.ArrayList(ExternSkyCoord).init(allocator);
-        errdefer asterism_list.deinit();
+        var asterism_list: std.ArrayList(ExternSkyCoord) = .empty;
+        errdefer asterism_list.deinit(allocator);
 
         var line_iter = std.mem.splitSequence(u8, data, "\r\n");
 
@@ -136,8 +137,8 @@ const SkyFile = struct {
 
                         if (stars.get(star_a_name)) |star_a| {
                             if (stars.get(star_b_name)) |star_b| {
-                                try asterism_list.append(star_a);
-                                try asterism_list.append(star_b);
+                                try asterism_list.append(allocator, star_a);
+                                try asterism_list.append(allocator, star_b);
                             }
                         }
                     },
@@ -158,16 +159,22 @@ const SkyFile = struct {
                             .declination = FixedPoint.fromFloat(degToRad(dec_value)),
                         };
 
-                        try boundary_list.append(boundary_coord);
+                        try boundary_list.append(allocator, boundary_coord);
                     },
                 }
             }
         }
 
-        sky_file.constellation.boundaries = try boundary_list.toOwnedSlice();
-        sky_file.constellation.asterism = try asterism_list.toOwnedSlice();
+        sky_file.constellation.boundaries = try boundary_list.toOwnedSlice(allocator);
+        sky_file.constellation.asterism = try asterism_list.toOwnedSlice(allocator);
 
         return sky_file;
+    }
+
+    fn deinit(sky_file: SkyFile, allocator: Allocator) void {
+        allocator.free(sky_file.name);
+        allocator.free(sky_file.epithet);
+        sky_file.constellation.deinit(allocator);
     }
 };
 
@@ -225,17 +232,19 @@ const Arguments = struct {
     };
 
     /// Controls the generation of star coordinates. Expects a path to the sao_catalog file as the source.
-    stars: ?SourceDest = null,
-    constellations: ?SourceDest = null,
-    metadata: ?SourceDest = null,
+    stars: SourceDest,
+    constellations: SourceDest,
+    metadata: SourceDest,
 
     pub fn init(args: []const []const u8) !Arguments {
-        var arguments = Arguments{};
+        var arguments: Arguments = undefined;
 
-        var arg_index: usize = 0;
-        while (arg_index < args.len) : (arg_index += 1) {
-            inline for (@typeInfo(Arguments).@"struct".fields) |field| {
-                const arg_name = "--" ++ field.name;
+        // var arg_index: usize = 0;
+        // while (arg_index < args.len) : (arg_index += 1) {
+        inline for (@typeInfo(@This()).@"struct".fields) |field| {
+            const arg_name = "--" ++ field.name;
+            var found_arg = false;
+            for (0..args.len) |arg_index| {
                 if (std.mem.eql(u8, args[arg_index], arg_name)) {
                     if (args.len < arg_index + 2) {
                         log.err("Wrong number of arguments provided for " ++ arg_name, .{});
@@ -247,8 +256,12 @@ const Arguments = struct {
                         .dest = args[arg_index + 2],
                     };
 
-                    arg_index += 2;
+                    found_arg = true;
                 }
+            }
+
+            if (!found_arg) {
+                return error.MissingArgument;
             }
         }
 
@@ -267,48 +280,43 @@ pub fn main() anyerror!void {
 
     const arguments = try Arguments.init(args);
 
-    if (arguments.stars) |star_args| {
-        log.debug("Generating star data: {s} -> {s}\n", .{ star_args.source, star_args.dest });
-        const stars = try readSaoCatalog(allocator, star_args.source);
-        try writeStarData(stars, star_args.dest);
-    }
+    var io_threaded: Io.Threaded = .init(allocator);
+    const io = io_threaded.io();
 
-    if (arguments.constellations) |const_args| {
-        log.debug("Generating constellation data: {s} -> {s}\n", .{ const_args.source, const_args.dest });
-        const sky_files = try readSkyFiles(allocator, const_args.source);
-        defer {
-            for (sky_files) |*f| f.constellation.deinit(allocator);
-            allocator.free(sky_files);
-        }
+    var stars_future = io.async(readSaoCatalog, .{ allocator, io, arguments.stars.source });
+    defer _ = stars_future.cancel(io) catch {};
 
-        try writeConstellationData(sky_files, const_args.dest);
-    }
+    var const_future = io.async(readSkyFiles, .{ allocator, io, arguments.constellations.source });
+    defer _ = const_future.cancel(io) catch {};
 
-    if (arguments.metadata) |meta_args| {
-        log.info("Generating constellation metadata: {s} -> {s}", .{ meta_args.source, meta_args.dest });
-        const sky_files = try readSkyFiles(allocator, meta_args.source);
-        defer {
-            for (sky_files) |*f| f.constellation.deinit(allocator);
-            allocator.free(sky_files);
-        }
-        try writeConstellationMetadata(allocator, sky_files, meta_args.dest);
+    const stars: []ExternStar = try stars_future.await(io);
+    try writeStarData(stars, arguments.stars.dest);
+
+    const sky_files: []SkyFile = try const_future.await(io);
+    defer {
+        for (sky_files) |sky_file| sky_file.deinit(allocator);
     }
+    try writeConstellationData(sky_files, arguments.constellations.dest);
+    try writeConstellationMetadata(sky_files, arguments.metadata.dest);
 }
 
-fn readSaoCatalog(allocator: Allocator, catalog_filename: []const u8) ![]ExternStar {
-    const cwd = fs.cwd();
-    const sao_catalog = try cwd.openFile(catalog_filename, .{});
-    defer sao_catalog.close();
+fn readSaoCatalog(allocator: Allocator, io: Io, catalog_filename: []const u8) ![]ExternStar {
+    // const cwd = fs.cwd();
+    // const sao_catalog = try cwd.openFile(catalog_filename, .{});
+    const sao_catalog = try std.Io.Dir.cwd().openFile(io, catalog_filename, .{});
+    defer sao_catalog.close(io);
 
-    var star_list = try std.ArrayList(ExternStar).initCapacity(allocator, 75000);
-    errdefer star_list.deinit();
+    var star_list: std.ArrayList(ExternStar) = .empty;
+    errdefer star_list.deinit(allocator);
 
     var read_buffer: [4096]u8 = undefined;
+    var reader = sao_catalog.reader(io, &.{});
+
     var read_start_index: usize = 0;
     var line_start_index: usize = 0;
     var line_end_index: usize = 0;
 
-    read_loop: while (sao_catalog.readAll(read_buffer[read_start_index..])) |bytes_read| {
+    read_loop: while (reader.interface.readSliceShort(read_buffer[read_start_index..])) |bytes_read| {
         if (bytes_read == 0) break;
         // Get all the lines currently read into the buffer
         while (line_start_index < read_buffer.len and line_end_index < read_buffer.len) {
@@ -330,7 +338,7 @@ fn readSaoCatalog(allocator: Allocator, catalog_filename: []const u8) ![]ExternS
             if (std.mem.startsWith(u8, line, "SAO")) {
                 if (parseStar(line)) |star| {
                     if (star.brightness > 0) {
-                        try star_list.append(star);
+                        try star_list.append(allocator, star);
                     }
                 } else |_| {}
             }
@@ -344,33 +352,26 @@ fn readSaoCatalog(allocator: Allocator, catalog_filename: []const u8) ![]ExternS
         read_start_index = 0;
     } else |err| return err;
 
-    return try star_list.toOwnedSlice();
+    return try star_list.toOwnedSlice(allocator);
 }
 
 fn writeStarData(stars: []ExternStar, out_filename: []const u8) !void {
-    const cwd = fs.cwd();
-
-    var out_file = try cwd.createFile(out_filename, .{});
+    var out_file = try std.fs.cwd().createFile(out_filename, .{});
     defer out_file.close();
 
-    const out_file_writer = out_file.writer();
-    var buffered_writer = std.io.bufferedWriter(out_file_writer);
-
-    var writer = buffered_writer.writer();
-
     const bytes = std.mem.sliceAsBytes(stars);
-    _ = try writer.write(bytes);
+    var writer = out_file.writer(&.{});
+    try writer.interface.writeAll(bytes);
 
-    try buffered_writer.flush();
+    try writer.interface.flush();
 }
 
 /// Read and parse all of the constellation files in a given directory.
-fn readSkyFiles(allocator: Allocator, constellation_dir_name: []const u8) ![]SkyFile {
-    var sky_files = std.ArrayList(SkyFile).init(allocator);
-    errdefer sky_files.deinit();
+fn readSkyFiles(allocator: Allocator, io: Io, constellation_dir_name: []const u8) ![]SkyFile {
+    var sky_files: std.ArrayList(SkyFile) = .empty;
+    errdefer sky_files.deinit(allocator);
 
-    const cwd = fs.cwd();
-    var constellation_dir = try cwd.openDir(constellation_dir_name, .{ .iterate = true });
+    var constellation_dir = try std.fs.cwd().openDir(constellation_dir_name, .{ .iterate = true });
     defer constellation_dir.close();
 
     var constellation_dir_walker = try constellation_dir.walk(allocator);
@@ -378,10 +379,10 @@ fn readSkyFiles(allocator: Allocator, constellation_dir_name: []const u8) ![]Sky
 
     var read_buffer: [4096]u8 = undefined;
 
-    var constellation_filenames = std.ArrayList([]const u8).init(allocator);
+    var constellation_filenames: std.ArrayList([]const u8) = .empty;
     defer {
         for (constellation_filenames.items) |name| allocator.free(name);
-        constellation_filenames.deinit();
+        constellation_filenames.deinit(allocator);
     }
 
     while (try constellation_dir_walker.next()) |entry| {
@@ -390,7 +391,7 @@ fn readSkyFiles(allocator: Allocator, constellation_dir_name: []const u8) ![]Sky
 
         const name_copy = try allocator.alloc(u8, entry.basename.len);
         @memcpy(name_copy, entry.basename);
-        try constellation_filenames.append(name_copy);
+        try constellation_filenames.append(allocator, name_copy);
     }
 
     const string_sort = (struct {
@@ -407,13 +408,15 @@ fn readSkyFiles(allocator: Allocator, constellation_dir_name: []const u8) ![]Sky
         var sky_file = try constellation_dir.openFile(basename, .{});
         defer sky_file.close();
 
-        const bytes_read = try sky_file.readAll(read_buffer[0..]);
+        var reader = sky_file.reader(io, &.{});
+
+        const bytes_read = try reader.interface.readSliceShort(read_buffer[0..]);
 
         const sky_file_data = try SkyFile.parse(allocator, read_buffer[0..bytes_read]);
-        try sky_files.append(sky_file_data);
+        try sky_files.append(allocator, sky_file_data);
     }
 
-    return try sky_files.toOwnedSlice();
+    return try sky_files.toOwnedSlice(allocator);
 }
 
 fn writeConstellationData(sky_files: []SkyFile, out_filename: []const u8) !void {
@@ -422,10 +425,7 @@ fn writeConstellationData(sky_files: []SkyFile, out_filename: []const u8) !void 
     var out_file = try cwd.createFile(out_filename, .{});
     defer out_file.close();
 
-    const out_file_writer = out_file.writer();
-    var buffered_writer = std.io.bufferedWriter(out_file_writer);
-
-    var writer = buffered_writer.writer();
+    var writer = out_file.writer(&.{});
 
     var num_boundaries: u32 = 0;
     var num_asterisms: u32 = 0;
@@ -434,53 +434,46 @@ fn writeConstellationData(sky_files: []SkyFile, out_filename: []const u8) !void 
         num_asterisms += @as(u32, @intCast(sky_file.constellation.asterism.len));
     }
 
-    _ = try writer.write(std.mem.toBytes(@as(u32, @intCast(sky_files.len)))[0..]);
-    _ = try writer.write(std.mem.toBytes(num_boundaries)[0..]);
-    _ = try writer.write(std.mem.toBytes(num_asterisms)[0..]);
+    _ = try writer.interface.write(std.mem.toBytes(@as(u32, @intCast(sky_files.len)))[0..]);
+    _ = try writer.interface.write(std.mem.toBytes(num_boundaries)[0..]);
+    _ = try writer.interface.write(std.mem.toBytes(num_asterisms)[0..]);
 
     for (sky_files) |sky_file| {
         const info = sky_file.constellation.getInfo();
-        _ = try writer.write(std.mem.toBytes(info)[0..]);
+        _ = try writer.interface.write(std.mem.toBytes(info)[0..]);
     }
 
     for (sky_files) |sky_file| {
         for (sky_file.constellation.boundaries) |boundary_coord| {
-            _ = try writer.write(std.mem.toBytes(boundary_coord)[0..]);
+            _ = try writer.interface.write(std.mem.toBytes(boundary_coord)[0..]);
         }
     }
 
     for (sky_files) |sky_file| {
         for (sky_file.constellation.asterism) |asterism_coord| {
-            _ = try writer.write(std.mem.toBytes(asterism_coord)[0..]);
+            _ = try writer.interface.write(std.mem.toBytes(asterism_coord)[0..]);
         }
     }
 
-    try buffered_writer.flush();
+    try writer.interface.flush();
 }
 
-fn writeConstellationMetadata(allocator: Allocator, sky_files: []SkyFile, filename: []const u8) !void {
+fn writeConstellationMetadata(sky_files: []SkyFile, filename: []const u8) !void {
     const cwd = fs.cwd();
 
     var out_file = try cwd.createFile(filename, .{});
     defer out_file.close();
 
-    const out_file_writer = out_file.writer();
-    var buffered_writer = std.io.bufferedWriter(out_file_writer);
+    var writer = out_file.writer(&.{});
 
-    const writer = buffered_writer.writer();
-
-    var metadata_json = std.ArrayList(std.json.Value).init(allocator);
-    for (sky_files) |sky_file| {
-        var c_map = std.json.ObjectMap.init(allocator);
-        try c_map.putNoClobber("name", std.json.Value{ .string = sky_file.name });
-        try c_map.putNoClobber("epithet", std.json.Value{ .string = sky_file.epithet });
-
-        const val = std.json.Value{ .object = c_map };
-        try metadata_json.append(val);
+    try writer.interface.writeByte('[');
+    for (sky_files, 0..) |sky_file, i| {
+        try writer.interface.print("{{\"name\":\"{s}\",\"epithet\":\"{s}\"}}", .{ sky_file.name, sky_file.epithet });
+        if (i < sky_files.len - 1) {
+            try writer.interface.writeByte(',');
+        }
     }
-    const metadata = std.json.Value{ .array = metadata_json };
+    try writer.interface.writeByte(']');
 
-    try std.json.stringify(metadata, .{}, writer);
-
-    try buffered_writer.flush();
+    try writer.interface.flush();
 }

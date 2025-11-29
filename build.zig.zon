@@ -5,8 +5,7 @@
     .fingerprint = 0x38a13ca53aacc3f1,
     .dependencies = .{
         .tortie = .{
-            .url = "https://github.com/mjoerussell/tortie/archive/main.tar.gz",
-            .hash = "N-V-__8AAOm3AADlkhJtqk4wh76Z3S0ye7UNDs3qFsDFoon6",
+            .path = "tortie",
         },
     },
 }

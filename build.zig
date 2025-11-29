@@ -26,19 +26,17 @@ pub fn build(b: *Build) !void {
 
     const default_linux_target = try std.Target.Query.parse(.{ .arch_os_abi = "x86_64-linux" });
 
-    const exe = b.addExecutable(.{
-        .name = "zig-server",
+    const server_module = b.createModule(.{
         .root_source_file = b.path("server/main.zig"),
         .optimize = options.mode,
         .target = if (options.target_linux) b.resolveTargetQuery(default_linux_target) else options.target,
         .single_threaded = options.single_threaded,
     });
 
-    const tortie_module = if (options.use_vendor)
-        b.createModule(.{ .root_source_file = b.path("vendor/tortie/src/tortie.zig") })
-    else
-        b.dependency("tortie", .{}).module("tortie");
-    exe.root_module.addImport("tortie", tortie_module);
+    const exe = b.addExecutable(.{
+        .name = "zig-server",
+        .root_module = server_module,
+    });
 
     b.installArtifact(exe);
 
@@ -60,13 +58,17 @@ fn buildWeb(b: *Build, nightsky: *Build.Module, options: Options) !void {
         .cpu_features = "generic+simd128",
     });
 
-    // Main WASM library
-    const wasm_renderer = b.addExecutable(.{
-        .name = "nightsky_render",
+    const render_module = b.createModule(.{
         .root_source_file = b.path("nightsky-render/main.zig"),
         .target = b.resolveTargetQuery(wasm_target),
         .link_libc = false,
         .optimize = options.mode,
+    });
+
+    // Main WASM library
+    const wasm_renderer = b.addExecutable(.{
+        .name = "nightsky_render",
+        .root_module = render_module,
     });
     wasm_renderer.entry = .disabled;
     wasm_renderer.rdynamic = true;
@@ -142,11 +144,15 @@ const StarDataConfig = struct {
 // Process raw star/constellation data and generate binary coordinate data.
 // These will be embedded in the final library
 fn generateStarData(b: *Build, main_exe: *Build.Step.Compile, nightsky: *Build.Module, options: Options, data_configs: []const StarDataConfig) void {
-    const data_gen = b.addExecutable(.{
-        .name = "prepare-data",
+    const gen_module = b.createModule(.{
         .root_source_file = b.path("prepare-data/main.zig"),
         .optimize = .ReleaseFast,
         .target = options.target,
+    });
+
+    const data_gen = b.addExecutable(.{
+        .name = "prepare-data",
+        .root_module = gen_module,
     });
 
     data_gen.root_module.addImport("nightsky", nightsky);

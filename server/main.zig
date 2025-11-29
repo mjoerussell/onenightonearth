@@ -2,10 +2,8 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const Allocator = std.mem.Allocator;
-
-const tortie = @import("tortie");
-const TortieServer = tortie.TortieServer;
-const http = tortie.http;
+const Io = std.Io;
+const net = Io.net;
 
 var static_files = [_]StaticFile{
     StaticFile.init("web/index.html", .{ .path = "/" }),
@@ -66,215 +64,115 @@ const StaticFile = struct {
         }
     }
 
-    fn loadContent(static_file: *StaticFile, allocator: Allocator) ![]const u8 {
+    fn loadContent(static_file: *StaticFile, allocator: Allocator, io: Io) ![]const u8 {
         static_file.is_standalone = true;
         static_file.compress = false;
-        const cwd = std.fs.cwd();
 
-        var file = try cwd.openFile(static_file.file_name, .{});
-        defer file.close();
+        var file = try Io.Dir.cwd().openFile(io, static_file.file_name, .{});
+        defer file.close(io);
 
-        static_file.content = try file.readToEndAlloc(allocator, std.math.maxInt(usize));
+        var reader = file.reader(io, &.{});
+        const size = try reader.getSize();
+
+        static_file.content = try reader.interface.readAlloc(allocator, @intCast(size));
         return static_file.content.?;
     }
-};
 
-const StaticContent = struct {
-    buffer: []const u8,
-    file_info: []StaticFile,
-
-    fn init(allocator: Allocator, file_info: []StaticFile) !StaticContent {
-        var content: StaticContent = undefined;
-        content.file_info = @constCast(file_info);
-
-        const cwd = std.fs.cwd();
-
-        var buffer = try std.ArrayList(u8).initCapacity(allocator, 1024 * file_info.len);
-        errdefer buffer.deinit();
-
-        var main_buffer_writer = buffer.writer();
-
-        var compressor = try std.compress.flate.compressor(main_buffer_writer, .{ .level = .best });
-
-        const Marker = struct { start: usize, end: usize };
-
-        var file_content_markers = try allocator.alloc(Marker, file_info.len);
-        defer allocator.free(file_content_markers);
-
-        var file_buffer: [1024]u8 = undefined;
-
-        for (content.file_info, 0..) |info, index| {
-            var file = cwd.openFile(info.file_name, .{}) catch |err| {
-                log.err("Error ocurred when trying to open file {s}: {}", .{ info.file_name, err });
-                file_content_markers[index] = .{ .start = 0, .end = 0 };
-                continue;
-            };
-            defer file.close();
-
-            const content_start_index = buffer.items.len;
-            var reader = std.io.bufferedReader(file.reader());
-
-            while (true) {
-                const bytes_read = try reader.read(&file_buffer);
-                if (info.compress) {
-                    try compressor.writer().writeAll(file_buffer[0..bytes_read]);
-                } else {
-                    try main_buffer_writer.writeAll(file_buffer[0..bytes_read]);
-                }
-
-                if (bytes_read < file_buffer.len) break;
+    fn getContent(static_file: *StaticFile, allocator: Allocator, io: Io) ![]const u8 {
+        if (static_file.content) |content| {
+            if (builtin.mode != .Debug) {
+                return content;
             }
-
-            if (info.compress) {
-                try compressor.finish();
-            }
-
-            file_content_markers[index] = .{ .start = content_start_index, .end = buffer.items.len };
         }
-
-        content.buffer = try buffer.toOwnedSlice();
-
-        for (file_content_markers, 0..) |marker, index| {
-            content.file_info[index].content = content.buffer[marker.start..marker.end];
-        }
-
-        return content;
-    }
-
-    fn deinit(content: *StaticContent, allocator: Allocator) void {
-        for (content.file_info) |*info| {
-            info.deinit(allocator);
-        }
-        allocator.free(content.buffer);
+        return try static_file.loadContent(allocator, io);
     }
 };
 
-const GlobalState = struct {
-    gpa: *std.heap.GeneralPurposeAllocator(.{}),
-    allocator: std.mem.Allocator,
-    content: StaticContent,
+var is_server_running = true;
 
-    fn init(gpa: *std.heap.GeneralPurposeAllocator(.{})) !GlobalState {
-        var state = GlobalState{
-            .gpa = gpa,
-            .content = undefined,
-            .allocator = undefined,
-        };
-
-        state.allocator = state.gpa.allocator();
-        state.content = try StaticContent.init(state.allocator, &static_files);
-
-        return state;
-    }
-
-    fn deinit(state: *GlobalState) void {
-        state.content.deinit(state.allocator);
-        _ = state.gpa.deinit();
-    }
-};
-
-var global_state: GlobalState = undefined;
-var server: TortieServer(GlobalState) = undefined;
-
-fn ctrlCHandlerWindows(_: u32) callconv(.C) c_int {
+fn ctrlCHandlerWindows(_: u32) callconv(.c) c_int {
     gracefulDeinit();
     return 0;
 }
 
-fn ctrlCHandlerLinux(_: c_int) callconv(.C) void {
+fn ctrlCHandlerLinux(_: c_int) callconv(.c) void {
     gracefulDeinit();
 }
 
 fn gracefulDeinit() void {
-    server.deinit();
-    global_state.deinit();
+    is_server_running = false;
 }
 
 pub fn main() anyerror!void {
     const port = 8080;
-    const localhost = try std.net.Address.parseIp("0.0.0.0", port);
-
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    global_state = try GlobalState.init(&gpa);
 
     switch (builtin.os.tag) {
         .windows => try std.os.windows.SetConsoleCtrlHandler(ctrlCHandlerWindows, true),
         else => try std.os.sigaction(std.os.SIG.INT, &.{ .handler = .{ .handler = ctrlCHandlerLinux }, .mask = std.mem.zeroes([32]u32), .flags = 0 }, null),
     }
 
-    server = try TortieServer(GlobalState).init(global_state.allocator, localhost, global_state, handleRequest);
+    const allocator = gpa.allocator();
 
-    log.info("{d:.3}Mb of static content loaded", .{@as(f32, @floatFromInt(global_state.content.buffer.len)) / (1024 * 1024)});
+    var io_threaded: std.Io.Threaded = .init(allocator);
+    const io = io_threaded.io();
+
+    var localhost = std.Io.net.IpAddress.parse("0.0.0.0", port) catch @panic("Could not parse listening address.");
+    var server = try localhost.listen(io, .{});
 
     log.info("Listening on port {}", .{port});
     log.debug("Build is single threaded: {}", .{builtin.single_threaded});
 
-    while (true) {
-        server.run() catch {};
+    var group: std.Io.Group = .init;
+    defer group.cancel(io);
+
+    while (is_server_running) {
+        const stream = try server.accept(io);
+
+        group.async(io, handleRequest, .{ allocator, io, stream });
     }
 }
 
-fn handleRequest(client: *tortie.Client, context: GlobalState) !void {
-    handleRequestError(client, context) catch |err| {
-        const status: tortie.Response.ResponseStatus = if (err == error.NotFound) .not_found else .internal_server_error;
-        if (status == .not_found) {
-            log.warn("Requested path \"{s}\" not found", .{client.buffers.request().getPath() catch "unknown"});
-        }
-        try client.buffers.responseWriter().writeStatus(status);
-    };
-}
+fn handleRequest(allocator: Allocator, io: std.Io, stream: std.Io.net.Stream) void {
+    defer stream.close(io);
 
-fn handleRequestError(client: *tortie.Client, context: GlobalState) !void {
-    const request_path = client.buffers.request().getPath() catch blk: {
-        log.warn("Could not parse path, defaulting to /", .{});
-        break :blk "/";
-    };
+    var request_buffer: [4096]u8 = undefined;
+    var request_reader = stream.reader(io, &request_buffer);
+    var request_writer = stream.writer(io, &.{});
+    var server: std.http.Server = .init(&request_reader.interface, &request_writer.interface);
+
+    var request = server.receiveHead() catch return;
+    const request_path = request.head.target;
 
     log.info("Handling request {s}", .{request_path});
 
-    for (context.content.file_info) |*info| {
-        if (std.mem.eql(u8, request_path, info.path)) {
-            try serveStaticFile(client, context.allocator, info);
+    for (&static_files) |*file| {
+        if (std.mem.eql(u8, request_path, file.path)) {
+            serveStaticFile(allocator, io, &request, file) catch |err| {
+                request.respond(@errorName(err), .{ .status = .internal_server_error }) catch {};
+            };
             return;
         }
     }
 
-    return error.NotFound;
+    request.respond("", .{ .status = .not_found }) catch |err| {
+        request.respond(@errorName(err), .{ .status = .internal_server_error }) catch {};
+    };
 }
 
-fn serveStaticFile(client: *tortie.Client, allocator: Allocator, options: *StaticFile) !void {
-    const content = blk: {
-        if (builtin.mode == .Debug or options.content == null) {
-            break :blk try options.loadContent(allocator);
-        }
+fn serveStaticFile(allocator: Allocator, io: Io, request: *std.http.Server.Request, file: *StaticFile) !void {
+    const content = try file.getContent(allocator, io);
 
-        break :blk options.content orelse return error.NotFound;
-    };
-    defer options.deinit(allocator);
+    log.info("Loaded content for {s}", .{file.path});
 
-    log.info("Loaded content for {s}", .{options.path});
-
-    var response = client.buffers.responseWriter();
-
-    try response.writeStatus(.ok);
-    try response.printHeader("Content-Type: {s}", .{options.content_type});
-    try response.printHeader("Content-Length: {}", .{content.len});
-
-    if (client.keep_alive) {
-        try response.writeHeader("Connection: keep-alive");
-        try response.writeHeader("Keep-Alive: timeout=5");
-    }
-
-    if (options.secure_context) {
-        try response.writeHeader("Cross-Origin-Opener-Policy: same-origin");
-        try response.writeHeader("Cross-Origin-Embedder-Policy: require-corp");
-    }
-
-    if (options.compress) {
-        try response.writeHeader("Content-Encoding: deflate");
-    }
-
-    try response.writeBody(content);
+    try request.respond(
+        content,
+        .{
+            .extra_headers = &.{
+                .{ .name = "Content-Type", .value = file.content_type },
+            },
+        },
+    );
 }
 
 fn getMimeType(file_name: []const u8) []const u8 {

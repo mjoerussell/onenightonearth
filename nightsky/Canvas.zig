@@ -156,8 +156,7 @@ pub fn projectAndRenderStarsWide(canvas: *Canvas, sky_coords: std.MultiArrayList
         const translate_x = center_x + (translate_factor * x_x4);
         const translate_y = center_y - (translate_factor * y_x4);
 
-        var point_index: usize = 0;
-        while (point_index < 4) : (point_index += 1) {
+        inline for (0..4) |point_index| {
             const point = Point{ .x = translate_x[point_index], .y = translate_y[point_index] };
             const pixel = pixels[index + point_index];
             canvas.setPixelAt(point, pixel);
