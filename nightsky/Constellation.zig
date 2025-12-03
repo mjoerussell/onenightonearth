@@ -11,6 +11,8 @@ const math_utils = @import("math_utils.zig");
 const Line = math_utils.Line;
 const Point = math_utils.Point;
 
+const ObserverPosition = @import("star_math.zig").ObserverPosition;
+
 const Constellation = @This();
 
 pub const ExternConstellation = struct {
@@ -98,7 +100,7 @@ pub fn centroid(constellation: Constellation) SkyCoord {
     };
 }
 
-pub fn isPointInside(constellation: Constellation, canvas: Canvas, point: Point, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) bool {
+pub fn isPointInside(constellation: Constellation, canvas: Canvas, point: Point, observer: ObserverPosition) bool {
     var num_intersections_right: u32 = 0;
     var num_intersections_left: u32 = 0;
 
@@ -111,8 +113,8 @@ pub fn isPointInside(constellation: Constellation, canvas: Canvas, point: Point,
     // If they intersect inside the canvas circle, then add that to the left or right intersection counter
     var iter = constellation.boundaryIter();
     while (iter.next()) |bound| {
-        const b_a = canvas.coordToPoint(bound[0], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
-        const b_b = canvas.coordToPoint(bound[1], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
+        const b_a = canvas.pointFromSkyCoord(bound[0], observer, false) orelse continue;
+        const b_b = canvas.pointFromSkyCoord(bound[1], observer, false) orelse continue;
 
         const bound_line = Line{ .a = b_a, .b = b_b };
         if (point_ray_right.segmentIntersection(bound_line)) |_| {

@@ -96,8 +96,8 @@ fn buildWeb(b: *Build, nightsky: *Build.Module, options: Options) !void {
     });
 
     var node_run = try buildNode(b, options);
-    // Install the artifact in dist/wasm
-    const lib_install_artifact = b.addInstallArtifact(wasm_renderer, .{ .dest_dir = .{ .override = .{ .custom = "../dist/wasm" } } });
+    // Install the artifact in dist
+    const lib_install_artifact = b.addInstallArtifact(wasm_renderer, .{ .dest_dir = .{ .override = .{ .custom = "../dist" } } });
 
     lib_install_artifact.step.dependOn(&node_run.step);
     install_step.dependOn(&lib_install_artifact.step);

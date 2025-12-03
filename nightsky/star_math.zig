@@ -13,6 +13,7 @@ const Line = math_utils.Line;
 
 const FixedPoint = @import("fixed_point.zig").DefaultFixedPoint;
 
+const SkyCoord = @import("SkyCoord.zig");
 const Constellation = @import("Constellation.zig");
 
 pub const Coord = packed struct {
@@ -21,16 +22,24 @@ pub const Coord = packed struct {
 };
 
 pub const ObserverPosition = struct {
+    lst: f32,
     latitude: f32,
     longitude: f32,
-    timestamp: i64,
+    sin_lat: f32,
+    cos_lat: f32,
 
-    pub fn localSiderealTime(pos: ObserverPosition) f32 {
-        return getPartialLocalSiderealTime(pos.timestamp) + pos.longitude;
+    pub fn init(latitude: f32, longitude: f32, timestamp: i64) ObserverPosition {
+        return ObserverPosition{
+            .lst = getPartialLocalSiderealTime(timestamp) + longitude,
+            .latitude = latitude,
+            .longitude = longitude,
+            .sin_lat = @sin(latitude),
+            .cos_lat = @cos(latitude),
+        };
     }
 };
 
-fn getPartialLocalSiderealTime(timestamp: i64) f32 {
+pub fn getPartialLocalSiderealTime(timestamp: i64) f32 {
     const j2000_offset_millis = 949_428_000_000;
     const days_since_j2000 = @as(f64, @floatFromInt(timestamp - j2000_offset_millis)) / 86_400_000.0;
     const lst = ((100.46 + (0.985647 * days_since_j2000) + @as(f64, @floatFromInt(15 * timestamp))) * (math.pi / 180.0));
@@ -38,13 +47,13 @@ fn getPartialLocalSiderealTime(timestamp: i64) f32 {
 }
 
 /// Get the constellation that's currently at the point on the canvas.
-pub fn getConstellationAtPoint(canvas: Canvas, point: Point, constellations: []Constellation, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) ?usize {
+pub fn getConstellationAtPoint(canvas: Canvas, point: Point, constellations: []Constellation, observer: ObserverPosition) ?usize {
     if (!canvas.isInsideCircle(point)) return null;
 
     for (constellations, 0..) |c, constellation_index| {
         if (canvas.settings.zodiac_only and !c.is_zodiac) continue;
 
-        if (c.isPointInside(canvas, point, local_sidereal_time, sin_latitude, cos_latitude)) {
+        if (c.isPointInside(canvas, point, observer)) {
             return constellation_index;
         }
     }

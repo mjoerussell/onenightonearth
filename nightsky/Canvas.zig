@@ -99,14 +99,14 @@ pub fn setPixelAt(canvas: *Canvas, point: Point, new_pixel: Pixel) void {
     canvas.data[p_index] = canvas.pixel_mask[p_index] & new_pixel.asU32();
 }
 
-pub fn projectAndRenderStarsWide(canvas: *Canvas, sky_coords: std.MultiArrayList(Star), local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
+pub fn projectAndRenderStarsWide(canvas: *Canvas, sky_coords: std.MultiArrayList(Star), observer: ObserverPosition) void {
     const f32x4 = @Vector(4, f32);
 
     // Constants for calculating sky coord-to-point
     const radius_x4: f32x4 = @splat(2.0 / math.pi);
-    const lst_x4: f32x4 = @splat(local_sidereal_time);
-    const sin_lat_x4: f32x4 = @splat(sin_latitude);
-    const cos_lat_x4: f32x4 = @splat(cos_latitude);
+    const lst_x4: f32x4 = @splat(observer.lst);
+    const sin_lat_x4: f32x4 = @splat(observer.sin_lat);
+    const cos_lat_x4: f32x4 = @splat(observer.cos_lat);
 
     // Constants for translatePoint
     const center_x: f32x4 = @splat(@as(f32, @floatFromInt(canvas.settings.width)) / 2);
@@ -164,22 +164,22 @@ pub fn projectAndRenderStarsWide(canvas: *Canvas, sky_coords: std.MultiArrayList
     }
 }
 
-pub fn coordToPoint(canvas: Canvas, sky_coord: SkyCoord, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32, filter_below_horizon: bool) ?Point {
+pub fn pointFromSkyCoord(canvas: Canvas, sky_coord: SkyCoord, observer: ObserverPosition, filter_below_horizon: bool) ?Point {
     const two_pi = comptime math.pi * 2.0;
 
     const right_ascension = sky_coord.right_ascension;
     const declination = sky_coord.declination;
 
-    const hour_angle = local_sidereal_time - right_ascension;
+    const hour_angle = observer.lst - right_ascension;
     const sin_dec = math.sin(declination);
 
-    const sin_alt = sin_dec * sin_latitude + math.cos(declination) * cos_latitude * math.cos(hour_angle);
+    const sin_alt = sin_dec * observer.sin_lat + math.cos(declination) * observer.cos_lat * math.cos(hour_angle);
     const altitude = math.asin(sin_alt);
     if (filter_below_horizon and altitude < 0) {
         return null;
     }
 
-    const cos_azi = (sin_dec - sin_alt * sin_latitude) / (math.cos(altitude) * cos_latitude);
+    const cos_azi = (sin_dec - sin_alt * observer.sin_lat) / (math.cos(altitude) * observer.cos_lat);
     const azi = math.acos(cos_azi);
     const azimuth = if (math.sin(hour_angle) < 0) azi else two_pi - azi;
 
@@ -191,7 +191,7 @@ pub fn coordToPoint(canvas: Canvas, sky_coord: SkyCoord, local_sidereal_time: f3
 
         // Convert from polar to cartesian coordinates
         break :blk Point{
-            // @note without negating x here, the whole chart is rendered backwards. Not sure if this is where the negations
+            // @note without negating s here, the whole chart is rendered backwards. Not sure if this is where the negation
             // is SUPPOSED to go, or if I messed up a negation somewhere else and this is just a hack that makes it work
             .x = -s * math.sin(azimuth),
             .y = s * cos_azi,
@@ -215,6 +215,7 @@ pub fn translatePoint(self: Canvas, pt: Point) Point {
     return Point{ .x = center.x + (translate_factor * pt.x), .y = center.y - (translate_factor * pt.y) };
 }
 
+/// Return `true` if `point` is inside the main circle where all the stars are drawn.
 pub fn isInsideCircle(self: Canvas, point: Point) bool {
     const center = Point{
         .x = @as(f32, @floatFromInt(self.settings.width)) / 2.0,
@@ -225,11 +226,11 @@ pub fn isInsideCircle(self: Canvas, point: Point) bool {
 }
 
 /// Draw the boundaries of a constellation.
-pub fn drawGrid(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
+pub fn drawGrid(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, observer: ObserverPosition) void {
     var iter = constellation.boundaryIter();
     while (iter.next()) |bound| {
-        const point_a = canvas.coordToPoint(bound[0], local_sidereal_time, sin_latitude, cos_latitude, false).?;
-        const point_b = canvas.coordToPoint(bound[1], local_sidereal_time, sin_latitude, cos_latitude, false).?;
+        const point_a = canvas.pointFromSkyCoord(bound[0], observer, false).?;
+        const point_b = canvas.pointFromSkyCoord(bound[1], observer, false).?;
 
         if (!canvas.isInsideCircle(point_a) and !canvas.isInsideCircle(point_b)) {
             continue;
@@ -245,11 +246,11 @@ pub fn drawGrid(canvas: *Canvas, constellation: Constellation, color: Pixel, lin
 }
 
 /// Draw the asterism (pattern) of a constellation.
-pub fn drawAsterism(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, local_sidereal_time: f32, sin_latitude: f32, cos_latitude: f32) void {
+pub fn drawAsterism(canvas: *Canvas, constellation: Constellation, color: Pixel, line_width: u32, observer: ObserverPosition) void {
     var branch_index: usize = 0;
     while (branch_index < constellation.asterism.len - 1) : (branch_index += 2) {
-        const point_a = canvas.coordToPoint(constellation.asterism[branch_index], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
-        const point_b = canvas.coordToPoint(constellation.asterism[branch_index + 1], local_sidereal_time, sin_latitude, cos_latitude, false) orelse continue;
+        const point_a = canvas.pointFromSkyCoord(constellation.asterism[branch_index], observer, false) orelse continue;
+        const point_b = canvas.pointFromSkyCoord(constellation.asterism[branch_index + 1], observer, false) orelse continue;
 
         if (!canvas.isInsideCircle(point_a) and !canvas.isInsideCircle(point_b)) {
             continue;
@@ -326,13 +327,9 @@ test "coord to point conversion" {
         .declination = -87.72806111 * (math.pi / 180.0),
     };
 
-    const original_coord = ObserverPosition{
-        .latitude = 56.5 * (math.pi / 180.0),
-        .longitude = -127.23 * (math.pi / 180.0),
-        .timestamp = 1635524865511,
-    };
+    const original_coord: ObserverPosition = .init(56.5 * (math.pi / 180.0), -127.23 * (math.pi / 180.0), 1635524865511);
 
-    const coord_to_point = canvas.coordToPoint(original_sky_coord, original_coord.localSiderealTime(), math.sin(original_coord.latitude), math.cos(original_coord.latitude), false).?;
+    const coord_to_point = canvas.pointFromSkyCoord(original_sky_coord, original_coord, false).?;
     const point_to_coord = canvas.pointToCoord(coord_to_point, original_coord).?;
 
     try std.testing.expectEqual(original_sky_coord, point_to_coord);

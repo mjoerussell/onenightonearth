@@ -153,7 +153,7 @@ export interface WasmModule {
 	getConstellationAtPoint: (arg_0: pointer, arg_1: number, arg_2: number, arg_3: number, arg_4: number, arg_5: BigInt) => BigInt;
 	dragAndMove: (arg_0: pointer, arg_1: number, arg_2: number, arg_3: number, arg_4: number) => void;
 	findWaypoints: (arg_0: number, arg_1: number, arg_2: number, arg_3: number) => pointer;
-	getCoordForSkyCoord: (arg_0: number, arg_1: number, arg_2: BigInt) => void;
+	coordFromSkyCoord: (arg_0: number, arg_1: number, arg_2: BigInt) => void;
 	getConstellationCentroid: (arg_0: pointer, arg_1: number) => void;
 	_wasm_alloc: (arg_0: number) => pointer;
 	_wasm_free: (arg_0: pointer, arg_1: number) => void;

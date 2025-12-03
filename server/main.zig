@@ -5,135 +5,126 @@ const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const net = Io.net;
 
-var static_files = [_]StaticFile{
-    StaticFile.init("web/index.html", .{ .path = "/" }),
-    StaticFile.init("zig-out/const_meta.json", .{ .path = "/constellations/meta", .content_type = "application/json" }),
-    StaticFile.init("web/styles/main.css", .{ .relative_to = "web" }),
-    StaticFile.init("web/assets/favicon.ico", .{ .relative_to = "web" }),
-    StaticFile.init("dist/bundle.js", .{ .relative_to = "dist", .compress = true }),
-    StaticFile.init("dist/bundle.js.map", .{ .relative_to = "dist", .compress = true }),
-    StaticFile.init("dist/wasm/nightsky_render.wasm", .{ .relative_to = "dist/wasm", .compress = true }),
-};
-
 pub const log_level = switch (builtin.mode) {
     .Debug => .debug,
     else => .info,
 };
-
 pub const log = std.log.scoped(.night_server);
 
 const StaticFile = struct {
-    const InitOptions = struct {
-        path: ?[]const u8 = null,
-        relative_to: ?[]const u8 = null,
-        content_type: ?[]const u8 = null,
-        compress: bool = false,
-    };
-
-    path: []const u8,
+    uri_path: []const u8,
     file_name: []const u8,
-    content: ?[]const u8 = null,
-    content_type: []const u8 = "text/plain",
-    secure_context: bool = true,
-    compress: bool = false,
-    is_standalone: bool = false,
 
-    fn init(file_name: []const u8, options: InitOptions) StaticFile {
-        var path: []const u8 = undefined;
-        if (options.path) |path_override| {
-            path = path_override;
-        } else if (options.relative_to) |relative_to| {
-            const start_index = if (std.mem.startsWith(u8, file_name, relative_to)) relative_to.len else 0;
-            path = file_name[start_index..];
-        } else {
-            path = file_name;
-        }
-
-        return StaticFile{
-            .path = path,
-            .file_name = file_name,
-            .content_type = options.content_type orelse getMimeType(file_name),
-            .compress = options.compress,
-        };
-    }
-
-    fn deinit(static_file: *StaticFile, allocator: Allocator) void {
-        if (!static_file.is_standalone) return;
-        if (static_file.content) |content| {
-            allocator.free(content);
-        }
-    }
-
-    fn loadContent(static_file: *StaticFile, allocator: Allocator, io: Io) ![]const u8 {
-        static_file.is_standalone = true;
-        static_file.compress = false;
-
+    fn sendFile(static_file: *StaticFile, io: Io, writer: *Io.Writer) !void {
         var file = try Io.Dir.cwd().openFile(io, static_file.file_name, .{});
         defer file.close(io);
 
         var reader = file.reader(io, &.{});
-        const size = try reader.getSize();
 
-        static_file.content = try reader.interface.readAlloc(allocator, @intCast(size));
-        return static_file.content.?;
+        _ = try reader.interface.streamRemaining(writer);
     }
 
-    fn getContent(static_file: *StaticFile, allocator: Allocator, io: Io) ![]const u8 {
-        if (static_file.content) |content| {
-            if (builtin.mode != .Debug) {
-                return content;
-            }
-        }
-        return try static_file.loadContent(allocator, io);
+    fn pathMatches(static_file: StaticFile, path: []const u8) bool {
+        const self_start: usize = if (std.mem.startsWith(u8, static_file.uri_path, "/")) 1 else 0;
+        const path_start: usize = if (std.mem.startsWith(u8, path, "/")) 1 else 0;
+
+        return std.mem.eql(u8, static_file.uri_path[self_start..], path[path_start..]);
+    }
+
+    fn contentSize(static_file: StaticFile, io: Io) !usize {
+        const stat = try Io.Dir.cwd().statPath(io, static_file.file_name, .{});
+        return @intCast(stat.size);
     }
 };
 
 var is_server_running = true;
 
-fn ctrlCHandlerWindows(_: u32) callconv(.c) c_int {
-    gracefulDeinit();
-    return 0;
+fn ctrlCHandlerWindows(signal: u32) callconv(.c) c_int {
+    switch (signal) {
+        std.os.windows.CTRL_C_EVENT => {
+            log.info("ctrl-c pressed", .{});
+            is_server_running = false;
+            return std.os.windows.FALSE;
+        },
+        else => return std.os.windows.FALSE,
+    }
 }
 
 fn ctrlCHandlerLinux(_: c_int) callconv(.c) void {
-    gracefulDeinit();
-}
-
-fn gracefulDeinit() void {
     is_server_running = false;
 }
 
-pub fn main() anyerror!void {
-    const port = 8080;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+var static_files = [_]StaticFile{
+    .{ .file_name = "web/index.html", .uri_path = "" },
+    .{ .file_name = "zig-out/const_meta.json", .uri_path = "constellations/meta" },
+    .{ .file_name = "web/styles/main.css", .uri_path = "styles/main.css" },
+    .{ .file_name = "web/assets/favicon.ico", .uri_path = "assets/favicon.ico" },
+    .{ .file_name = "dist/bundle.js", .uri_path = "bundle.js" },
+    .{ .file_name = "dist/bundle.js.map", .uri_path = "bundle.js.map" },
+    .{ .file_name = "dist/nightsky_render.wasm", .uri_path = "nightsky_render.wasm" },
+};
 
+const TaskTypes = enum { accept, handle };
+const Task = union(TaskTypes) {
+    accept: net.Server.AcceptError!net.Stream,
+    handle: void,
+};
+
+pub fn main() !void {
     switch (builtin.os.tag) {
         .windows => try std.os.windows.SetConsoleCtrlHandler(ctrlCHandlerWindows, true),
-        else => try std.os.sigaction(std.os.SIG.INT, &.{ .handler = .{ .handler = ctrlCHandlerLinux }, .mask = std.mem.zeroes([32]u32), .flags = 0 }, null),
+        else => try std.os.sigaction(
+            std.os.SIG.INT,
+            &.{
+                .handler = .{ .handler = ctrlCHandlerLinux },
+                .mask = std.mem.zeroes([32]u32),
+                .flags = 0,
+            },
+            null,
+        ),
+    }
+
+    const port = 8080;
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
+    defer {
+        _ = gpa.detectLeaks();
+        _ = gpa.deinit();
     }
 
     const allocator = gpa.allocator();
 
     var io_threaded: std.Io.Threaded = .init(allocator);
+    defer io_threaded.deinit();
     const io = io_threaded.io();
 
-    var localhost = std.Io.net.IpAddress.parse("0.0.0.0", port) catch @panic("Could not parse listening address.");
+    var localhost = net.IpAddress.parse("0.0.0.0", port) catch @panic("Could not parse listening address.");
     var server = try localhost.listen(io, .{});
+    defer server.deinit(io);
+
+    const task_buffer = try allocator.alloc(Task, try std.Thread.getCpuCount());
+    defer allocator.free(task_buffer);
+
+    var select: Io.Select(Task) = .init(io, task_buffer);
+    defer select.cancel();
 
     log.info("Listening on port {}", .{port});
     log.debug("Build is single threaded: {}", .{builtin.single_threaded});
 
-    var group: std.Io.Group = .init;
-    defer group.cancel(io);
-
+    select.async(.accept, net.Server.accept, .{ &server, io });
     while (is_server_running) {
-        const stream = try server.accept(io);
-
-        group.async(io, handleRequest, .{ allocator, io, stream });
+        switch (try select.wait()) {
+            .accept => |result| if (result) |stream| {
+                select.async(.handle, handleRequest, .{ io, stream });
+                select.async(.accept, net.Server.accept, .{ &server, io });
+            } else |_| continue,
+            .handle => {},
+        }
     }
+
+    log.info("Shutting down server...", .{});
 }
 
-fn handleRequest(allocator: Allocator, io: std.Io, stream: std.Io.net.Stream) void {
+fn handleRequest(io: Io, stream: net.Stream) void {
     defer stream.close(io);
 
     var request_buffer: [4096]u8 = undefined;
@@ -142,37 +133,45 @@ fn handleRequest(allocator: Allocator, io: std.Io, stream: std.Io.net.Stream) vo
     var server: std.http.Server = .init(&request_reader.interface, &request_writer.interface);
 
     var request = server.receiveHead() catch return;
+
+    handleRequestError(io, &request) catch |err| {
+        const status: std.http.Status = switch (err) {
+            error.not_found => .not_found,
+            error.unexpected => .internal_server_error,
+        };
+
+        request.respond("", .{ .status = status }) catch {};
+    };
+}
+
+const RequestError = error{ not_found, unexpected };
+fn handleRequestError(io: Io, request: *std.http.Server.Request) RequestError!void {
     const request_path = request.head.target;
 
     log.info("Handling request {s}", .{request_path});
 
     for (&static_files) |*file| {
-        if (std.mem.eql(u8, request_path, file.path)) {
-            serveStaticFile(allocator, io, &request, file) catch |err| {
-                request.respond(@errorName(err), .{ .status = .internal_server_error }) catch {};
-            };
-            return;
+        if (file.pathMatches(request_path)) {
+            serveStaticFile(io, request, file) catch return error.unexpected;
         }
     }
 
-    request.respond("", .{ .status = .not_found }) catch |err| {
-        request.respond(@errorName(err), .{ .status = .internal_server_error }) catch {};
-    };
+    return error.not_found;
 }
 
-fn serveStaticFile(allocator: Allocator, io: Io, request: *std.http.Server.Request, file: *StaticFile) !void {
-    const content = try file.getContent(allocator, io);
-
-    log.info("Loaded content for {s}", .{file.path});
-
-    try request.respond(
-        content,
-        .{
+fn serveStaticFile(io: Io, request: *std.http.Server.Request, static_file: *StaticFile) !void {
+    var write_buf: [1024]u8 = undefined;
+    var body_writer = try request.respondStreaming(&write_buf, .{
+        .content_length = static_file.contentSize(io) catch 0,
+        .respond_options = .{
             .extra_headers = &.{
-                .{ .name = "Content-Type", .value = file.content_type },
+                .{ .name = "Content-Type", .value = getMimeType(static_file.file_name) },
             },
         },
-    );
+    });
+
+    try static_file.sendFile(io, &body_writer.writer);
+    try body_writer.end();
 }
 
 fn getMimeType(file_name: []const u8) []const u8 {
@@ -186,6 +185,8 @@ fn getMimeType(file_name: []const u8) []const u8 {
         return "image/png";
     } else if (std.mem.endsWith(u8, file_name, ".html")) {
         return "text/html";
+    } else if (std.mem.endsWith(u8, file_name, ".json")) {
+        return "application/json";
     } else {
         return "text/plain";
     }

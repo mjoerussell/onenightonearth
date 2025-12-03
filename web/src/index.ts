@@ -1,6 +1,7 @@
 import { Controls } from './controls';
 import { WasmInterface } from './wasm/wasm-interface';
 import { Coord } from './wasm/wasm_module';
+import { CITIES } from './cities'; 
 
 export type Constellation = {
     name: string;
@@ -36,6 +37,47 @@ const renderStars = (controls: Controls, date?: Date) => {
     const draw_end = performance.now();
 
     const diff = draw_end - draw_start;
+
+    const city_points = CITIES.map(city => {
+        const city_zenith = wasm_interface.skyCoordFromCoord({ latitude: city.latitude, longitude: city.longitude }, BigInt(timestamp));
+        const zenith_point = wasm_interface.pointFromSkyCoord(city_zenith, { latitude: controls.latitude, longitude: controls.longitude }, BigInt(timestamp));
+        
+        return {
+            ...city,
+            ...zenith_point,
+        };
+    });
+
+    controls.renderer.context.save();
+
+    controls.renderer.context.beginPath();
+    controls.renderer.context.arc(controls.renderer.width / 2, controls.renderer.height / 2, controls.renderer.background_radius, 0, 2 * Math.PI);
+    controls.renderer.context.clip();
+
+    const indicator_radius = 5;
+    controls.renderer.context.fillStyle = '#f5f5ec';
+    controls.renderer.context.font = 'bold 12px Poppins';
+
+    for (const city of city_points) {
+        // const city_zenith = wasm_interface.skyCoordFromCoord({ latitude: city.latitude, longitude: city.longitude }, BigInt(timestamp));
+        // const zenith_point = wasm_interface.pointFromSkyCoord(city_zenith, { latitude: controls.latitude, longitude: controls.longitude }, BigInt(timestamp));
+
+        // if (city.x !== 0 && city.y !== 0) {
+            controls.renderer.context.beginPath();
+            controls.renderer.context.arc(city.x, city.y, indicator_radius, 0, 2 * Math.PI);
+            controls.renderer.context.fill();
+
+            // const name_dim = controls.renderer.context.measureText(city.name);
+            // controls.renderer.context.fillText(city.name, zenith_point.x - (name_dim.width / 2), zenith_point.y - (3 * radius));
+        // }
+    }
+
+    for (const city of city_points) {
+        const name_dim = controls.renderer.context.measureText(city.name);
+        controls.renderer.context.fillText(city.name, city.x - (name_dim.width / 2), city.y - (3 * indicator_radius));
+    }
+
+    controls.renderer.context.restore();
 
     // 60frame/sec 1sec/1000ms ~= 16.6 ms per frame
     console.log(`${1 / (diff / 1000)} fps`);
@@ -225,7 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
         controls.constellation_name = `${constellations[const_index].name} - ${constellations[const_index].epithet}`;
         const constellation_center = wasm_interface.getConstellationCentroid(const_index);
         if (constellation_center) {
-            const new_coord = wasm_interface.getCoordForSkyCoord(constellation_center, BigInt(controls.date.valueOf()));
+            const new_coord = wasm_interface.coordFromSkyCoord(constellation_center, BigInt(controls.date.valueOf()));
             updateLocation(new_coord, 2.5);
         }
     });

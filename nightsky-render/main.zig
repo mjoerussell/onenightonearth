@@ -27,7 +27,8 @@ const allocator = switch (builtin.cpu.arch) {
 const num_waypoints = 150;
 var waypoints: [num_waypoints]Coord = undefined;
 
-var result_data: []u8 = undefined;
+const result_data_size = 8;
+var result_data: [result_data_size]u8 = undefined;
 
 const embeded_star_data align(@alignOf(ExternStar)) = @embedFile("star_data").*;
 const embeded_const_data = @embedFile("const_data").*;
@@ -96,8 +97,7 @@ pub export fn updateCanvasSettings(star_renderer: *StarRenderer, settings: *Exte
 
 /// Initialize the result data slice - this will be used to "return" multiple results at once in functions like `getCoordForSkyCoord`.
 pub export fn initializeResultData() [*]u8 {
-    result_data = allocator.alloc(u8, 8) catch unreachable;
-    return result_data.ptr;
+    return @ptrCast(&result_data);
 }
 
 /// Initialize the constellation boundaries, asterisms, and zodiac flags. Because each constellation has a variable number of boundaries and
@@ -163,7 +163,7 @@ pub fn initializeConstellations(star_renderer: *StarRenderer, data: []const u8) 
 /// Returns a pointer to the pixel data so that it can be rendered on the canvas. Also sets the length of this buffer into the first slot
 /// of result_data.
 pub export fn getImageData(star_renderer: *StarRenderer) [*]u32 {
-    setResult(@as(u32, @intCast(star_renderer.canvas.data.len)) * 4, 0);
+    setResult(@as(u32, @intCast(star_renderer.canvas.data.len)) * 4, @as(u32, 0));
     return star_renderer.canvas.data.ptr;
 }
 
@@ -173,8 +173,9 @@ pub export fn resetImageData(star_renderer: *StarRenderer) void {
 }
 
 /// The main rendering function. This will render all of the stars and, if turned on, the constellation asterisms and/or boundaries.
-pub export fn projectStarsAndConstellations(star_renderer: *StarRenderer, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) void {
-    star_renderer.run(observer_latitude, observer_longitude, observer_timestamp);
+pub export fn projectStarsAndConstellations(star_renderer: *StarRenderer, latitude: f32, longitude: f32, timestamp: i64) void {
+    const observer: ObserverPosition = .init(latitude, longitude, timestamp);
+    star_renderer.run(observer);
 }
 
 /// Given a point on the canvas, determine which constellation (if any (but there should always be one)) is currently at that point. Once
@@ -183,18 +184,14 @@ pub export fn projectStarsAndConstellations(star_renderer: *StarRenderer, observ
 pub export fn getConstellationAtPoint(star_renderer: *StarRenderer, x: f32, y: f32, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) isize {
     const point = Point{ .x = x, .y = y };
 
-    const pos = ObserverPosition{ .latitude = observer_latitude, .longitude = observer_longitude, .timestamp = observer_timestamp };
-    const local_sidereal_time = pos.localSiderealTime();
-    const sin_lat = std.math.sin(observer_latitude);
-    const cos_lat = std.math.cos(observer_latitude);
-
-    const index = star_math.getConstellationAtPoint(star_renderer.canvas, point, star_renderer.constellations, local_sidereal_time, sin_lat, cos_lat);
+    const observer: ObserverPosition = .init(observer_latitude, observer_longitude, observer_timestamp);
+    const index = star_math.getConstellationAtPoint(star_renderer.canvas, point, star_renderer.constellations, observer);
     if (index) |i| {
         if (star_renderer.canvas.settings.draw_constellation_grid) {
-            star_renderer.canvas.drawGrid(star_renderer.constellations[i], Pixel.rgb(255, 255, 255), 3, local_sidereal_time, sin_lat, cos_lat);
+            star_renderer.canvas.drawGrid(star_renderer.constellations[i], Pixel.rgb(255, 255, 255), 3, observer);
         }
         if (star_renderer.canvas.settings.draw_asterisms) {
-            star_renderer.canvas.drawAsterism(star_renderer.constellations[i], Pixel.rgb(255, 255, 255), 3, local_sidereal_time, sin_lat, cos_lat);
+            star_renderer.canvas.drawAsterism(star_renderer.constellations[i], Pixel.rgb(255, 255, 255), 3, observer);
         }
         return @as(isize, @intCast(i));
     } else return -1;
@@ -226,26 +223,57 @@ pub export fn findWaypoints(start_lat: f32, start_long: f32, end_lat: f32, end_l
 
 /// Given a sky coordinate and a timestamp, compute the Earth coordinate currently "below" that position. Puts the latitude and
 /// longitude into the result_data buffer.
-pub export fn getCoordForSkyCoord(right_ascension: f32, declination: f32, observer_timestamp: i64) void {
+pub export fn coordFromSkyCoord(right_ascension: f32, declination: f32, timestamp: i64) void {
     const sky_coord = SkyCoord{ .right_ascension = right_ascension, .declination = declination };
-    const coord = sky_coord.getCoord(observer_timestamp);
+    const coord = sky_coord.toCoord(timestamp);
     setResult(coord.latitude, coord.longitude);
+}
+
+pub export fn pointFromSkyCoord(star_renderer: *StarRenderer, right_ascension: f32, declination: f32, latitude: f32, longitude: f32, timestamp: i64, filter_below_horizon: bool) void {
+    const observer: ObserverPosition = .init(latitude, longitude, timestamp);
+    const sky_coord = SkyCoord{ .right_ascension = right_ascension, .declination = declination };
+    if (star_renderer.canvas.pointFromSkyCoord(sky_coord, observer, filter_below_horizon)) |point| {
+        setResult(point, {});
+    } else {
+        setResult(@as(f32, 0), @as(f32, 0));
+    }
+}
+
+pub export fn skyCoordFromCoord(latitude: f32, longitude: f32, timestamp: i64) void {
+    const sky_coord = SkyCoord.fromCoord(.{ .latitude = latitude, .longitude = longitude }, timestamp);
+    setResult(sky_coord, {});
 }
 
 /// Get the central point of a given constellation. This point may be outside of the boundaries of a constellation if the constellation is
 /// irregularly shaped. The point is selected to make the constellation centered in the canvas.
 pub export fn getConstellationCentroid(star_renderer: *StarRenderer, constellation_index: u32) void {
     const centroid = if (constellation_index > star_renderer.constellations.len) SkyCoord{} else star_renderer.constellations[@as(usize, @intCast(constellation_index))].centroid();
-    setResult(centroid.right_ascension, centroid.declination);
+    setResult(centroid, {});
 }
 
 /// Set data in the result buffer so that it can be read in the JS side. Both values must be exactly 4 bytes long.
-fn setResult(a: anytype, b: @TypeOf(a)) void {
+fn setResult(a: anytype, b: anytype) void {
     const A = @TypeOf(a);
-    comptime if (@sizeOf(A) != 4) @compileError("Result data must be exactly 4 bytes each");
-    const result_ptr = @as([*]A, @ptrCast(@alignCast(result_data.ptr)));
-    result_ptr[0] = a;
-    result_ptr[1] = b;
+    const B = @TypeOf(b);
+
+    comptime if (@sizeOf(A) > result_data_size) {
+        const msg = std.fmt.comptimePrint("First result data must be {} bytes or less (type {s} is {} bytes).", .{ result_data_size, @typeName(A), @sizeOf(A) });
+        @compileError(msg);
+    };
+
+    const remaining_size = result_data_size - @sizeOf(A);
+    comptime if (@sizeOf(B) > remaining_size) {
+        const msg = std.fmt.comptimePrint("Second result data must be {} bytes or less (type {s} is {} bytes).", .{ remaining_size, @typeName(B), @sizeOf(B) });
+        @compileError(msg);
+    };
+
+    const result_a = @as(*A, @ptrCast(@alignCast(&result_data)));
+    result_a.* = a;
+
+    if (@sizeOf(A) != result_data.len) {
+        const result_b = @as(*B, @ptrCast(@alignCast(&result_data[@sizeOf(A)])));
+        result_b.* = b;
+    }
 }
 
 pub export fn _wasm_alloc(byte_len: u32) ?[*]u8 {

@@ -4,7 +4,8 @@ const math = std.math;
 const math_utils = @import("math_utils.zig");
 const FixedPoint = @import("fixed_point.zig").DefaultFixedPoint;
 
-const Coord = @import("star_math.zig").Coord;
+const star_math = @import("star_math.zig");
+const Coord = star_math.Coord;
 
 const SkyCoord = @This();
 
@@ -30,11 +31,18 @@ pub const ExternSkyCoord = extern struct {
 right_ascension: f32 = 0,
 declination: f32 = 0,
 
-pub fn getCoord(sky_coord: SkyCoord, observer_timestamp: i64) Coord {
-    const partial_lst = getPartialLocalSiderealTime(observer_timestamp);
-    const longitude = sky_coord.right_ascension - partial_lst;
+pub fn fromCoord(coord: Coord, timestamp: i64) SkyCoord {
+    return .{
+        .right_ascension = coord.longitude + star_math.getPartialLocalSiderealTime(timestamp),
+        .declination = coord.latitude,
+    };
+}
 
-    return Coord{ .latitude = sky_coord.declination, .longitude = longitude };
+pub fn toCoord(sky_coord: SkyCoord, timestamp: i64) Coord {
+    return Coord{
+        .longitude = sky_coord.right_ascension - star_math.getPartialLocalSiderealTime(timestamp),
+        .latitude = sky_coord.declination,
+    };
 }
 
 pub fn getVector(sky_coord: SkyCoord, local_sidereal_time: f32) [3]f32 {
@@ -45,7 +53,6 @@ pub fn getVector(sky_coord: SkyCoord, local_sidereal_time: f32) [3]f32 {
 
     const cos_azi = math.sin(sky_coord.declination) / math.cos(altitude);
     const azimuth = math.acos(cos_azi);
-    // const azimuth = if (math.sin(hour_angle) < 0) azi else two_pi - azi;
 
     var result: [3]f32 = [_]f32{ 0, 0, 0 };
     result[0] = math.cos(altitude) * math.cos(azimuth); // x
@@ -53,11 +60,4 @@ pub fn getVector(sky_coord: SkyCoord, local_sidereal_time: f32) [3]f32 {
     result[2] = math.sin(altitude); // z
 
     return result;
-}
-
-fn getPartialLocalSiderealTime(timestamp: i64) f32 {
-    const j2000_offset_millis = 949_428_000_000;
-    const days_since_j2000 = @as(f64, @floatFromInt(timestamp - j2000_offset_millis)) / 86_400_000.0;
-    const lst = ((100.46 + (0.985647 * days_since_j2000) + @as(f64, @floatFromInt(15 * timestamp))) * (math.pi / 180.0));
-    return @as(f32, @floatCast(math_utils.floatMod(lst, 2 * math.pi)));
 }

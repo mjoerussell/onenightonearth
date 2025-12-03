@@ -95,12 +95,30 @@ export class WasmInterface {
         };
     }
 
-    getCoordForSkyCoord(sky_coord: wasm.ExternSkyCoord, timestamp: BigInt): wasm.Coord {
-        this.lib.getCoordForSkyCoord(sky_coord.right_ascension, sky_coord.declination, timestamp);
+    coordFromSkyCoord(sky_coord: wasm.ExternSkyCoord, timestamp: BigInt): wasm.Coord {
+        this.lib.coordFromSkyCoord(sky_coord.right_ascension, sky_coord.declination, timestamp);
         const result_data = new Float32Array(this.memory, this.result_ptr, 2);
         return {
             latitude: result_data[0],
             longitude: result_data[1],
+        };
+    }
+
+    pointFromSkyCoord(sky_coord: wasm.ExternSkyCoord, observer: wasm.Coord, timestamp: BigInt, filter_below_horizon: boolean = false): wasm.Point {
+        (this.lib as any).pointFromSkyCoord(this.renderer_ptr, sky_coord.right_ascension, sky_coord.declination, observer.latitude, observer.longitude, timestamp, filter_below_horizon);
+        const result_data = new Float32Array(this.memory, this.result_ptr, 2);
+        return {
+            x: result_data[0],
+            y: result_data[1],
+        }
+    }
+
+    skyCoordFromCoord(pos: wasm.Coord, timestamp: BigInt): wasm.ExternSkyCoord {
+        (this.lib as any).skyCoordFromCoord(pos.latitude, pos.longitude, timestamp);
+        const result_data = new Float32Array(this.memory, this.result_ptr, 2);
+        return {
+            right_ascension: result_data[0],
+            declination: result_data[1],
         };
     }
 
