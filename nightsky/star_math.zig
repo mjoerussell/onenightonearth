@@ -61,21 +61,19 @@ pub fn getConstellationAtPoint(canvas: Canvas, point: Point, constellations: []C
     return null;
 }
 
-pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_end_y: f32, drag_speed: f32) Coord {
-    const dist_x = drag_end_x - drag_start_x;
-    const dist_y = drag_end_y - drag_start_y;
-
+pub fn dragAndMove(start: Point, end: Point, drag_speed: f32) Coord {
     // Angle between the starting point and the end point
     // Usually atan2 is used with the parameters in the reverse order (atan2(y, x)).
     // The order here (x, y) is intentional, since otherwise horizontal drags would result in vertical movement
     // and vice versa
-    const dist_phi = math.atan2(dist_x, dist_y);
+    const dist = end.distVec(start);
+    const dist_phi = math.atan2(dist.x, dist.y);
 
     // drag_distance is the angular distance between the starting location and the result location after a single drag
     // Higher = move more with smaller cursor movements, and vice versa
     const drag_distance: f32 = drag_speed * (math.pi / 180.0);
 
-    // Calculate asin(new_latitude), and clamp the result between [-1, 1]
+    // Calculate sin(new_latitude), and clamp the result between [-1, 1]
     var sin_lat_x = math.sin(drag_distance) * math.cos(dist_phi);
     if (sin_lat_x > 1.0) {
         sin_lat_x = 1.0;
@@ -85,7 +83,7 @@ pub fn dragAndMove(drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_e
 
     const new_latitude = math.asin(sin_lat_x);
 
-    // Calculate acos(new_relative_longitude) and clamp the result between [-1, 1]
+    // Calculate cos(new_relative_longitude) and clamp the result between [-1, 1]
     var cos_long_x = math.cos(drag_distance) / math.cos(new_latitude);
     if (cos_long_x > 1.0) {
         cos_long_x = 1.0;

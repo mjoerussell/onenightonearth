@@ -12,9 +12,15 @@ pub const Point = packed struct {
     y: f32 = 0,
 
     pub fn getDist(self: Point, other: Point) f32 {
-        const x_diff_sq = (self.x - other.x) * (self.x - other.x);
-        const y_diff_sq = (self.y - other.y) * (self.y - other.y);
-        return std.math.sqrt(x_diff_sq + y_diff_sq);
+        const dist = self.distVec(other);
+        return std.math.sqrt((dist.x * dist.x) + (dist.y * dist.y));
+    }
+
+    pub fn distVec(self: Point, other: Point) Point {
+        return Point{
+            .x = self.x - other.x,
+            .y = self.y - other.y,
+        };
     }
 };
 

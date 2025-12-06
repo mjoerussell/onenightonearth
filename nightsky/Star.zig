@@ -2,7 +2,8 @@ const std = @import("std");
 const math = std.math;
 
 const FixedPoint = @import("fixed_point.zig").DefaultFixedPoint;
-const ExternSkyCoord = @import("SkyCoord.zig").ExternSkyCoord;
+const SkyCoord = @import("SkyCoord.zig");
+const ExternSkyCoord = SkyCoord.ExternSkyCoord;
 const Pixel = @import("Canvas.zig").Pixel;
 
 const Star = @This();
@@ -76,3 +77,10 @@ declination: f32,
 sin_declination: f32,
 cos_declination: f32,
 pixel: Pixel,
+
+pub fn skyCoord(star: Star) SkyCoord {
+    return SkyCoord{
+        .right_ascension = star.right_ascension,
+        .declination = star.declination,
+    };
+}

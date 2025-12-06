@@ -27,6 +27,8 @@ const allocator = switch (builtin.cpu.arch) {
 const num_waypoints = 150;
 var waypoints: [num_waypoints]Coord = undefined;
 
+var star_renderer: StarRenderer = undefined;
+
 const result_data_size = 8;
 var result_data: [result_data_size]u8 = undefined;
 
@@ -59,37 +61,12 @@ pub const ExternCanvasSettings = packed struct {
     }
 };
 
-pub fn initializeStars(star_renderer: *StarRenderer, stars: []const ExternStar) void {
-    star_renderer.stars = std.MultiArrayList(Star){};
-    star_renderer.stars.ensureTotalCapacity(allocator, embeded_star_data.len) catch {
-        log.err("Ran out of memory trying to ensureCapacity to {} stars", .{stars.len});
-        unreachable;
-    };
-
-    for (stars) |star| {
-        star_renderer.stars.appendAssumeCapacity(star.toStar());
-    }
-}
-
-pub export fn initialize(settings: *ExternCanvasSettings) *StarRenderer {
-    var star_renderer = allocator.create(StarRenderer) catch @panic("OOM for StarRenderer");
-    const stars = std.mem.bytesAsSlice(ExternStar, embeded_star_data[0..]);
-
-    initializeStars(star_renderer, @alignCast(stars));
-
-    star_renderer.canvas = Canvas.init(allocator, settings.getCanvasSettings()) catch @panic("OOM for Canvas");
-
-    initializeConstellations(star_renderer, embeded_const_data[0..]);
-
-    return star_renderer;
-}
-
-pub export fn updateCanvasSettings(star_renderer: *StarRenderer, settings: *ExternCanvasSettings) ?[*]u32 {
+pub export fn updateCanvasSettings(settings: *ExternCanvasSettings) ?[*]u32 {
     const new_settings = settings.getCanvasSettings();
     if (new_settings.width != star_renderer.canvas.settings.width or new_settings.height != star_renderer.canvas.settings.height) {
         star_renderer.canvas.data = allocator.realloc(star_renderer.canvas.data, new_settings.width * new_settings.height) catch unreachable;
         star_renderer.canvas.settings = new_settings;
-        return getImageData(star_renderer);
+        return getImageData();
     }
     star_renderer.canvas.settings = new_settings;
     return null;
@@ -100,6 +77,34 @@ pub export fn initializeResultData() [*]u8 {
     return @ptrCast(&result_data);
 }
 
+pub export fn initialize(settings: *ExternCanvasSettings) void {
+    const stars = std.mem.bytesAsSlice(ExternStar, embeded_star_data[0..]);
+
+    initializeStars(@alignCast(stars));
+
+    star_renderer.canvas = Canvas.init(allocator, settings.getCanvasSettings()) catch @panic("OOM for Canvas");
+
+    initializeConstellations(embeded_const_data[0..]);
+}
+
+pub fn initializeStars(stars: []const ExternStar) void {
+    star_renderer.stars = std.MultiArrayList(Star){};
+    star_renderer.stars.ensureTotalCapacity(allocator, embeded_star_data.len) catch {
+        log.err("Ran out of memory trying to ensureCapacity to {} stars", .{stars.len});
+        unreachable;
+    };
+    for (stars) |star| {
+        star_renderer.stars.appendAssumeCapacity(star.toStar());
+    }
+    // star_renderer.stars = allocator.alloc(Star, embeded_star_data.len) catch {
+    //     log.err("OOM allocating stars array.", .{});
+    //     @panic("OOM");
+    // };
+    // for (stars, 0..) |star, i| {
+    //     star_renderer.stars[i] = star.toStar();
+    // }
+}
+
 /// Initialize the constellation boundaries, asterisms, and zodiac flags. Because each constellation has a variable number of boundaries and
 /// asterisms, the data layout is slightly complicated.
 /// Constellation data layout:
@@ -107,7 +112,7 @@ pub export fn initializeResultData() [*]u8 {
 /// constellations size = num_constellations * @sizeOf(ConstellationInfo)
 /// constellation_boundaries size = num_boundary_coords * { i16, i16 }
 /// constellation_asterisms size = num_asterism_coords * { i16, i16 }
-pub fn initializeConstellations(star_renderer: *StarRenderer, data: []const u8) void {
+pub fn initializeConstellations(data: []const u8) void {
     const ConstellationInfo = packed struct {
         num_boundaries: u8,
         num_asterisms: u8,
@@ -162,18 +167,18 @@ pub fn initializeConstellations(star_renderer: *StarRenderer, data: []const u8) 
 
 /// Returns a pointer to the pixel data so that it can be rendered on the canvas. Also sets the length of this buffer into the first slot
 /// of result_data.
-pub export fn getImageData(star_renderer: *StarRenderer) [*]u32 {
+pub export fn getImageData() [*]u32 {
     setResult(@as(u32, @intCast(star_renderer.canvas.data.len)) * 4, @as(u32, 0));
     return star_renderer.canvas.data.ptr;
 }
 
 /// Clear the canvas pixel data.
-pub export fn resetImageData(star_renderer: *StarRenderer) void {
+pub export fn resetImageData() void {
     star_renderer.canvas.resetImageData();
 }
 
 /// The main rendering function. This will render all of the stars and, if turned on, the constellation asterisms and/or boundaries.
-pub export fn projectStarsAndConstellations(star_renderer: *StarRenderer, latitude: f32, longitude: f32, timestamp: i64) void {
+pub export fn projectStarsAndConstellations(latitude: f32, longitude: f32, timestamp: i64) void {
     const observer: ObserverPosition = .init(latitude, longitude, timestamp);
     star_renderer.run(observer);
 }
@@ -181,10 +186,10 @@ pub export fn projectStarsAndConstellations(star_renderer: *StarRenderer, latitu
 /// Given a point on the canvas, determine which constellation (if any (but there should always be one)) is currently at that point. Once
 /// the constellation is found, draw a thicker line over that constellation's boundary and/or asterism to highlight it.
 /// Finally, return the index of the constellation so that the JS part of the frontend can show the constellation info.
-pub export fn getConstellationAtPoint(star_renderer: *StarRenderer, x: f32, y: f32, observer_latitude: f32, observer_longitude: f32, observer_timestamp: i64) isize {
+pub export fn getConstellationAtPoint(x: f32, y: f32, latitude: f32, longitude: f32, timestamp: i64) isize {
     const point = Point{ .x = x, .y = y };
 
-    const observer: ObserverPosition = .init(observer_latitude, observer_longitude, observer_timestamp);
+    const observer: ObserverPosition = .init(latitude, longitude, timestamp);
     const index = star_math.getConstellationAtPoint(star_renderer.canvas, point, star_renderer.constellations, observer);
     if (index) |i| {
         if (star_renderer.canvas.settings.draw_constellation_grid) {
@@ -199,8 +204,12 @@ pub export fn getConstellationAtPoint(star_renderer: *StarRenderer, x: f32, y: f
 
 /// Compute a new coordiate based on the mouse drag state. Sets the latitude and longitude of the new coordinate into the respective slots of
 /// `result_data`.
-pub export fn dragAndMove(star_renderer: *StarRenderer, drag_start_x: f32, drag_start_y: f32, drag_end_x: f32, drag_end_y: f32) void {
-    const coord = star_math.dragAndMove(drag_start_x, drag_start_y, drag_end_x, drag_end_y, star_renderer.canvas.settings.drag_speed);
+pub export fn dragAndMove(start_x: f32, start_y: f32, end_x: f32, end_y: f32) void {
+    const coord = star_math.dragAndMove(
+        .{ .x = start_x, .y = start_y },
+        .{ .x = end_x, .y = end_y },
+        star_renderer.canvas.settings.drag_speed,
+    );
     setResult(coord.latitude, coord.longitude);
 }
 
@@ -229,7 +238,7 @@ pub export fn coordFromSkyCoord(right_ascension: f32, declination: f32, timestam
     setResult(coord.latitude, coord.longitude);
 }
 
-pub export fn pointFromSkyCoord(star_renderer: *StarRenderer, right_ascension: f32, declination: f32, latitude: f32, longitude: f32, timestamp: i64, filter_below_horizon: bool) void {
+pub export fn pointFromSkyCoord(right_ascension: f32, declination: f32, latitude: f32, longitude: f32, timestamp: i64, filter_below_horizon: bool) void {
     const observer: ObserverPosition = .init(latitude, longitude, timestamp);
     const sky_coord = SkyCoord{ .right_ascension = right_ascension, .declination = declination };
     if (star_renderer.canvas.pointFromSkyCoord(sky_coord, observer, filter_below_horizon)) |point| {
@@ -246,12 +255,12 @@ pub export fn skyCoordFromCoord(latitude: f32, longitude: f32, timestamp: i64) v
 
 /// Get the central point of a given constellation. This point may be outside of the boundaries of a constellation if the constellation is
 /// irregularly shaped. The point is selected to make the constellation centered in the canvas.
-pub export fn getConstellationCentroid(star_renderer: *StarRenderer, constellation_index: u32) void {
+pub export fn getConstellationCentroid(constellation_index: u32) void {
     const centroid = if (constellation_index > star_renderer.constellations.len) SkyCoord{} else star_renderer.constellations[@as(usize, @intCast(constellation_index))].centroid();
     setResult(centroid, {});
 }
 
-/// Set data in the result buffer so that it can be read in the JS side. Both values must be exactly 4 bytes long.
+/// Set data in the result buffer so that it can be read in the JS side. The combined size of the two values must not be greater than 8 bytes.
 fn setResult(a: anytype, b: anytype) void {
     const A = @TypeOf(a);
     const B = @TypeOf(b);

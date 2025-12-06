@@ -16,6 +16,12 @@ let constellations: Constellation[] = [];
 let wasm_interface: WasmInterface;
 
 const renderStars = (controls: Controls, date?: Date) => {
+    controls.renderer.context.save();
+
+    controls.renderer.context.beginPath();
+    controls.renderer.context.arc(controls.renderer.width / 2, controls.renderer.height / 2, controls.renderer.background_radius, 0, 2 * Math.PI);
+    controls.renderer.context.clip();
+
     const render_date = date ?? controls.date;
     const timestamp = render_date.valueOf();
 
@@ -48,11 +54,6 @@ const renderStars = (controls: Controls, date?: Date) => {
         };
     });
 
-    controls.renderer.context.save();
-
-    controls.renderer.context.beginPath();
-    controls.renderer.context.arc(controls.renderer.width / 2, controls.renderer.height / 2, controls.renderer.background_radius, 0, 2 * Math.PI);
-    controls.renderer.context.clip();
 
     const indicator_radius = 5;
     controls.renderer.context.fillStyle = '#f5f5ec';

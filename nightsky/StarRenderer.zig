@@ -16,12 +16,14 @@ const StarRenderer = @This();
 canvas: Canvas,
 
 stars: std.MultiArrayList(Star),
+// stars: []Star,
 constellations: []Constellation,
 
 pub fn run(renderer: *StarRenderer, observer: ObserverPosition) void {
     const line_color = Pixel.rgba(255, 245, 194, 175);
 
     renderer.canvas.projectAndRenderStarsWide(renderer.stars, observer);
+    // renderer.canvas.projectAndRenderStars(renderer.stars, observer);
 
     if (renderer.canvas.settings.draw_constellation_grid or renderer.canvas.settings.draw_asterisms) {
         for (renderer.constellations) |constellation| {

@@ -9,7 +9,7 @@ export class WasmInterface {
     /** Pointer to wasm result data, for returning multiple values from functions. */
     private result_ptr: number = 0;
 
-    private renderer_ptr: number = 0;
+    // private renderer_ptr: number = 0;
 
     /** Pointer to the image data. */
     private pixel_data_ptr: number = 0;
@@ -32,11 +32,11 @@ export class WasmInterface {
 
         this.settings_ptr = this.allocObject(canvas_settings, wasm.sizedExternCanvasSettings);
 
-        this.renderer_ptr = this.lib.initialize(this.settings_ptr);
+        this.lib.initialize(this.settings_ptr);
 
         this.result_ptr = this.lib.initializeResultData();
 
-        this.pixel_data_ptr = this.lib.getImageData(this.renderer_ptr);
+        this.pixel_data_ptr = this.lib.getImageData();
         this.pixel_count = new Uint32Array(this.memory, this.result_ptr, 2)[0];
 
         const init_end = performance.now();
@@ -45,16 +45,16 @@ export class WasmInterface {
     }
 
     projectStarsAndConstellations(latitude: number, longitude: number, timestamp: BigInt): void {
-        this.lib.projectStarsAndConstellations(this.renderer_ptr, latitude, longitude, timestamp);
+        this.lib.projectStarsAndConstellations(latitude, longitude, timestamp);
     }
 
     getConstellationAtPoint(point: wasm.Point, latitude: number, longitude: number, timestamp: BigInt): BigInt {
-        const constellation_index = this.lib.getConstellationAtPoint(this.renderer_ptr, point.x, point.y, latitude, longitude, timestamp);
+        const constellation_index = this.lib.getConstellationAtPoint(point.x, point.y, latitude, longitude, timestamp);
         return constellation_index;
     }
 
     getConstellationCentroid(index: number): wasm.ExternSkyCoord | null {
-        this.lib.getConstellationCentroid(this.renderer_ptr, index);
+        this.lib.getConstellationCentroid(index);
         const result_data = new Float32Array(this.memory, this.result_ptr, 2);
         return {
             right_ascension: result_data[0],
@@ -64,7 +64,7 @@ export class WasmInterface {
 
     /** Clear the canvas. */
     resetImageData(): void {
-        this.lib.resetImageData(this.renderer_ptr);
+        this.lib.resetImageData();
     }
 
     /**
@@ -87,7 +87,7 @@ export class WasmInterface {
     }
 
     dragAndMove(start_x: number, start_y: number, end_x: number, end_y: number): wasm.Coord {
-        this.lib.dragAndMove(this.renderer_ptr, start_x, start_y, end_x, end_y);
+        this.lib.dragAndMove(start_x, start_y, end_x, end_y);
         const result_data = new Float32Array(this.memory, this.result_ptr, 2);
         return {
             latitude: result_data[0],
@@ -105,7 +105,7 @@ export class WasmInterface {
     }
 
     pointFromSkyCoord(sky_coord: wasm.ExternSkyCoord, observer: wasm.Coord, timestamp: BigInt, filter_below_horizon: boolean = false): wasm.Point {
-        (this.lib as any).pointFromSkyCoord(this.renderer_ptr, sky_coord.right_ascension, sky_coord.declination, observer.latitude, observer.longitude, timestamp, filter_below_horizon);
+        (this.lib as any).pointFromSkyCoord(sky_coord.right_ascension, sky_coord.declination, observer.latitude, observer.longitude, timestamp, filter_below_horizon);
         const result_data = new Float32Array(this.memory, this.result_ptr, 2);
         return {
             x: result_data[0],
@@ -124,7 +124,7 @@ export class WasmInterface {
 
     updateSettings(settings: wasm.ExternCanvasSettings): void {
         this.setObject(new DataView(this.memory, this.settings_ptr), settings, wasm.sizedExternCanvasSettings);
-        const pixel_data_ptr = this.lib.updateCanvasSettings(this.renderer_ptr, this.settings_ptr);
+        const pixel_data_ptr = this.lib.updateCanvasSettings(this.settings_ptr);
         if (pixel_data_ptr !== 0) {
             this.pixel_data_ptr = pixel_data_ptr;
             this.pixel_count = new Uint32Array(this.memory, this.result_ptr, 2)[0];

@@ -18,6 +18,9 @@ const FixedPoint = @import("fixed_point.zig").DefaultFixedPoint;
 const Canvas = @This();
 
 pub const Pixel = packed struct {
+    pub const white: Pixel = .rgb(255, 255, 255);
+    pub const black: Pixel = .rgb(0, 0, 0);
+
     r: u8 = 0,
     g: u8 = 0,
     b: u8 = 0,
@@ -69,8 +72,8 @@ pub fn init(allocator: Allocator, settings: Settings) !Canvas {
     for (pixel_mask, 0..) |*p, p_index| {
         const x = @as(f32, @floatFromInt(p_index % canvas.settings.width));
         const y = @as(f32, @floatFromInt(@divFloor(p_index, canvas.settings.width)));
-        const mask_value =
-            if (canvas.isInsideCircle(.{ .x = x, .y = y })) Pixel.rgba(255, 255, 255, 255) else Pixel.rgba(0, 0, 0, 0);
+        const mask_value: Pixel =
+            if (canvas.isInsideCircle(.{ .x = x, .y = y })) .white else .black;
         p.* = mask_value.asU32();
     }
 
