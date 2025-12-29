@@ -32,7 +32,7 @@ const StaticFile = struct {
     }
 
     fn contentSize(static_file: StaticFile, io: Io) !usize {
-        const stat = try Io.Dir.cwd().statPath(io, static_file.file_name, .{});
+        const stat = try Io.Dir.cwd().statFile(io, static_file.file_name, .{});
         return @intCast(stat.size);
     }
 };
@@ -93,7 +93,7 @@ pub fn main() !void {
 
     const allocator = gpa.allocator();
 
-    var io_threaded: std.Io.Threaded = .init(allocator);
+    var io_threaded: std.Io.Threaded = .init(allocator, .{});
     defer io_threaded.deinit();
     const io = io_threaded.io();
 

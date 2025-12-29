@@ -280,7 +280,7 @@ pub fn main() anyerror!void {
 
     const arguments = try Arguments.init(args);
 
-    var io_threaded: Io.Threaded = .init(allocator);
+    var io_threaded: Io.Threaded = .init(allocator, .{});
     const io = io_threaded.io();
 
     var stars_future = io.async(readSaoCatalog, .{ allocator, io, arguments.stars.source });
@@ -290,14 +290,14 @@ pub fn main() anyerror!void {
     defer _ = const_future.cancel(io) catch {};
 
     const stars: []ExternStar = try stars_future.await(io);
-    try writeStarData(stars, arguments.stars.dest);
+    try writeStarData(io, stars, arguments.stars.dest);
 
     const sky_files: []SkyFile = try const_future.await(io);
     defer {
         for (sky_files) |sky_file| sky_file.deinit(allocator);
     }
-    try writeConstellationData(sky_files, arguments.constellations.dest);
-    try writeConstellationMetadata(sky_files, arguments.metadata.dest);
+    try writeConstellationData(io, sky_files, arguments.constellations.dest);
+    try writeConstellationMetadata(io, sky_files, arguments.metadata.dest);
 }
 
 fn readSaoCatalog(allocator: Allocator, io: Io, catalog_filename: []const u8) ![]ExternStar {
@@ -355,12 +355,12 @@ fn readSaoCatalog(allocator: Allocator, io: Io, catalog_filename: []const u8) ![
     return try star_list.toOwnedSlice(allocator);
 }
 
-fn writeStarData(stars: []ExternStar, out_filename: []const u8) !void {
-    var out_file = try std.fs.cwd().createFile(out_filename, .{});
-    defer out_file.close();
+fn writeStarData(io: Io, stars: []ExternStar, out_filename: []const u8) !void {
+    var out_file = try std.Io.Dir.cwd().createFile(io, out_filename, .{});
+    defer out_file.close(io);
 
     const bytes = std.mem.sliceAsBytes(stars);
-    var writer = out_file.writer(&.{});
+    var writer = out_file.writer(io, &.{});
     try writer.interface.writeAll(bytes);
 
     try writer.interface.flush();
@@ -371,8 +371,8 @@ fn readSkyFiles(allocator: Allocator, io: Io, constellation_dir_name: []const u8
     var sky_files: std.ArrayList(SkyFile) = .empty;
     errdefer sky_files.deinit(allocator);
 
-    var constellation_dir = try std.fs.cwd().openDir(constellation_dir_name, .{ .iterate = true });
-    defer constellation_dir.close();
+    var constellation_dir = try Io.Dir.cwd().openDir(io, constellation_dir_name, .{ .iterate = true });
+    defer constellation_dir.close(io);
 
     var constellation_dir_walker = try constellation_dir.walk(allocator);
     defer constellation_dir_walker.deinit();
@@ -385,7 +385,7 @@ fn readSkyFiles(allocator: Allocator, io: Io, constellation_dir_name: []const u8
         constellation_filenames.deinit(allocator);
     }
 
-    while (try constellation_dir_walker.next()) |entry| {
+    while (try constellation_dir_walker.next(io)) |entry| {
         if (entry.kind != .file) continue;
         if (!std.mem.endsWith(u8, entry.basename, ".sky")) continue;
 
@@ -405,8 +405,8 @@ fn readSkyFiles(allocator: Allocator, io: Io, constellation_dir_name: []const u8
     std.sort.insertion([]const u8, constellation_filenames.items, @as(u32, 0), string_sort);
 
     for (constellation_filenames.items) |basename| {
-        var sky_file = try constellation_dir.openFile(basename, .{});
-        defer sky_file.close();
+        var sky_file = try constellation_dir.openFile(io, basename, .{});
+        defer sky_file.close(io);
 
         var reader = sky_file.reader(io, &.{});
 
@@ -419,13 +419,11 @@ fn readSkyFiles(allocator: Allocator, io: Io, constellation_dir_name: []const u8
     return try sky_files.toOwnedSlice(allocator);
 }
 
-fn writeConstellationData(sky_files: []SkyFile, out_filename: []const u8) !void {
-    const cwd = fs.cwd();
+fn writeConstellationData(io: Io, sky_files: []SkyFile, out_filename: []const u8) !void {
+    var out_file = try Io.Dir.cwd().createFile(io, out_filename, .{});
+    defer out_file.close(io);
 
-    var out_file = try cwd.createFile(out_filename, .{});
-    defer out_file.close();
-
-    var writer = out_file.writer(&.{});
+    var writer = out_file.writer(io, &.{});
 
     var num_boundaries: u32 = 0;
     var num_asterisms: u32 = 0;
@@ -458,13 +456,11 @@ fn writeConstellationData(sky_files: []SkyFile, out_filename: []const u8) !void 
     try writer.interface.flush();
 }
 
-fn writeConstellationMetadata(sky_files: []SkyFile, filename: []const u8) !void {
-    const cwd = fs.cwd();
+fn writeConstellationMetadata(io: Io, sky_files: []SkyFile, filename: []const u8) !void {
+    var out_file = try Io.Dir.cwd().createFile(io, filename, .{});
+    defer out_file.close(io);
 
-    var out_file = try cwd.createFile(filename, .{});
-    defer out_file.close();
-
-    var writer = out_file.writer(&.{});
+    var writer = out_file.writer(io, &.{});
 
     try writer.interface.writeByte('[');
     for (sky_files, 0..) |sky_file, i| {

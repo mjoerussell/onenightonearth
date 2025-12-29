@@ -1,5 +1,6 @@
 const std = @import("std");
 const Build = std.Build;
+const Io = std.Io;
 
 const Options = struct {
     mode: std.builtin.OptimizeMode,
@@ -22,7 +23,7 @@ pub fn build(b: *Build) !void {
         .root_source_file = b.path("nightsky/root.zig"),
     });
 
-    try buildWeb(b, nightsky, options);
+    try buildWeb(b, b.graph.io, nightsky, options);
 
     const default_linux_target = try std.Target.Query.parse(.{ .arch_os_abi = "x86_64-linux" });
 
@@ -50,7 +51,7 @@ pub fn build(b: *Build) !void {
     run_step.dependOn(&run_cmd.step);
 }
 
-fn buildWeb(b: *Build, nightsky: *Build.Module, options: Options) !void {
+fn buildWeb(b: *Build, io: Io, nightsky: *Build.Module, options: Options) !void {
     var install_step = b.getInstallStep();
 
     const wasm_target = try std.Target.Query.parse(.{
@@ -95,7 +96,7 @@ fn buildWeb(b: *Build, nightsky: *Build.Module, options: Options) !void {
         },
     });
 
-    var node_run = try buildNode(b, options);
+    var node_run = try buildNode(b, io, options);
     // Install the artifact in dist
     const lib_install_artifact = b.addInstallArtifact(wasm_renderer, .{ .dest_dir = .{ .override = .{ .custom = "../dist" } } });
 
@@ -103,7 +104,7 @@ fn buildWeb(b: *Build, nightsky: *Build.Module, options: Options) !void {
     install_step.dependOn(&lib_install_artifact.step);
 }
 
-fn buildNode(b: *Build, options: Options) !*Build.Step.Run {
+fn buildNode(b: *Build, io: Io, options: Options) !*Build.Step.Run {
     var node_run = b.addSystemCommand(&.{"node"});
     node_run.addArg("esbuild.config.mjs");
 
@@ -111,10 +112,10 @@ fn buildNode(b: *Build, options: Options) !*Build.Step.Run {
         node_run.addArg("--prod");
     }
 
-    var dir = std.fs.cwd().openDir("node_modules", .{});
+    var dir = Io.Dir.cwd().openDir(io, "node_modules", .{});
 
     if (dir) |*d| {
-        d.close();
+        d.close(io);
     } else |err| switch (err) {
         error.FileNotFound => {
             // If node_modules does not exist, add a step to install the dependencies
